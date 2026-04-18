@@ -50,6 +50,8 @@ class Session:
     role: Role
     user_label: Optional[str]
     expires_at: float
+    # 個人アカウントログイン時のみ（グループ送信・一覧用）
+    staff_account_id: Optional[str] = None
 
 
 def _row_to_workspace(row: sqlite3.Row) -> Workspace:
@@ -176,6 +178,7 @@ class SessionStore:
         role: Role,
         user_label: Optional[str],
         ttl_seconds: int,
+        staff_account_id: Optional[str] = None,
     ) -> Session:
         raw = secrets.token_urlsafe(32)
         sess = Session(
@@ -184,6 +187,7 @@ class SessionStore:
             role=role,
             user_label=user_label,
             expires_at=time.time() + ttl_seconds,
+            staff_account_id=staff_account_id,
         )
         self._by_token[raw] = sess
         return sess

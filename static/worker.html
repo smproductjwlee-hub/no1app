@@ -74,7 +74,9 @@
 
     </p>
 
-    <a href="/login?role=worker" class="inline-flex w-full justify-center py-3 rounded-xl bg-indigo-900 text-white font-semibold text-sm shadow-md hover:bg-indigo-800 transition mb-4">ログイン画面へ</a>
+    <a id="gate-to-login" href="/login?role=worker" class="inline-flex w-full justify-center py-3 rounded-xl bg-indigo-900 text-white font-semibold text-sm shadow-md hover:bg-indigo-800 transition mb-4">ログイン画面へ</a>
+
+    <p id="gate-login-url-hint" class="text-[11px] text-gray-600 leading-relaxed mb-2"></p>
 
     <p class="text-gray-500 text-xs leading-relaxed">
 
@@ -83,6 +85,22 @@
     </p>
 
   </div>
+
+  <!-- メインの IIFE がトークンなしで return する前に、ログインURLを絶対パスで確定させる -->
+  <script>
+    (function () {
+      var url = location.origin + "/login?role=worker";
+      var link = document.getElementById("gate-to-login");
+      if (link) link.setAttribute("href", url);
+      var hint = document.getElementById("gate-login-url-hint");
+      if (hint) {
+        hint.innerHTML =
+          "ブラウザのURL欄に<strong>下の一行をそのまま</strong>貼り付けてください（<code class=\"bg-gray-100 px-0.5 rounded text-[10px]\">/worker</code> のまま <code class=\"bg-gray-100 px-0.5 rounded text-[10px]\">login</code> だけ入力すると <code class=\"bg-gray-100 px-0.5 rounded text-[10px]\">/worker/login</code> になり 404 になります）。<br /><code class=\"mt-1 inline-block bg-gray-100 px-2 py-1 rounded text-[11px] break-all\" id=\"gate-login-url-raw\"></code>";
+        var raw = document.getElementById("gate-login-url-raw");
+        if (raw) raw.textContent = url;
+      }
+    })();
+  </script>
 
 
 
@@ -935,6 +953,8 @@
 
 
 
+        var currentInstructionId = null;
+
         ws.onmessage = function (ev) {
 
           var data;
@@ -942,6 +962,9 @@
           try { data = JSON.parse(ev.data); } catch (e) { return; }
 
           if (data.type === "instruction" && typeof data.text === "string") {
+
+            currentInstructionId =
+              typeof data.instruction_id === "string" && data.instruction_id ? data.instruction_id : null;
 
             setInstruction(data.text);
 
@@ -955,7 +978,11 @@
 
           if (ws.readyState !== WebSocket.OPEN) return;
 
-          ws.send(JSON.stringify({ type: "worker_response", button: code }));
+          var payload = { type: "worker_response", button: code };
+
+          if (currentInstructionId) payload.instruction_id = currentInstructionId;
+
+          ws.send(JSON.stringify(payload));
 
         }
 

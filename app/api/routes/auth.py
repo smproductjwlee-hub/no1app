@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.core.config import Settings, get_settings
+from app.services.staff_accounts import staff_accounts
 from app.services.stores import (
     SUPER_WORKSPACE_ID,
     Role,
@@ -94,6 +95,8 @@ class PortalLoginRequest(BaseModel):
     username: str = Field("", max_length=200)
     password: str = Field(..., min_length=1, max_length=200)
     user_label: Optional[str] = Field(None, max_length=100)
+    # スタッフ個人アカウント（設定時）: 共有PWではなく DB の個人PWで検証
+    worker_account_login: Optional[str] = Field(None, max_length=100)
 
 
 class PortalLoginOut(BaseModel):
@@ -182,16 +185,40 @@ async def portal_login(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="username required",
         )
-    if body.password != settings.portal_worker_password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
-        )
     ws = _resolve_workspace(body.username)
     if ws is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workspace not found",
+        )
+    acc_login = (body.worker_account_login or "").strip()
+    if acc_login:
+        acc = staff_accounts.get_by_workspace_login(ws.id, acc_login)
+        if acc is None or not staff_accounts.verify_password(body.password, acc.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
+        label = (acc.display_name or "").strip() or acc.login_id
+        sess = sessions.create(
+            ws.id,
+            Role.WORKER,
+            label,
+            ttl_seconds=ttl,
+            staff_account_id=acc.id,
+        )
+        return PortalLoginOut(
+            access_token=sess.token,
+            role=sess.role,
+            workspace_id=ws.id,
+            workspace_name=ws.name,
+            worker_display_label=label,
+            expires_in_seconds=ttl,
+        )
+    if body.password != settings.portal_worker_password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials",
         )
     label = _normalize_worker_label(body.user_label)
     if label is None:

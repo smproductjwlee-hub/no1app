@@ -6,13 +6,36 @@
   <title>WorkBridge — ログイン</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body, button, input {
+    /* Tailwind CDN이 막혀도 레이아웃·hidden 이 동작하도록 (로그인 화면이 비어 보이는 현상 방지) */
+    .hidden {
+      display: none !important;
+    }
+    body,
+    button,
+    input {
       font-family: "Meiryo UI", "Meiryo", "MS PGothic", "Hiragino Kaku Gothic ProN", sans-serif;
+    }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(to bottom, #eef2ff, #f3f4f6);
+      color: #111827;
+    }
+    .login-shell {
+      max-width: 28rem;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 2.5rem 1rem;
     }
   </style>
 </head>
 <body class="min-h-screen bg-gradient-to-b from-indigo-50 to-gray-100 text-gray-900 antialiased">
-  <div class="max-w-md mx-auto px-4 py-10">
+  <noscript>
+    <p style="padding: 1rem; text-align: center; background: #fef2f2; color: #991b1b">
+      この画面を使うには JavaScript を有効にしてください。 / 이 화면을 쓰려면 브라우저에서 JavaScript를 켜 주세요.
+    </p>
+  </noscript>
+  <div class="max-w-md mx-auto px-4 py-10 login-shell">
     <p class="text-center text-[11px] font-semibold uppercase tracking-wide text-indigo-600">WorkBridge</p>
     <h1 class="text-center text-xl font-bold text-gray-900 mt-1 mb-8">ログイン</h1>
 
@@ -38,8 +61,19 @@
       </div>
       <label class="block text-xs text-gray-500">パスワード</label>
       <input type="password" id="password" autocomplete="current-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base" placeholder="" />
+      <div id="worker-account-wrap" class="hidden">
+        <label class="block text-xs text-gray-500">スタッフID（個人アカウントを登録した場合）</label>
+        <input
+          type="text"
+          id="worker-account-login"
+          autocomplete="username"
+          maxlength="100"
+          class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base"
+          placeholder="空欄＝共有パスワードで入る"
+        />
+      </div>
       <div id="worker-name-wrap" class="hidden">
-        <label class="block text-xs text-gray-500">表示名（任意）</label>
+        <label class="block text-xs text-gray-500">表示名（共有ログイン時・任意）</label>
         <input type="text" id="user-label" maxlength="100" class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base" placeholder="例：山田" />
       </div>
       <p id="login-err" class="text-sm text-rose-600 hidden"></p>
@@ -47,7 +81,8 @@
         ログイン
       </button>
       <p class="text-[11px] text-gray-500 leading-relaxed">
-        管理者: ワークスペース名 + 共有パスワード（初回は自動でワークスペース作成）。スタッフ: ワークスペースIDまたは同じ名前 + 共有パスワード。
+        管理者: ワークスペース名 + 共有パスワード（初回は自動でワークスペース作成）。スタッフ: ワークスペース
+        + 共有パスワード、または「スタッフID」を入れて個人パスワード（管理者がユーザー一覧で登録）。
       </p>
     </div>
   </div>
@@ -80,15 +115,18 @@
         if (r === "admin") {
           formTitle.textContent = "管理者としてログイン";
           username.placeholder = "ワークスペース名（例：渋谷店）";
+          document.getElementById("worker-account-wrap").classList.add("hidden");
           workerNameWrap.classList.add("hidden");
           usernameWrap.classList.remove("hidden");
         } else if (r === "super_admin") {
           formTitle.textContent = "総運営としてログイン";
+          document.getElementById("worker-account-wrap").classList.add("hidden");
           workerNameWrap.classList.add("hidden");
           usernameWrap.classList.add("hidden");
         } else {
           formTitle.textContent = "スタッフとしてログイン";
           username.placeholder = "ワークスペースID または 名前";
+          document.getElementById("worker-account-wrap").classList.remove("hidden");
           workerNameWrap.classList.remove("hidden");
           usernameWrap.classList.remove("hidden");
         }
@@ -134,6 +172,8 @@
           password: p,
         };
         if (role === "worker") {
+          var wal = (document.getElementById("worker-account-login").value || "").trim();
+          if (wal) body.worker_account_login = wal;
           var ul = (userLabel.value || "").trim();
           if (ul) body.user_label = ul;
         }
