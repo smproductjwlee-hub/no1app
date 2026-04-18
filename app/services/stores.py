@@ -32,6 +32,8 @@ class Workspace:
     company_name: str = ""
     branch_name: str = ""
     department_name: str = ""
+    # 管理者 UI 言語: ja en ko zh vi id（ブラウザ音声認識が弱い言語は除外）
+    admin_ui_locale: str = "ja"
 
 
 @dataclass
@@ -51,6 +53,10 @@ class Session:
 
 
 def _row_to_workspace(row: sqlite3.Row) -> Workspace:
+    keys = row.keys()
+    loc = "ja"
+    if "admin_ui_locale" in keys and row["admin_ui_locale"]:
+        loc = str(row["admin_ui_locale"]).strip() or "ja"
     return Workspace(
         id=row["id"],
         name=row["name"],
@@ -58,6 +64,7 @@ def _row_to_workspace(row: sqlite3.Row) -> Workspace:
         company_name=row["company_name"] or "",
         branch_name=row["branch_name"] or "",
         department_name=row["department_name"] or "",
+        admin_ui_locale=loc,
     )
 
 
@@ -68,8 +75,8 @@ class WorkspaceStore:
         now = time.time()
         conn.execute(
             """
-            INSERT INTO workspaces (id, name, created_at, company_name, branch_name, department_name)
-            VALUES (?, ?, ?, '', '', '')
+            INSERT INTO workspaces (id, name, created_at, company_name, branch_name, department_name, admin_ui_locale)
+            VALUES (?, ?, ?, '', '', '', 'ja')
             """,
             (ws_id, name, now),
         )
@@ -107,6 +114,7 @@ class WorkspaceStore:
         company_name: Optional[str] = None,
         branch_name: Optional[str] = None,
         department_name: Optional[str] = None,
+        admin_ui_locale: Optional[str] = None,
     ) -> Optional[Workspace]:
         conn = get_connection()
         row = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
@@ -123,6 +131,9 @@ class WorkspaceStore:
         if department_name is not None:
             sets.append("department_name = ?")
             vals.append(department_name.strip())
+        if admin_ui_locale is not None:
+            sets.append("admin_ui_locale = ?")
+            vals.append(admin_ui_locale.strip() or "ja")
         if sets:
             sql = "UPDATE workspaces SET " + ", ".join(sets) + " WHERE id = ?"
             vals.append(workspace_id)

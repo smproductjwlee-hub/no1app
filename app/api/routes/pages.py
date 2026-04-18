@@ -27,6 +27,15 @@ def _super_file() -> FileResponse:
     return FileResponse(_STATIC / "super.html")
 
 
+def _admin_i18n_js() -> FileResponse:
+    return FileResponse(_STATIC / "admin-i18n.js", media_type="application/javascript")
+
+
+@router.get("/static/admin-i18n.js")
+async def admin_i18n_js() -> FileResponse:
+    return _admin_i18n_js()
+
+
 @router.get("/super")
 async def super_selector_page() -> FileResponse:
     return _super_file()

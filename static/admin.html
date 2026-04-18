@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>WorkBridge — 管理者</title>
+  <script src="/static/admin-i18n.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     /* 관리자·직원 페이지 공통: 일본어 UI 폰트 (Meiryo UI 우선) */
@@ -37,41 +38,43 @@
     html:not(.admin-pc) .admin-pc-only {
       display: none;
     }
+    body.admin-locale-ko { font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+    body.admin-locale-zh { font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", sans-serif; }
+    body.admin-locale-vi,
+    body.admin-locale-id,
+    body.admin-locale-en { font-family: "Segoe UI", "Meiryo UI", sans-serif; }
   </style>
 </head>
-<body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+<body class="min-h-screen bg-gray-50 text-gray-900 antialiased admin-locale-ja">
   <div id="gate" class="max-w-md mx-auto px-5 py-12 hidden">
-    <h1 class="text-xl font-bold text-gray-900 mb-2">ログインが必要です</h1>
-    <p class="text-gray-600 text-sm leading-relaxed mb-4">
-      ログイン画面から管理者として入るか、<br />
-      <code class="bg-gray-100 px-1 rounded text-xs">/admin?token=…</code> で直接トークンを指定できます。
-    </p>
-    <a href="/login?role=admin" class="inline-flex w-full justify-center py-3 rounded-xl bg-indigo-900 text-white font-semibold text-sm shadow-md hover:bg-indigo-800 transition">ログイン画面へ</a>
+    <h1 class="text-xl font-bold text-gray-900 mb-2" data-i18n="gate_title">ログインが必要です</h1>
+    <p id="gate-p" class="text-gray-600 text-sm leading-relaxed mb-4" data-i18n="gate_html"></p>
+    <a href="/login?role=admin" class="inline-flex w-full justify-center py-3 rounded-xl bg-indigo-900 text-white font-semibold text-sm shadow-md hover:bg-indigo-800 transition" data-i18n="gate_link">ログイン画面へ</a>
   </div>
 
-  <div id="app" class="max-w-md mx-auto px-4 pb-12 pt-6 flex flex-col gap-5 min-h-screen hidden">
-    <div id="super-banner" class="hidden rounded-xl bg-slate-800 text-white text-sm px-4 py-3 border border-slate-600">
+  <div id="app" class="max-w-md mx-auto px-4 pb-24 pt-6 flex flex-col gap-5 min-h-screen hidden">
+    <div id="super-banner" class="hidden rounded-xl bg-slate-800 text-white text-sm px-4 py-3 border border-slate-600" data-i18n="super_banner">
       総運営として、この顧客の管理者画面を閲覧中です。ログアウトでワークスペース一覧に戻ります。
     </div>
     <header class="flex items-start justify-between gap-3">
       <div>
-        <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">WorkBridge</p>
-        <h1 class="text-xl font-bold text-gray-900">管理者</h1>
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-600" data-i18n="page_subtitle">WorkBridge</p>
+        <h1 class="text-xl font-bold text-gray-900" data-i18n="page_title">管理者</h1>
       </div>
       <div class="relative shrink-0">
         <button type="button" id="menu-btn" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50">
-          メニュー
+          <span data-i18n="menu">メニュー</span>
           <span class="text-gray-400 text-xs">▼</span>
         </button>
         <div id="menu-dropdown" class="hidden absolute right-0 mt-1 w-56 rounded-xl bg-white border border-gray-200 shadow-lg z-50 py-1 text-sm">
           <p id="menu-conn-status" class="px-3 py-2 text-[11px] text-gray-600 border-b border-gray-100">接続: …</p>
-          <button type="button" id="m-layout-pc" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800">PCレイアウト（広い画面）</button>
-          <button type="button" id="m-layout-mobile" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800">スマホレイアウト（狭い画面）</button>
-          <button type="button" id="m-qr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100">QRコード（参加用）</button>
-          <button type="button" id="m-words" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800">用語・単語登録</button>
-          <button type="button" id="m-users" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800">ユーザー一覧</button>
-          <button type="button" id="m-myinfo" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100">マイ情報</button>
-          <button type="button" id="m-logout" class="w-full text-left px-3 py-2.5 text-rose-600 hover:bg-rose-50 border-t border-gray-100">ログアウト</button>
+          <button type="button" id="m-layout-pc" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800" data-i18n="layout_pc">PCレイアウト（広い画面）</button>
+          <button type="button" id="m-layout-mobile" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800" data-i18n="layout_mobile">スマホレイアウト（狭い画面）</button>
+          <button type="button" id="m-qr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100" data-i18n="qr">QRコード（参加用）</button>
+          <button type="button" id="m-words" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="words">用語・単語登録</button>
+          <button type="button" id="m-users" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="users">ユーザー一覧</button>
+          <button type="button" id="m-myinfo" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100" data-i18n="myinfo">マイ情報</button>
+          <button type="button" id="m-logout" class="w-full text-left px-3 py-2.5 text-rose-600 hover:bg-rose-50 border-t border-gray-100" data-i18n="logout">ログアウト</button>
         </div>
       </div>
     </header>
@@ -79,69 +82,74 @@
     <div id="admin-main" class="flex flex-col gap-5">
     <div class="admin-col flex flex-col gap-5">
     <p class="text-center text-sm text-gray-600 leading-relaxed px-2">
-      マイクを押すか、下の欄に<br />現場スタッフへ伝えたい日本語を入力してください。
+      <span data-i18n="hint_1">上の欄に現場スタッフへ伝えたい日本語を入力してください。</span><br />
+      <span data-i18n="hint_2">送信直前のマイクで入力欄にフォーカスできます。</span>
     </p>
 
-    <div class="flex justify-center py-2">
-      <button type="button" id="mic-btn" class="relative flex h-28 w-28 items-center justify-center rounded-full bg-gray-900 text-white shadow-xl shadow-gray-900/25 ring-4 ring-white active:scale-95 transition">
-        <svg class="h-14 w-14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
-        </svg>
-        <span class="sr-only">入力欄にフォーカス</span>
-      </button>
-    </div>
-
     <section class="rounded-2xl bg-[#ebe4f8] border border-violet-100 px-4 py-4 shadow-sm">
-      <p class="text-[11px] font-semibold text-violet-900 mb-2">入力された日本語（現場の端末に送信）</p>
+      <p class="text-[11px] font-semibold text-violet-900 mb-2" data-i18n="section_input">入力された日本語（現場の端末に送信）</p>
       <label for="input" class="sr-only">指示テキスト</label>
       <textarea id="input" rows="5" class="ja-text w-full rounded-xl bg-white/90 border border-violet-200 p-3 text-base text-gray-900 placeholder:text-gray-400 resize-y focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 outline-none" placeholder="例：3番テーブルに料理が出たか確認して、4番と5番の片付けも見ておいて。"></textarea>
-      <p class="text-[10px] text-violet-800/80 mt-2">※ 翻訳API接続後、スタッフ側は選択言語で表示されます。</p>
+      <p class="text-[10px] text-violet-800/80 mt-2" data-i18n="input_note">※ 翻訳API接続後、スタッフ側は選択言語で表示されます。</p>
     </section>
 
     <section class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm">
-      <p class="text-[11px] font-semibold text-gray-800 mb-2">送信先</p>
+      <p class="text-[11px] font-semibold text-gray-800 mb-2" data-i18n="send_target">送信先</p>
       <div class="flex flex-wrap gap-4 text-sm">
         <label class="inline-flex items-center gap-2 cursor-pointer">
           <input type="radio" name="send-mode" value="all" checked class="text-indigo-900 focus:ring-indigo-500" />
-          <span>全員</span>
+          <span data-i18n="radio_all">全員</span>
         </label>
         <label class="inline-flex items-center gap-2 cursor-pointer">
           <input type="radio" name="send-mode" value="selected" class="text-indigo-900 focus:ring-indigo-500" />
-          <span>選択したスタッフのみ</span>
+          <span data-i18n="radio_sel">選択したスタッフのみ</span>
         </label>
       </div>
       <div id="worker-checkboxes" class="mt-3 space-y-2 text-sm hidden max-h-36 overflow-y-auto"></div>
       <p id="worker-target-hint" class="text-[10px] text-gray-500 mt-2 min-h-[1rem]"></p>
     </section>
 
-    <button type="button" id="send" disabled class="w-full py-4 rounded-2xl bg-indigo-900 hover:bg-indigo-800 disabled:opacity-40 disabled:pointer-events-none text-white font-semibold text-base shadow-md transition">
+    <div class="flex justify-center pt-1 pb-1">
+      <button type="button" id="mic-btn" class="relative flex h-28 w-28 items-center justify-center rounded-full bg-gray-900 text-white shadow-xl shadow-gray-900/25 ring-4 ring-white active:scale-95 transition">
+        <svg class="h-14 w-14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+        </svg>
+        <span class="sr-only" data-i18n="mic_sr">入力欄にフォーカス</span>
+      </button>
+    </div>
+
+    <div class="flex justify-center -mt-1 mb-1 px-1" aria-label="locale quick">
+      <div class="flex justify-center gap-1.5 flex-wrap max-w-full" id="admin-locale-buttons-micro"></div>
+    </div>
+
+    <button type="button" id="send" disabled class="w-full py-4 rounded-2xl bg-indigo-900 hover:bg-indigo-800 disabled:opacity-40 disabled:pointer-events-none text-white font-semibold text-base shadow-md transition" data-i18n="send_btn">
       スタッフに送信
     </button>
 
-    <p id="footer-hint" class="text-center text-[11px] text-gray-400">入力を待っています。</p>
+    <p id="footer-hint" class="text-center text-[11px] text-gray-400" data-i18n="footer_wait">入力を待っています。</p>
     </div>
 
     <div class="admin-col flex flex-col gap-5">
     <section class="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
       <div class="px-4 py-3 bg-[#ebe4f8] border-b border-violet-100">
-        <h2 class="text-sm font-semibold text-violet-950">作業者の応答</h2>
+        <h2 class="text-sm font-semibold text-violet-950" data-i18n="resp_title">作業者の応答</h2>
       </div>
       <ul id="responses" class="space-y-2 p-4 text-sm min-h-[5rem] max-h-52 overflow-y-auto bg-gray-50/80"></ul>
     </section>
 
     <details class="group rounded-2xl bg-white border border-gray-200 shadow-sm">
       <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-800 flex justify-between items-center">
-        <span>シナリオ・用語（Google シート）</span>
+        <span data-i18n="cur_summary">シナリオ・用語（Google シート）</span>
         <span class="text-gray-400 text-xs group-open:rotate-180 transition">▼</span>
       </summary>
       <div class="border-t border-gray-100 px-4 pb-4 pt-2 space-y-3">
-        <p class="text-xs text-gray-500">参照のみ · <code class="bg-gray-100 px-1 rounded">/api/v1/curriculum/…</code></p>
+        <p class="text-xs text-gray-500"><span data-i18n="cur_ref">参照のみ · </span><code class="bg-gray-100 px-1 rounded">/api/v1/curriculum/…</code></p>
         <div class="flex flex-wrap gap-2">
-          <button type="button" data-cur-key="kaigo" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">介護</button>
-          <button type="button" data-cur-key="food" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">外食</button>
-          <button type="button" data-cur-key="food-glossary" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">用語</button>
-          <button type="button" data-cur-key="course-list" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">コース一覧</button>
-          <button type="button" data-cur-key="extra" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">その他</button>
+          <button type="button" data-cur-key="kaigo" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_kaigo">介護</button>
+          <button type="button" data-cur-key="food" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_food">外食</button>
+          <button type="button" data-cur-key="food-glossary" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_glossary">用語</button>
+          <button type="button" data-cur-key="course-list" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_course">コース一覧</button>
+          <button type="button" data-cur-key="extra" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_extra">その他</button>
         </div>
         <input type="search" id="cur-search" class="w-full rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-sm" placeholder="検索…" autocomplete="off" />
         <p id="cur-status" class="text-xs text-gray-500 min-h-[1rem]"></p>
@@ -155,71 +163,93 @@
     </details>
 
     <section class="admin-pc-only rounded-2xl bg-white border border-indigo-100 shadow-sm p-4">
-      <h3 class="text-sm font-semibold text-indigo-950 mb-2">追加の管理者（PC）</h3>
-      <p class="text-xs text-gray-600 leading-relaxed mb-2">
+      <h3 class="text-sm font-semibold text-indigo-950 mb-2" data-i18n="pc_admin_title">追加の管理者（PC）</h3>
+      <p class="text-xs text-gray-600 leading-relaxed mb-2" data-i18n="pc_admin_p">
         同じワークスペース名でログイン画面から「管理者」として入ると、同じ現場に別の管理者セッションが追加されます。パスワードは顧客向け共有パスワードです。
       </p>
-      <h3 class="text-sm font-semibold text-indigo-950 mt-4 mb-2">用語・単語の登録（PC）</h3>
-      <p class="text-xs text-gray-600 leading-relaxed">
+      <h3 class="text-sm font-semibold text-indigo-950 mt-4 mb-2" data-i18n="pc_words_title">用語・単語の登録（PC）</h3>
+      <p class="text-xs text-gray-600 leading-relaxed" data-i18n="pc_words_p">
         Google スプレッドシート側でシートを編集してください。下の「シナリオ・用語」から API 経由の参照を確認できます。
       </p>
     </section>
     </div>
     </div>
+
+    <div
+      id="admin-locale-dock"
+      class="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200/80 bg-white/95 backdrop-blur-md shadow-[0_-4px_12px_rgba(0,0,0,0.06)]"
+    >
+      <div class="max-w-md mx-auto px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <p class="text-[10px] text-gray-500 text-center mb-1" data-i18n="locale_quick_caption">表示言語（タップで切替・自動保存）</p>
+        <div class="flex justify-center gap-1.5 flex-wrap" id="admin-locale-buttons-dock"></div>
+      </div>
+    </div>
   </div>
 
   <div id="modal-qr" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
     <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
-      <h3 class="font-semibold text-gray-900 mb-2">参加用 QR</h3>
+      <h3 class="font-semibold text-gray-900 mb-2" data-i18n="modal_qr_title">参加用 QR</h3>
       <img id="qr-img" alt="QR" class="mx-auto w-48 h-48 object-contain border rounded-lg bg-white" />
       <p class="text-[11px] text-gray-500 mt-2 break-all" id="qr-url-text"></p>
-      <p class="text-[10px] text-amber-900 bg-amber-50 rounded-lg px-2 py-2 mt-2 leading-relaxed border border-amber-100">
-        スマホで読み取る場合: <code class="bg-white/80 px-0.5 rounded">.env</code> の <code class="bg-white/80 px-0.5 rounded">PUBLIC_BASE_URL</code> を PC の LAN アドレス（例: <code class="bg-white/80 px-0.5 rounded">http://192.168.0.5:8000</code>）にし、サーバーを <code class="bg-white/80 px-0.5 rounded">--host 0.0.0.0</code> で起動してください。<code class="bg-white/80 px-0.5 rounded">127.0.0.1</code> はスマホ自身を指します。
+      <p id="modal-qr-tip" class="text-[10px] text-amber-900 bg-amber-50 rounded-lg px-2 py-2 mt-2 leading-relaxed border border-amber-100" data-i18n="modal_qr_tip">
+        スマホで読み取る場合: .env の PUBLIC_BASE_URL を PC の LAN アドレスにし、サーバーを --host 0.0.0.0 で起動してください。127.0.0.1 はスマホ自身を指します。
       </p>
-      <button type="button" id="modal-qr-close" class="mt-4 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800">閉じる</button>
+      <button type="button" id="modal-qr-close" class="mt-4 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800" data-i18n="modal_qr_close">閉じる</button>
     </div>
   </div>
   <div id="modal-words" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
     <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl text-sm text-gray-700">
-      <h3 class="font-semibold text-gray-900 mb-2">用語・単語登録</h3>
-      <p class="text-xs leading-relaxed mb-3">Google スプレッドシート連携のデータを API で参照しています。編集はスプレッドシート側で行い、サーバー設定のスプレッドシートIDを参照してください。</p>
+      <h3 class="font-semibold text-gray-900 mb-2" data-i18n="modal_words_title">用語・単語登録</h3>
+      <p class="text-xs leading-relaxed mb-3" data-i18n="modal_words_body">Google スプレッドシート連携のデータを API で参照しています。編集はスプレッドシート側で行い、サーバー設定のスプレッドシートIDを参照してください。</p>
       <p class="text-xs text-gray-500 mb-2">参照API: <code class="bg-gray-100 px-1 rounded text-[10px]">/api/v1/curriculum/food-glossary</code> など</p>
-      <button type="button" id="modal-words-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800">閉じる</button>
+      <button type="button" id="modal-words-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800" data-i18n="modal_words_close">閉じる</button>
     </div>
   </div>
   <div id="modal-users" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
     <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl max-h-[80vh] flex flex-col">
-      <h3 class="font-semibold text-gray-900 mb-2">接続中のスタッフ</h3>
+      <h3 class="font-semibold text-gray-900 mb-2" data-i18n="modal_users_title">接続中のスタッフ</h3>
       <ul id="modal-users-list" class="text-sm text-gray-800 overflow-y-auto flex-1 min-h-[4rem]"></ul>
-      <p id="modal-users-empty" class="text-xs text-gray-500 hidden">接続中のスタッフはいません。</p>
-      <button type="button" id="modal-users-close" class="mt-4 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800">閉じる</button>
+      <p id="modal-users-empty" class="text-xs text-gray-500 hidden" data-i18n="modal_users_empty">接続中のスタッフはいません。</p>
+      <button type="button" id="modal-users-close" class="mt-4 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800" data-i18n="modal_users_close">閉じる</button>
     </div>
   </div>
   <div id="modal-myinfo" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
     <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl text-sm text-gray-800">
-      <h3 class="font-semibold text-gray-900 mb-1">マイ情報</h3>
-      <p class="text-[11px] text-gray-500 mb-3">会社・店舗・部署は総運営のワークスペース一覧にも表示されます。</p>
+      <h3 class="font-semibold text-gray-900 mb-1" data-i18n="myinfo_title">マイ情報</h3>
+      <p class="text-[11px] text-gray-500 mb-3" data-i18n="myinfo_note">会社・店舗・部署は総運営のワークスペース一覧にも表示されます。</p>
       <div class="space-y-3">
         <div>
-          <label class="block text-[11px] font-medium text-gray-600 mb-1">ワークスペース名（ログインID）</label>
+          <label class="block text-[11px] font-medium text-gray-600 mb-1" data-i18n="myinfo_ws_label">ワークスペース名（ログインID）</label>
           <p id="myinfo-ws-name" class="text-sm text-gray-900 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">—</p>
         </div>
         <div>
-          <label for="myinfo-company" class="block text-[11px] font-medium text-gray-600 mb-1">会社名</label>
+          <label for="myinfo-admin-locale" class="block text-[11px] font-medium text-gray-600 mb-1" data-i18n="myinfo_locale_label">管理者画面の表示言語</label>
+          <select id="myinfo-admin-locale" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm bg-white">
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+            <option value="ko">한국어</option>
+            <option value="zh">中文（简体）</option>
+            <option value="vi">Tiếng Việt</option>
+            <option value="id">Bahasa Indonesia</option>
+          </select>
+          <p class="text-[10px] text-gray-500 mt-1 leading-snug" data-i18n="myinfo_locale_hint">メニュー・説明文の言語です（音声入力が使いやすい言語のみ）。</p>
+        </div>
+        <div>
+          <label for="myinfo-company" class="block text-[11px] font-medium text-gray-600 mb-1" data-i18n="myinfo_company">会社名</label>
           <input id="myinfo-company" type="text" maxlength="200" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="例：株式会社〇〇" autocomplete="organization" />
         </div>
         <div>
-          <label for="myinfo-branch" class="block text-[11px] font-medium text-gray-600 mb-1">店舗・拠点名</label>
+          <label for="myinfo-branch" class="block text-[11px] font-medium text-gray-600 mb-1" data-i18n="myinfo_branch">店舗・拠点名</label>
           <input id="myinfo-branch" type="text" maxlength="200" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="例：渋谷店" />
         </div>
         <div>
-          <label for="myinfo-dept" class="block text-[11px] font-medium text-gray-600 mb-1">部署名</label>
+          <label for="myinfo-dept" class="block text-[11px] font-medium text-gray-600 mb-1" data-i18n="myinfo_dept">部署名</label>
           <input id="myinfo-dept" type="text" maxlength="200" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="例：介護サービス部" />
         </div>
       </div>
       <p id="myinfo-status" class="text-xs mt-2 min-h-[1.25rem] text-emerald-700"></p>
-      <button type="button" id="myinfo-save" class="mt-2 w-full py-2.5 rounded-xl bg-indigo-900 text-white font-medium text-sm hover:bg-indigo-800">保存</button>
-      <button type="button" id="modal-myinfo-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800">閉じる</button>
+      <button type="button" id="myinfo-save" class="mt-2 w-full py-2.5 rounded-xl bg-indigo-900 text-white font-medium text-sm hover:bg-indigo-800" data-i18n="myinfo_save">保存</button>
+      <button type="button" id="modal-myinfo-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800" data-i18n="myinfo_close">閉じる</button>
     </div>
   </div>
 
@@ -247,6 +277,180 @@
       const workerTargetHint = document.getElementById("worker-target-hint");
       var selectedTokensSnapshot = {};
 
+      const ADMIN_I18N = window.__WB_ADMIN_I18N__ || {};
+      const ALLOWED_LOCALES = ["ja", "en", "ko", "zh", "vi", "id"];
+      var LOCALE_FLAGS = [
+        { code: "ja", flag: "🇯🇵", label: "日本語" },
+        { code: "en", flag: "🇺🇸", label: "English" },
+        { code: "ko", flag: "🇰🇷", label: "한국어" },
+        { code: "zh", flag: "🇨🇳", label: "中文" },
+        { code: "vi", flag: "🇻🇳", label: "Tiếng Việt" },
+        { code: "id", flag: "🇮🇩", label: "Bahasa Indonesia" },
+      ];
+      var adminLocale = "ja";
+      var lastConnKind = "checking";
+      var lastConnOk = false;
+      var footerState = { type: "wait" };
+
+      function normalizeLocale(x) {
+        if (x && ALLOWED_LOCALES.indexOf(x) !== -1) return x;
+        return "ja";
+      }
+
+      function t(key) {
+        var pack = ADMIN_I18N[adminLocale] || ADMIN_I18N.ja;
+        var v = pack && pack[key];
+        if (v !== undefined && v !== null) return v;
+        return ADMIN_I18N.ja[key] || key;
+      }
+
+      function applyFooter() {
+        var s = footerState;
+        if (s.type === "wait") footerHint.textContent = t("footer_wait");
+        else if (s.type === "connected") footerHint.textContent = t("footer_connected");
+        else if (s.type === "disconnected") footerHint.textContent = t("footer_disconnected");
+        else if (s.type === "sending") footerHint.textContent = t("footer_sending");
+        else if (s.type === "no_workers") footerHint.textContent = t("footer_no_workers");
+        else if (s.type === "no_match") footerHint.textContent = t("footer_no_match");
+        else if (s.type === "delivery_failed") footerHint.textContent = t("footer_fail");
+        else if (s.type === "sent")
+          footerHint.textContent =
+            (t("footer_sent_prefix") || "") + s.d + t("footer_sent_mid") + s.wo + t("footer_sent_end");
+        else if (s.type === "empty") footerHint.textContent = t("footer_empty");
+        else if (s.type === "send_no_target") footerHint.textContent = t("send_no_target");
+      }
+
+      function setFooterState(next) {
+        footerState = next;
+        applyFooter();
+      }
+
+      function syncLocaleQuickButtons() {
+        document.querySelectorAll(".locale-flag-btn").forEach(function (btn) {
+          var on = btn.getAttribute("data-locale") === adminLocale;
+          btn.classList.toggle("ring-2", on);
+          btn.classList.toggle("ring-indigo-600", on);
+          btn.classList.toggle("ring-offset-2", on);
+          btn.classList.toggle("bg-indigo-50", on);
+          btn.classList.toggle("border-indigo-200", on);
+          btn.setAttribute("aria-pressed", on ? "true" : "false");
+        });
+      }
+
+      function setupLocaleButtons(container) {
+        if (!container || container.dataset.bound) return;
+        container.dataset.bound = "1";
+        LOCALE_FLAGS.forEach(function (L) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className =
+            "locale-flag-btn text-2xl leading-none rounded-lg px-2 py-1.5 border border-transparent hover:bg-gray-100 active:scale-95 transition focus:outline-none focus:ring-2 focus:ring-indigo-400/60";
+          b.setAttribute("data-locale", L.code);
+          b.setAttribute("aria-label", L.label);
+          b.setAttribute("title", L.label);
+          b.textContent = L.flag;
+          b.addEventListener("click", function () {
+            onLocalePick(L.code);
+          });
+          container.appendChild(b);
+        });
+      }
+
+      function persistAdminLocaleQuiet(loc) {
+        var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+        if (!wid || !token) return;
+        var l = normalizeLocale(loc);
+        fetch(
+          "/api/v1/workspaces/" + encodeURIComponent(wid) + "/org?admin_token=" + encodeURIComponent(token),
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ admin_ui_locale: l }),
+          }
+        ).catch(function () {});
+      }
+
+      function onLocalePick(code) {
+        var loc = normalizeLocale(code);
+        applyAdminLocale(loc);
+        persistAdminLocaleQuiet(loc);
+      }
+
+      function applyAdminLocale(loc) {
+        adminLocale = normalizeLocale(loc);
+        try {
+          localStorage.setItem("wb_admin_ui_locale", adminLocale);
+        } catch (e) {}
+        document.body.classList.remove(
+          "admin-locale-ja",
+          "admin-locale-en",
+          "admin-locale-ko",
+          "admin-locale-zh",
+          "admin-locale-vi",
+          "admin-locale-id"
+        );
+        document.body.classList.add("admin-locale-" + adminLocale);
+        var langMap = { ja: "ja", en: "en", ko: "ko", zh: "zh-CN", vi: "vi", id: "id" };
+        document.documentElement.lang = langMap[adminLocale] || "ja";
+
+        document.title = t("doc_title");
+        document.querySelectorAll("[data-i18n]").forEach(function (el) {
+          var key = el.getAttribute("data-i18n");
+          if (!key) return;
+          var val = t(key);
+          if (key === "gate_html") el.innerHTML = val;
+          else el.textContent = val;
+        });
+        var inputEl = document.getElementById("input");
+        if (inputEl) inputEl.placeholder = t("input_placeholder");
+        var curSearchEl = document.getElementById("cur-search");
+        if (curSearchEl) curSearchEl.placeholder = t("cur_search_ph");
+        var mc = document.getElementById("myinfo-company");
+        if (mc) mc.placeholder = t("myinfo_ph_company");
+        var mb = document.getElementById("myinfo-branch");
+        if (mb) mb.placeholder = t("myinfo_ph_branch");
+        var md = document.getElementById("myinfo-dept");
+        if (md) md.placeholder = t("myinfo_ph_dept");
+        var mySel = document.getElementById("myinfo-admin-locale");
+        if (mySel) mySel.value = adminLocale;
+        syncLocaleQuickButtons();
+        setStatus(lastConnKind, lastConnOk);
+        applyFooter();
+      }
+
+      function loadOrgLocale() {
+        var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+        if (!wid || !token) return;
+        fetch(
+          "/api/v1/workspaces/" + encodeURIComponent(wid) + "/org?admin_token=" + encodeURIComponent(token)
+        )
+          .then(function (r) {
+            return r.ok ? r.json() : Promise.reject();
+          })
+          .then(function (j) {
+            if (j && j.admin_ui_locale) applyAdminLocale(j.admin_ui_locale);
+          })
+          .catch(function () {});
+      }
+
+      function setStatus(kind, ok) {
+        lastConnKind = kind;
+        lastConnOk = ok;
+        var map = {
+          checking: "status_checking",
+          ok: "status_ok",
+          off: "status_off",
+          err: "status_err",
+        };
+        var text = t(map[kind] || "status_checking");
+        connStatusEl.textContent = t("conn_prefix") + text;
+        connStatusEl.className =
+          "px-3 py-2 text-[11px] border-b border-gray-100 " +
+          (ok ? "text-emerald-800 bg-emerald-50/60" : "text-amber-900 bg-amber-50/60");
+      }
+
+      applyAdminLocale(localStorage.getItem("wb_admin_ui_locale") || "ja");
+
       if (!token) {
         gate.classList.remove("hidden");
         return;
@@ -254,6 +458,10 @@
 
       gate.classList.add("hidden");
       app.classList.remove("hidden");
+
+      setupLocaleButtons(document.getElementById("admin-locale-buttons-micro"));
+      setupLocaleButtons(document.getElementById("admin-locale-buttons-dock"));
+      syncLocaleQuickButtons();
 
       fetch("/api/v1/auth/session?token=" + encodeURIComponent(token))
         .then(function (r) {
@@ -264,6 +472,7 @@
             workspaceId = d.workspace_id;
             sessionStorage.setItem("wb_workspace_id", workspaceId);
           }
+          loadOrgLocale();
         })
         .catch(function () {});
 
@@ -275,14 +484,7 @@
       const wsUrl = wsProto + "//" + location.host + "/api/v1/ws?token=" + encodeURIComponent(token);
       const ws = new WebSocket(wsUrl);
 
-      setStatus("確認中…", false);
-
-      function setStatus(text, ok) {
-        connStatusEl.textContent = "接続: " + text;
-        connStatusEl.className =
-          "px-3 py-2 text-[11px] border-b border-gray-100 " +
-          (ok ? "text-emerald-800 bg-emerald-50/60" : "text-amber-900 bg-amber-50/60");
-      }
+      setStatus("checking", false);
 
       function refreshOnlineWorkers() {
         fetch("/api/v1/workspaces/online-workers?admin_token=" + encodeURIComponent(token))
@@ -294,7 +496,7 @@
             renderWorkerTargets(data.workers || []);
           })
           .catch(function () {
-            workerTargetHint.textContent = "オンライン一覧の取得に失敗しました（再接続後にお試しください）。";
+            workerTargetHint.textContent = t("conn_fail_online");
           });
       }
 
@@ -304,7 +506,7 @@
         if (!workers.length) {
           workerCheckboxes.innerHTML = "";
           workerCheckboxes.classList.add("hidden");
-          workerTargetHint.textContent = isSel ? "接続中のスタッフがいません。" : "";
+          workerTargetHint.textContent = isSel ? t("no_staff_online") : "";
           return;
         }
         var preserve = {};
@@ -329,7 +531,7 @@
           lab.appendChild(document.createTextNode(w.label));
           workerCheckboxes.appendChild(lab);
         });
-        workerTargetHint.textContent = isSel ? workers.length + "名が接続中です。" : "";
+        workerTargetHint.textContent = isSel ? workers.length + t("n_staff_suffix") : "";
       }
 
       document.querySelectorAll('input[name="send-mode"]').forEach(function (el) {
@@ -360,7 +562,7 @@
           menuDropdown.classList.add("hidden");
           var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
           if (!wid) {
-            alert("ワークスペースIDを取得できません。ログインし直してください。");
+            alert(t("alert_no_ws"));
             return;
           }
           document.getElementById("qr-img").src =
@@ -373,7 +575,7 @@
               document.getElementById("qr-url-text").textContent = j.join_url || "";
             })
             .catch(function () {
-              document.getElementById("qr-url-text").textContent = "リンク取得に失敗しました";
+              document.getElementById("qr-url-text").textContent = t("alert_qr_fail");
             });
           document.getElementById("modal-qr").classList.remove("hidden");
         });
@@ -428,7 +630,7 @@
           st.textContent = "";
           st.className = "text-xs mt-2 min-h-[1.25rem] text-emerald-700";
           if (!wid) {
-            alert("ワークスペースIDを取得できません。ログインし直してください。");
+            alert(t("alert_no_ws"));
             return;
           }
           fetch("/api/v1/workspaces/" + encodeURIComponent(wid) + "/org?admin_token=" + encodeURIComponent(token))
@@ -441,10 +643,12 @@
               document.getElementById("myinfo-company").value = j.company_name || "";
               document.getElementById("myinfo-branch").value = j.branch_name || "";
               document.getElementById("myinfo-dept").value = j.department_name || "";
+              var locSel = document.getElementById("myinfo-admin-locale");
+              if (locSel) locSel.value = normalizeLocale(j.admin_ui_locale || "ja");
               document.getElementById("modal-myinfo").classList.remove("hidden");
             })
             .catch(function () {
-              alert("マイ情報の読み込みに失敗しました。");
+              alert(t("alert_myinfo_fail"));
             });
         }
         document.getElementById("m-myinfo").addEventListener("click", function (e) {
@@ -459,12 +663,12 @@
           var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
           var st = document.getElementById("myinfo-status");
           if (!wid) {
-            st.textContent = "ワークスペースIDを取得できません。";
+            st.textContent = t("save_err_ws");
             st.className = "text-xs mt-2 min-h-[1.25rem] text-rose-600";
             return;
           }
           st.className = "text-xs mt-2 min-h-[1.25rem] text-emerald-700";
-          st.textContent = "保存中…";
+          st.textContent = t("save_saving");
           fetch("/api/v1/workspaces/" + encodeURIComponent(wid) + "/org?admin_token=" + encodeURIComponent(token), {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -472,17 +676,19 @@
               company_name: document.getElementById("myinfo-company").value,
               branch_name: document.getElementById("myinfo-branch").value,
               department_name: document.getElementById("myinfo-dept").value,
+              admin_ui_locale: normalizeLocale(document.getElementById("myinfo-admin-locale").value),
             }),
           })
             .then(function (r) {
               if (!r.ok) throw new Error(String(r.status));
               return r.json();
             })
-            .then(function () {
-              st.textContent = "保存しました。";
+            .then(function (j) {
+              st.textContent = t("save_ok");
+              if (j && j.admin_ui_locale) applyAdminLocale(j.admin_ui_locale);
             })
             .catch(function () {
-              st.textContent = "保存に失敗しました。";
+              st.textContent = t("save_fail");
               st.className = "text-xs mt-2 min-h-[1.25rem] text-rose-600";
             });
         });
@@ -515,21 +721,21 @@
       })();
 
       ws.onopen = function () {
-        setStatus("済み", true);
+        setStatus("ok", true);
         sendBtn.disabled = false;
-        footerHint.textContent = "接続済み · 指示を入力して送信できます。";
+        setFooterState({ type: "connected" });
         refreshOnlineWorkers();
         setInterval(refreshOnlineWorkers, 4000);
       };
 
       ws.onclose = function () {
-        setStatus("切断されました", false);
+        setStatus("off", false);
         sendBtn.disabled = true;
-        footerHint.textContent = "切断されました。";
+        setFooterState({ type: "disconnected" });
       };
 
       ws.onerror = function () {
-        setStatus("エラー", false);
+        setStatus("err", false);
       };
 
       ws.onmessage = function (ev) {
@@ -544,31 +750,24 @@
           var wo = Number(data.workers_online || 0);
           var w = data.warning;
           if (w === "no_workers_online") {
-            footerHint.textContent =
-              "送信しましたが、接続中のスタッフがいません（同じワークスペースで worker を開いていますか？）。";
+            setFooterState({ type: "no_workers" });
           } else if (w === "no_matching_recipients") {
-            footerHint.textContent =
-              "送信先スタッフに届きませんでした。一覧を更新し、選択または「全員」を確認してください。";
+            setFooterState({ type: "no_match" });
           } else if (w === "delivery_failed") {
-            footerHint.textContent = "送信に失敗しました。再接続してください。";
+            setFooterState({ type: "delivery_failed" });
           } else if (d > 0) {
-            footerHint.textContent =
-              "スタッフ " +
-              d +
-              " 端末に送信しました。（接続中のスタッフ数: " +
-              wo +
-              "）";
+            setFooterState({ type: "sent", d: d, wo: wo });
           } else {
-            footerHint.textContent = "処理しましたが、届いた端末はありませんでした。";
+            setFooterState({ type: "empty" });
           }
           return;
         }
         if (data.type === "worker_response" && data.button) {
           const labels = {
-            OK: "わかりました（OK）",
-            REPEAT: "もういちど（Repeat）",
-            NG: "わからない（NG）",
-            CUSTOM: "自分で答える（CUSTOM）",
+            OK: t("resp_ok"),
+            REPEAT: t("resp_repeat"),
+            NG: t("resp_ng"),
+            CUSTOM: t("resp_custom"),
           };
           const colors = {
             OK: "border-l-4 border-l-emerald-500 bg-emerald-50/80",
@@ -589,7 +788,7 @@
         if (!text || ws.readyState !== WebSocket.OPEN) return;
         var modeEl = document.querySelector('input[name="send-mode"]:checked');
         var mode = modeEl ? modeEl.value : "all";
-        footerHint.textContent = "送信中…";
+        setFooterState({ type: "sending" });
         if (mode === "selected") {
           var boxes = workerCheckboxes.querySelectorAll('input[type="checkbox"]:checked');
           var target_tokens = [];
@@ -597,7 +796,7 @@
             target_tokens.push(cb.value);
           });
           if (!target_tokens.length) {
-            footerHint.textContent = "送信先にチェックを入れるか、「全員」に切り替えてください。";
+            setFooterState({ type: "send_no_target" });
             return;
           }
           ws.send(JSON.stringify({ type: "instruction", text: text, target_tokens: target_tokens }));
@@ -680,14 +879,16 @@
           return JSON.stringify(row).toLowerCase().indexOf(q) !== -1;
         });
         renderCurriculumTable(filtered);
-        curStatus.textContent = curRows.length ? "表示 " + filtered.length + " / " + curRows.length + " 行" : "";
+        curStatus.textContent = curRows.length
+          ? t("cur_show") + filtered.length + " / " + curRows.length + t("cur_rows")
+          : "";
       }
 
       function loadCurriculum(key) {
         var url = curEndpoints[key];
         if (!url) return;
         setCurTabActive(key);
-        curStatus.textContent = "読み込み中…";
+        curStatus.textContent = t("cur_loading");
         curTableWrap.classList.add("hidden");
         curRows = [];
         fetch(url)
@@ -698,12 +899,12 @@
           .then(function (data) {
             curRows = data.rows || [];
             curStatus.textContent =
-              data.row_count != null ? data.row_count + " 行" : curRows.length + " 行";
+              (data.row_count != null ? data.row_count : curRows.length) + t("cur_rows");
             renderCurriculumTable(curRows);
             applyCurSearch();
           })
           .catch(function (err) {
-            curStatus.textContent = "読み込み失敗: " + err.message;
+            curStatus.textContent = t("cur_fail") + err.message;
             curThead.innerHTML = "";
             curTbody.innerHTML = "";
           });

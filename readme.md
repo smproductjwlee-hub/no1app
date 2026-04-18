@@ -1,4 +1,4 @@
-# WorkBridge Japan — 프로젝트 정의서 (v1.4)
+# WorkBridge Japan — 프로젝트 정의서 (v1.5)
 
 일본 현장 외국인 근로자 실시간 소통 및 일본어 학습 통합 플랫폼
 
@@ -39,6 +39,11 @@
 6. **総運営スーパー管理者（運営会社）:** `portal-login` 의 `role: super_admin` + `super_admin_password`(기본 `superadmin`, `.env`의 `SUPER_ADMIN_PASSWORD`). `GET /api/v1/workspaces?super_token=…` 로 전체 워크스페이스 목록, `POST /api/v1/auth/super-assume` 로 선택 워크스페이스의 **관리자 토큰 발급** 후 `/admin` 과 동일 UI. WebSocket 은 슈퍼 토큰으로 연결 불가(반드시 assume 후 관리자 토큰 사용). `/super` 페이지에서 목록·선택.
 7. **管理者 UI レイアウト:** メニューで **PCレイアウト**（広い2カラム・用語/追加管理者の説明パネル）と **スマホレイアウト**（従来の狭幅）を切替。`localStorage` 키 `wb_admin_layout`.
 8. **현장별 전용 사전:** 3계층 사전(Global / Industry / Site-specific) 적용 및 구글 스프레드시트 연동.
+9. **관리자 화면 UI 언어 (`admin_ui_locale`):** 워크스페이스마다 관리자 메뉴·안내·입력 힌트 등의 표시 언어를 저장한다. SQLite `workspaces` 테이블 컬럼 `admin_ui_locale`(기본 `ja`). **허용 코드:** `ja`, `en`, `ko`, `zh`, `vi`, `id` — 브라우저 음성 입력(Web Speech)이 실용적인 언어만 포함(미얀마어 등 제외).
+   - **API:** `GET` / `PATCH /api/v1/workspaces/{workspace_id}/org` 요청·응답 본문에 `admin_ui_locale` 포함. `PATCH` 시 다른 조직 필드와 함께 또는 `admin_ui_locale`만 보내도 된다.
+   - **프론트:** `static/admin-i18n.js`가 `window.__WB_ADMIN_I18N__`로 6개 로케일 문자열을 제공하고, `GET /static/admin-i18n.js`로 배포된다. `static/admin.html`은 `data-i18n`과 `applyAdminLocale()`으로 즉시 반영한다. 로그인 전 게이트 화면은 `localStorage` 키 `wb_admin_ui_locale`으로 언어를 맞춘다.
+   - **切替 UI:** **メニュー → マイ情報**에서 `<select>`로 저장하거나, **마이크 버튼 아래**와 **화면 하단 고정 바**의 6개 국기 버튼을 눌러 즉시 전환한다(화면 갱신 + `wb_admin_ui_locale` 동기화 + `PATCH`로 서버 저장).
+10. **근로자 쪽 번역·やさしい日本語 (API):** `POST /api/v1/i18n/translate`(일본어 원문 → 대상 언어), `POST /api/v1/i18n/easy-japanese`(쉬운 일본어 변환) 등 — 근로자 세션(`worker`)에서 사용. 서비스 모듈: `google_translate`, `easy_japanese`(GCP/설정은 `.env`·`google_key.json` 등, 저장소에는 비밀키 미포함).
 
 ### 3.2 학습 및 게임화
 1. **스마트 플래시카드:** TTS 발음 재생 지원 및 업종별 커리큘럼(1차: 개호, 2차: 음식업).
@@ -50,7 +55,7 @@
 
 - **Backend:** Python (FastAPI), WebSockets
 - **Frontend:** PWA (HTML/JS/Tailwind CSS)
-- **Database:** PostgreSQL (SQLAlchemy ORM), Google Sheets API
+- **Database:** SQLite (`sqlite3`, MVP — `data/workbridge.db`, §6.2), Google Sheets API. 향후 PostgreSQL(SQLAlchemy) 전환 검토.
 - **AI/ML:** OpenAI Whisper (STT), DeepL/Google Translate (번역), Google TTS
 - **Environment:** Windows 10 x64, Python 3.9 (32bit)
 
@@ -58,7 +63,7 @@
 
 ## 5. 개발 로드맵
 
-1. **Phase 1 (MVP):** WebSocket·QR/조인·포털·슈퍼관리자(목록·`super-assume`)·`GET /auth/session`·관리자 PC/모바일 레이아웃·메뉴(QR·用語·ユーザー)·전원/개별 지시·`online-workers`·근로자 표시명.
+1. **Phase 1 (MVP):** WebSocket·QR/조인·포털·슈퍼관리자(목록·`super-assume`)·`GET /auth/session`·관리자 PC/모바일 레이아웃·메뉴(QR·用語·ユーザー)·전원/개별 지시·`online-workers`·근로자 표시명·**관리자 UI 6개국어(`admin_ui_locale`, `admin-i18n.js`, マイ情報·국기 퀵 전환)**·근로자용 i18n 번역/easy-ja API.
 2. **Phase 2 (LMS):** 개호 분야 학습 콘텐츠 연동 및 기초 게임화.
 3. **Phase 3 (고도화):** B2B 리포트 기능, giftee API 연동, PWA 최적화.
 

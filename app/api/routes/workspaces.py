@@ -4,6 +4,9 @@ import io
 from typing import Optional
 
 import qrcode
+
+# 管理者 UI 言語（Chrome 等の Web Speech API で実用しやすいもののみ）
+ALLOWED_ADMIN_UI_LOCALES = frozenset({"ja", "en", "ko", "zh", "vi", "id"})
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 
@@ -54,12 +57,14 @@ class WorkspaceOrgOut(BaseModel):
     company_name: str
     branch_name: str
     department_name: str
+    admin_ui_locale: str = "ja"
 
 
 class WorkspaceOrgPatch(BaseModel):
     company_name: Optional[str] = Field(None, max_length=200)
     branch_name: Optional[str] = Field(None, max_length=200)
     department_name: Optional[str] = Field(None, max_length=200)
+    admin_ui_locale: Optional[str] = Field(None, max_length=5)
 
 
 def _require_admin_for_workspace(admin_token: str, workspace_id: str) -> None:
@@ -97,12 +102,16 @@ async def get_workspace_org(
     ws = workspaces.get(workspace_id)
     if ws is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    loc = (ws.admin_ui_locale or "ja").strip()
+    if loc not in ALLOWED_ADMIN_UI_LOCALES:
+        loc = "ja"
     return WorkspaceOrgOut(
         workspace_id=ws.id,
         name=ws.name,
         company_name=ws.company_name or "",
         branch_name=ws.branch_name or "",
         department_name=ws.department_name or "",
+        admin_ui_locale=loc,
     )
 
 
@@ -113,20 +122,32 @@ async def patch_workspace_org(
     admin_token: str = Query(..., description="管理者セッショントークン"),
 ) -> WorkspaceOrgOut:
     _require_admin_for_workspace(admin_token, workspace_id)
+    if body.admin_ui_locale is not None:
+        al = body.admin_ui_locale.strip()
+        if al and al not in ALLOWED_ADMIN_UI_LOCALES:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="invalid admin_ui_locale",
+            )
     ws = workspaces.update_org(
         workspace_id,
         company_name=body.company_name,
         branch_name=body.branch_name,
         department_name=body.department_name,
+        admin_ui_locale=body.admin_ui_locale,
     )
     if ws is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    loc = (ws.admin_ui_locale or "ja").strip()
+    if loc not in ALLOWED_ADMIN_UI_LOCALES:
+        loc = "ja"
     return WorkspaceOrgOut(
         workspace_id=ws.id,
         name=ws.name,
         company_name=ws.company_name or "",
         branch_name=ws.branch_name or "",
         department_name=ws.department_name or "",
+        admin_ui_locale=loc,
     )
 
 

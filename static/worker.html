@@ -151,11 +151,11 @@
 
 
 
-    <!-- やさしい日本語（将来用） -->
+    <!-- やさしい日本語：分野・매장 용어 시트 기반 치환 -->
 
     <section class="rounded-2xl bg-white px-4 py-3 border border-gray-100 shadow-sm">
 
-      <p class="text-[11px] font-semibold text-gray-500 mb-1">やさしい日本語（準備中）</p>
+      <p class="text-[11px] font-semibold text-gray-500 mb-1">やさしい日本語（用語シート）</p>
 
       <p id="text-easy" class="ja-text text-sm text-gray-600 whitespace-pre-wrap break-words">—</p>
 
@@ -163,7 +163,7 @@
 
 
 
-    <!-- メイン：選択言語での表示エリア（翻訳API前は日本語と同じ） -->
+    <!-- メイン：既定は日本語。英語・VI などのタブを押したときだけ翻訳 -->
 
     <section class="rounded-2xl bg-white px-5 py-5 border-2 border-indigo-100 shadow-md min-h-[11rem] flex flex-col justify-center">
 
@@ -177,7 +177,7 @@
 
       <p id="translation-note" class="text-[11px] text-amber-800 mt-4 leading-relaxed bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
 
-        번역 서버 연결 후, 위 언어로 번역문이 표시됩니다. 지금은 관리자가 보낸 일본어와 동일하게 보입니다.
+        既定は日本語（管理員の原文）です。英語・ベトナム語・インドネシア語などのタブを押すと、そのときだけ翻訳が表示されます。
 
       </p>
 
@@ -353,17 +353,17 @@
 
       var NOTES = {
 
-        vi: "번역 서버 연결 후 베트남어로 표시됩니다. 지금은 일본어 원문과 같습니다.",
+        ja: "日本語：管理員が送った原文をそのまま表示しています。",
 
-        en: "영어 번역은 API 연결 후 표시됩니다. 지금은 일본어 원문과 같습니다.",
+        en: "English: shown after you tap this tab (translation API).",
 
-        id: "인도네시아어 번역은 API 연결 후 표시됩니다. 지금은 일본어 원문과 같습니다.",
+        vi: "Tiếng Việt: hiển thị sau khi chọn tab (API dịch).",
 
-        my: "미얀마어 번역은 API 연결 후 표시됩니다. 지금은 일본어 원문과 같습니다.",
+        id: "Bahasa Indonesia: ditampilkan setelah mengetuk tab (API terjemahan).",
 
-        ne: "네팔어 번역은 API 연결 후 표시됩니다. 지금은 일본어 원문과 같습니다.",
+        my: "မြန်မာ: ဤတဘ်ကို နှိပ်ပြီးမှ ပြပါသည်။",
 
-        ja: "日本語のみ表示しています。"
+        ne: "नेपाली: यो ट्याब छोएपछि देखाइन्छ।"
 
       };
 
@@ -424,6 +424,8 @@
       var lastInstruction = "";
 
       var localeTargets = [];
+
+      var translationCache = {};
 
 
 
@@ -575,13 +577,131 @@
 
         if (!lastInstruction) {
 
-          textTranslated.textContent = WAITING[activeLocale] || WAITING.en;
+          textTranslated.textContent = WAITING[activeLocale] || WAITING.ja;
 
           return;
 
         }
 
-        textTranslated.textContent = lastInstruction;
+        if (activeLocale === "ja") {
+
+          textTranslated.textContent = lastInstruction;
+
+          return;
+
+        }
+
+        var key = lastInstruction + "\0" + activeLocale;
+
+        if (translationCache[key]) {
+
+          textTranslated.textContent = translationCache[key];
+
+          return;
+
+        }
+
+        textTranslated.textContent = "翻訳を読み込み中…";
+
+        var tok = sessionStorage.getItem("wb_worker_token");
+
+        if (!tok) {
+
+          textTranslated.textContent = lastInstruction;
+
+          return;
+
+        }
+
+        var loc = activeLocale;
+
+        fetch("/api/v1/i18n/translate?token=" + encodeURIComponent(tok), {
+
+          method: "POST",
+
+          headers: { "Content-Type": "application/json" },
+
+          body: JSON.stringify({ text: lastInstruction, target_locale: loc })
+
+        })
+
+          .then(function (r) {
+
+            if (!r.ok) throw new Error(String(r.status));
+
+            return r.json();
+
+          })
+
+          .then(function (j) {
+
+            var out = j && j.translated_text ? j.translated_text : lastInstruction;
+
+            translationCache[lastInstruction + "\0" + loc] = out;
+
+            if (activeLocale === loc) {
+
+              textTranslated.textContent = out;
+
+            }
+
+          })
+
+          .catch(function () {
+
+            if (activeLocale === loc) {
+
+              textTranslated.textContent = lastInstruction;
+
+            }
+
+          });
+
+      }
+
+
+
+      function fetchEasyJa(text) {
+
+        var tok = sessionStorage.getItem("wb_worker_token");
+
+        if (!tok || !text) {
+
+          textEasy.textContent = "—";
+
+          return;
+
+        }
+
+        fetch("/api/v1/i18n/easy-ja?token=" + encodeURIComponent(tok), {
+
+          method: "POST",
+
+          headers: { "Content-Type": "application/json" },
+
+          body: JSON.stringify({ text: text })
+
+        })
+
+          .then(function (r) {
+
+            if (!r.ok) throw new Error(String(r.status));
+
+            return r.json();
+
+          })
+
+          .then(function (j) {
+
+            textEasy.textContent = j && j.easy_ja ? j.easy_ja : text;
+
+          })
+
+          .catch(function () {
+
+            textEasy.textContent = text;
+
+          });
 
       }
 
@@ -593,11 +713,31 @@
 
         textOriginal.textContent = text;
 
-        textEasy.textContent = "（やさしい日本語は後から表示できます）";
+        textEasy.textContent = "読み込み中…";
+
+        translationCache = {};
 
         footerHint.textContent = "最新の指示を表示しています。";
 
-        refreshTranslatedPane();
+        try {
+
+          localStorage.setItem(STORAGE_LOCALE, "ja");
+
+        } catch (e) {}
+
+        activeLocale = "ja";
+
+        if (langRow && langRow.querySelectorAll("[data-locale]").length) {
+
+          applyLocale("ja");
+
+        } else {
+
+          refreshTranslatedPane();
+
+        }
+
+        fetchEasyJa(text);
 
       }
 
@@ -612,6 +752,12 @@
         var saved = "";
 
         try { saved = localStorage.getItem(STORAGE_LOCALE) || ""; } catch (e) {}
+
+        if (lastInstruction) {
+
+          saved = "ja";
+
+        }
 
         var first = (targets && targets[0] && targets[0].locale) || "ja";
 

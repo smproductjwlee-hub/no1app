@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     # 세 번째 시트(구 엑셀 업로드 → 새 Google 시트로 재작성 한 문서, gid=0 탭)
     extra_spreadsheet_id: str = "1sTgBJHhojdAmINcR7NpT6Veymj4YuFGXtCMlCxsWRF4"
     extra_sheet_gid: int = 0
+    # 매장·현장별 용어(やさしい日本語 치환) — 비우면 food-glossary·extra 만 사용
+    site_glossary_spreadsheet_id: str = ""
+    site_glossary_sheet_gid: int = 0
+    site_glossary_header_row: int = 1
+    # 용어 시트 메모리 캐시 TTL (초)
+    glossary_cache_ttl_seconds: int = 300
     # Row number (1-based) that contains column headers
     kaigo_header_row: int = 5
     food_header_row: int = 4

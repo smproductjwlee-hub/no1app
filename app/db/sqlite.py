@@ -46,6 +46,12 @@ def init_db() -> None:
             )
             """
         )
+        cur = conn.execute("PRAGMA table_info(workspaces)")
+        existing = {row[1] for row in cur.fetchall()}
+        if "admin_ui_locale" not in existing:
+            conn.execute(
+                "ALTER TABLE workspaces ADD COLUMN admin_ui_locale TEXT NOT NULL DEFAULT 'ja'"
+            )
         conn.commit()
     finally:
         conn.close()
