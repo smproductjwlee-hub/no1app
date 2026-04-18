@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+pandas
+openpyxl
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+google-api-python-client
+google-auth
+pydantic-settings

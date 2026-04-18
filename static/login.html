@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WorkBridge — ログイン</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body, button, input {
+      font-family: "Meiryo UI", "Meiryo", "MS PGothic", "Hiragino Kaku Gothic ProN", sans-serif;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-b from-indigo-50 to-gray-100 text-gray-900 antialiased">
+  <div class="max-w-md mx-auto px-4 py-10">
+    <p class="text-center text-[11px] font-semibold uppercase tracking-wide text-indigo-600">WorkBridge</p>
+    <h1 class="text-center text-xl font-bold text-gray-900 mt-1 mb-8">ログイン</h1>
+
+    <div id="step-role" class="space-y-4">
+      <p class="text-sm text-gray-600 text-center">利用する画面を選んでください</p>
+      <button type="button" id="pick-admin" class="w-full py-4 rounded-2xl bg-indigo-900 text-white font-semibold shadow-md hover:bg-indigo-800 transition">
+        管理者（顧客）
+      </button>
+      <button type="button" id="pick-worker" class="w-full py-4 rounded-2xl bg-white border-2 border-indigo-200 text-indigo-950 font-semibold shadow-sm hover:bg-indigo-50 transition">
+        現場スタッフ
+      </button>
+      <button type="button" id="pick-super" class="w-full py-3 rounded-2xl bg-slate-800 text-white text-sm font-semibold shadow-sm hover:bg-slate-700 transition border border-slate-600">
+        総運営（運営会社）
+      </button>
+    </div>
+
+    <div id="step-form" class="hidden space-y-4 mt-2">
+      <button type="button" id="back-role" class="text-sm text-indigo-700 underline underline-offset-2">← 戻る</button>
+      <p id="form-title" class="text-sm font-semibold text-gray-800"></p>
+      <div id="username-wrap">
+        <label class="block text-xs text-gray-500">ログインID / ワークスペース</label>
+        <input type="text" id="username" autocomplete="username" class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base" placeholder="" />
+      </div>
+      <label class="block text-xs text-gray-500">パスワード</label>
+      <input type="password" id="password" autocomplete="current-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base" placeholder="" />
+      <div id="worker-name-wrap" class="hidden">
+        <label class="block text-xs text-gray-500">表示名（任意）</label>
+        <input type="text" id="user-label" maxlength="100" class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base" placeholder="例：山田" />
+      </div>
+      <p id="login-err" class="text-sm text-rose-600 hidden"></p>
+      <button type="button" id="btn-login" class="w-full py-4 rounded-2xl bg-indigo-900 text-white font-semibold shadow-md hover:bg-indigo-800 transition">
+        ログイン
+      </button>
+      <p class="text-[11px] text-gray-500 leading-relaxed">
+        管理者: ワークスペース名 + 共有パスワード（初回は自動でワークスペース作成）。スタッフ: ワークスペースIDまたは同じ名前 + 共有パスワード。
+      </p>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var role = "";
+      var params = new URLSearchParams(location.search);
+      var preset = params.get("role");
+      var stepRole = document.getElementById("step-role");
+      var stepForm = document.getElementById("step-form");
+      var pickAdmin = document.getElementById("pick-admin");
+      var pickWorker = document.getElementById("pick-worker");
+      var pickSuper = document.getElementById("pick-super");
+      var usernameWrap = document.getElementById("username-wrap");
+      var backRole = document.getElementById("back-role");
+      var formTitle = document.getElementById("form-title");
+      var username = document.getElementById("username");
+      var password = document.getElementById("password");
+      var userLabel = document.getElementById("user-label");
+      var workerNameWrap = document.getElementById("worker-name-wrap");
+      var btnLogin = document.getElementById("btn-login");
+      var loginErr = document.getElementById("login-err");
+
+      function showForm(r) {
+        role = r;
+        stepRole.classList.add("hidden");
+        stepForm.classList.remove("hidden");
+        loginErr.classList.add("hidden");
+        if (r === "admin") {
+          formTitle.textContent = "管理者としてログイン";
+          username.placeholder = "ワークスペース名（例：渋谷店）";
+          workerNameWrap.classList.add("hidden");
+          usernameWrap.classList.remove("hidden");
+        } else if (r === "super_admin") {
+          formTitle.textContent = "総運営としてログイン";
+          workerNameWrap.classList.add("hidden");
+          usernameWrap.classList.add("hidden");
+        } else {
+          formTitle.textContent = "スタッフとしてログイン";
+          username.placeholder = "ワークスペースID または 名前";
+          workerNameWrap.classList.remove("hidden");
+          usernameWrap.classList.remove("hidden");
+        }
+      }
+
+      pickAdmin.addEventListener("click", function () {
+        showForm("admin");
+      });
+      pickWorker.addEventListener("click", function () {
+        showForm("worker");
+      });
+      pickSuper.addEventListener("click", function () {
+        showForm("super_admin");
+      });
+      backRole.addEventListener("click", function () {
+        stepForm.classList.add("hidden");
+        stepRole.classList.remove("hidden");
+        role = "";
+      });
+
+      if (preset === "admin") showForm("admin");
+      if (preset === "worker") showForm("worker");
+      if (preset === "super_admin") showForm("super_admin");
+
+      btnLogin.addEventListener("click", function () {
+        loginErr.classList.add("hidden");
+        var u = (username.value || "").trim();
+        var p = password.value || "";
+        if (role === "super_admin") {
+          if (!p) {
+            loginErr.textContent = "パスワードを入力してください。";
+            loginErr.classList.remove("hidden");
+            return;
+          }
+        } else if (!u || !p) {
+          loginErr.textContent = "ID とパスワードを入力してください。";
+          loginErr.classList.remove("hidden");
+          return;
+        }
+        var body = {
+          role: role,
+          username: role === "super_admin" ? "" : u,
+          password: p,
+        };
+        if (role === "worker") {
+          var ul = (userLabel.value || "").trim();
+          if (ul) body.user_label = ul;
+        }
+        btnLogin.disabled = true;
+        btnLogin.textContent = "ログイン中…";
+        fetch("/api/v1/auth/portal-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+          .then(function (r) {
+            if (!r.ok) {
+              return r.json().then(function (j) {
+                var d = j.detail;
+                if (Array.isArray(d)) d = d.map(function (x) { return x.msg || JSON.stringify(x); }).join(" ");
+                throw new Error(typeof d === "string" ? d : String(r.status));
+              });
+            }
+            return r.json();
+          })
+          .then(function (data) {
+            if (role === "super_admin") {
+              sessionStorage.setItem("wb_super_token", data.access_token);
+              location.href = "/super";
+            } else if (role === "admin") {
+              sessionStorage.setItem("wb_admin_token", data.access_token);
+              sessionStorage.setItem("wb_workspace_id", data.workspace_id);
+              if (data.workspace_name) sessionStorage.setItem("wb_workspace_name", data.workspace_name);
+              sessionStorage.removeItem("wb_super_assumed");
+              location.href = "/admin";
+            } else {
+              sessionStorage.setItem("wb_worker_token", data.access_token);
+              sessionStorage.setItem("wb_worker_label", data.worker_display_label || "");
+              sessionStorage.setItem("wb_workspace_id", data.workspace_id || "");
+              location.href = "/worker";
+            }
+          })
+          .catch(function (e) {
+            loginErr.textContent = "ログインに失敗しました: " + (e.message || e);
+            loginErr.classList.remove("hidden");
+            btnLogin.disabled = false;
+            btnLogin.textContent = "ログイン";
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

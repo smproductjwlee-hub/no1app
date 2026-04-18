@@ -1,0 +1,8 @@
+google_key.json
+.env
+data/
+*.db
+venv/
+__pycache__/
+*.py[cod]
+*.pyc

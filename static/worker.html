@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+
+<html lang="vi">
+
+<head>
+
+  <meta charset="utf-8" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+  <title>WorkBridge — 現場スタッフ</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+
+    /* 관리자·직원 페이지 공통: 일본어 UI 폰트 (Meiryo UI 우선) */
+
+    body,
+
+    button,
+
+    input,
+
+    textarea {
+
+      font-family: "Meiryo UI", "Meiryo", "MS PGothic", "Hiragino Kaku Gothic ProN", sans-serif;
+
+    }
+
+    .ja-text {
+
+      font-family: "Meiryo UI", sans-serif;
+
+      line-height: 1.5;
+
+    }
+
+    /* 큰 일본어 지시문: 가독성 (행간·약간 자간) */
+
+    .ja-text-lead {
+
+      font-family: "Meiryo UI", sans-serif;
+
+      line-height: 1.65;
+
+      letter-spacing: 0.03em;
+
+      font-weight: 400;
+
+      font-feature-settings: "palt" 1;
+
+    }
+
+    code {
+
+      font-family: ui-monospace, "Consolas", "Cascadia Mono", monospace;
+
+    }
+
+  </style>
+
+</head>
+
+<body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+
+  <div id="gate" class="max-w-md mx-auto px-5 py-10">
+
+    <h1 class="text-xl font-bold text-gray-900 mb-2">リンクまたはログインが必要です</h1>
+
+    <p class="text-gray-600 text-sm leading-relaxed mb-3">
+
+      QR または <code class="bg-gray-100 px-1 rounded text-xs">/worker?join_token=…</code> で開くか、ログイン画面からスタッフとして入ってください。
+
+    </p>
+
+    <a href="/login?role=worker" class="inline-flex w-full justify-center py-3 rounded-xl bg-indigo-900 text-white font-semibold text-sm shadow-md hover:bg-indigo-800 transition mb-4">ログイン画面へ</a>
+
+    <p class="text-gray-500 text-xs leading-relaxed">
+
+      表示名（名前）を付ける場合は <code class="bg-gray-100 px-1 rounded text-[10px]">&amp;user_label=山田</code> のように URL に追加できます。未指定の場合は自動で No.1, No.2 … が付きます。
+
+    </p>
+
+  </div>
+
+
+
+  <div id="loading" class="max-w-md mx-auto px-5 py-16 text-center hidden">
+
+    <p class="text-gray-500 text-sm">セッション確認中…</p>
+
+  </div>
+
+
+
+  <div id="app" class="max-w-md mx-auto px-4 pb-10 pt-5 flex flex-col gap-4 min-h-screen hidden">
+
+    <header class="flex items-center justify-between gap-3">
+
+      <div>
+
+        <p class="text-[11px] uppercase tracking-wide text-indigo-600 font-semibold">WorkBridge</p>
+
+        <h1 class="text-lg font-bold text-gray-900 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+
+          <span>スタッフ</span>
+
+          <span id="worker-identity" class="text-indigo-700 font-semibold tabular-nums tracking-tight" title="">—</span>
+
+        </h1>
+
+      </div>
+
+      <div class="relative shrink-0">
+        <button type="button" id="menu-btn" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50">
+          メニュー
+          <span class="text-gray-400 text-xs">▼</span>
+        </button>
+        <div id="menu-dropdown" class="hidden absolute right-0 mt-1 w-48 rounded-xl bg-white border border-gray-200 shadow-lg z-50 py-1 text-sm">
+          <p id="menu-conn-status" class="px-3 py-2 text-[11px] text-gray-600 border-b border-gray-100">接続: …</p>
+          <button type="button" id="m-logout" class="w-full text-left px-3 py-2.5 text-rose-600 hover:bg-rose-50">ログアウト</button>
+        </div>
+      </div>
+
+    </header>
+
+
+
+    <!-- 言語（順序はサーバー /locale-config · 既定: JP→US→VN→ID→MM→NP） -->
+
+    <div>
+
+      <p class="text-xs text-gray-500 mb-2 font-medium">表示する言語 / Ngôn ngữ hiển thị</p>
+
+      <div id="lang-row" class="flex flex-wrap gap-2 justify-between items-center"></div>
+
+    </div>
+
+
+
+    <!-- 原文（日本語） -->
+
+    <section class="rounded-2xl bg-[#ebe4f8] px-4 py-3 border border-violet-100 shadow-sm">
+
+      <p class="text-[11px] font-semibold text-violet-900 mb-1.5 tracking-tight">入力された原文（日本語）</p>
+
+      <p id="text-original" class="ja-text text-sm text-gray-900 whitespace-pre-wrap break-words min-h-[2.75rem]">—</p>
+
+    </section>
+
+
+
+    <!-- やさしい日本語（将来用） -->
+
+    <section class="rounded-2xl bg-white px-4 py-3 border border-gray-100 shadow-sm">
+
+      <p class="text-[11px] font-semibold text-gray-500 mb-1">やさしい日本語（準備中）</p>
+
+      <p id="text-easy" class="ja-text text-sm text-gray-600 whitespace-pre-wrap break-words">—</p>
+
+    </section>
+
+
+
+    <!-- メイン：選択言語での表示エリア（翻訳API前は日本語と同じ） -->
+
+    <section class="rounded-2xl bg-white px-5 py-5 border-2 border-indigo-100 shadow-md min-h-[11rem] flex flex-col justify-center">
+
+      <p id="locale-badge" class="text-[10px] text-indigo-600 font-semibold mb-2 uppercase tracking-wide">Tiếng Việt</p>
+
+      <p id="text-translated" class="ja-text-lead text-[1.35rem] md:text-[1.4rem] text-gray-900 whitespace-pre-wrap break-words">
+
+        指示を待っています。
+
+      </p>
+
+      <p id="translation-note" class="text-[11px] text-amber-800 mt-4 leading-relaxed bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
+
+        번역 서버 연결 후, 위 언어로 번역문이 표시됩니다. 지금은 관리자가 보낸 일본어와 동일하게 보입니다.
+
+      </p>
+
+    </section>
+
+
+
+    <!-- 応答ボタン（언어별 라벨） -->
+
+    <div class="grid grid-cols-2 gap-3">
+
+      <button type="button" data-btn="OK" class="btn-r py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-semibold text-sm shadow-md transition shadow-emerald-900/10"></button>
+
+      <button type="button" data-btn="REPEAT" class="btn-r py-4 rounded-2xl bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-amber-950 font-semibold text-sm shadow-md transition"></button>
+
+      <button type="button" data-btn="NG" class="btn-r py-4 rounded-2xl bg-rose-400 hover:bg-rose-300 active:scale-[0.98] text-white font-semibold text-sm shadow-md transition"></button>
+
+      <button type="button" data-btn="CUSTOM" class="btn-r py-4 rounded-2xl bg-white hover:bg-gray-50 active:scale-[0.98] border-2 border-indigo-900 text-indigo-950 font-semibold text-sm shadow-sm transition flex flex-col items-center justify-center gap-1">
+
+        <span class="text-xs opacity-70">話す · Speak</span>
+
+      </button>
+
+    </div>
+
+
+
+    <!-- 「自分で答える」デモ：音声UI風 -->
+
+    <div id="voice-panel" class="hidden rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/80 px-4 py-6 text-center">
+
+      <div class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white border border-indigo-200 mb-3 shadow-inner" aria-hidden="true">
+
+        <svg class="h-6 w-6 text-indigo-700 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+
+      </div>
+
+      <p id="voice-msg" class="text-sm font-medium text-indigo-950 mb-4">音声入力は今後つなぎ込みます（現在は送信のみ）</p>
+
+      <button type="button" id="voice-done" class="text-sm font-semibold text-indigo-700 underline underline-offset-2">閉じる</button>
+
+    </div>
+
+
+
+    <p id="footer-hint" class="text-center text-[11px] text-gray-400 pb-2">入力を待っています。</p>
+
+
+
+    <!-- 用語リスト -->
+
+    <div class="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+
+      <button type="button" id="glossary-toggle" class="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 flex justify-between items-center">
+
+        <span>外食・用語リスト</span>
+
+        <span id="glossary-chevron" class="text-gray-400 text-xs">▼</span>
+
+      </button>
+
+      <div id="glossary-panel" class="hidden border-t border-gray-100 px-4 pb-4 pt-2 flex flex-col gap-2 bg-gray-50/80">
+
+        <input type="search" id="glossary-search" class="w-full rounded-xl bg-white border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400" placeholder="検索…" autocomplete="off" />
+
+        <p id="glossary-status" class="text-[11px] text-gray-500"></p>
+
+        <ul id="glossary-list" class="max-h-48 overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100 text-sm bg-white"></ul>
+
+      </div>
+
+    </div>
+
+  </div>
+
+
+
+  <script>
+
+    (function () {
+
+      var STORAGE_LOCALE = "workbridge_worker_locale";
+
+
+
+      var FLAGS = { ja: "🇯🇵", en: "🇺🇸", vi: "🇻🇳", id: "🇮🇩", my: "🇲🇲", ne: "🇳🇵" };
+
+
+
+      /* UI: JP, US, VN, ID, MM, NP (서버 locale-config 순서와 맞출 것) */
+
+      var SHORT_CODES = { ja: "JP", en: "US", vi: "VN", id: "ID", my: "MM", ne: "NP" };
+
+
+
+      var BTN = {
+
+        vi: {
+
+          ok: "Tôi đã hiểu.",
+
+          repeat: "Nói lại giúp tôi.",
+
+          ng: "Tôi không hiểu.",
+
+          custom: "Tự trả lời"
+
+        },
+
+        en: {
+
+          ok: "I understand.",
+
+          repeat: "Please say that again.",
+
+          ng: "I don't understand.",
+
+          custom: "Answer myself"
+
+        },
+
+        id: {
+
+          ok: "Saya mengerti.",
+
+          repeat: "Tolong ulangi sekali lagi.",
+
+          ng: "Saya tidak mengerti.",
+
+          custom: "Jawab sendiri"
+
+        },
+
+        my: {
+
+          ok: "နားလည်ပါတယ်။",
+
+          repeat: "ပြန်ပြောပြပါ။",
+
+          ng: "မနားလည်ပါ။",
+
+          custom: "ကိုယ်တိုင်ဖြေမယ်"
+
+        },
+
+        ne: {
+
+          ok: "बुझेँ।",
+
+          repeat: "फेरि भन्नुहोस्।",
+
+          ng: "बुझिनँ।",
+
+          custom: "आफै जवाफ दिनु"
+
+        },
+
+        ja: {
+
+          ok: "わかりました。",
+
+          repeat: "もういちど言ってください。",
+
+          ng: "わかりません。",
+
+          custom: "じぶんで答える"
+
+        }
+
+      };
+
+
+
+      var NOTES = {
+
+        vi: "번역 서버 연결 후 베트남어로 표시됩니다. 지금은 일본어 원문과 같습니다.",
+
+        en: "영어 번역은 API 연결 후 표시됩니다. 지금은 일본어 원문과 같습니다.",
+
+        id: "인도네시아어 번역은 API 연결 후 표시됩니다. 지금은 일본어 원문과 같습니다.",
+
+        my: "미얀마어 번역은 API 연결 후 표시됩니다. 지금은 일본어 원문과 같습니다.",
+
+        ne: "네팔어 번역은 API 연결 후 표시됩니다. 지금은 일본어 원문과 같습니다.",
+
+        ja: "日本語のみ表示しています。"
+
+      };
+
+
+
+      var WAITING = {
+
+        ja: "指示を待っています。",
+
+        en: "Waiting for instruction…",
+
+        vi: "Chờ hướng dẫn…",
+
+        id: "Menunggu instruksi…",
+
+        my: "ညွှန်ကြားချက်ကို စောင့်နေပါသည်။",
+
+        ne: "निर्देश पर्खँदै…"
+
+      };
+
+
+
+      var params = new URLSearchParams(location.search);
+
+      var joinToken = params.get("join_token");
+
+      var gate = document.getElementById("gate");
+
+      var loading = document.getElementById("loading");
+
+      var app = document.getElementById("app");
+
+      var connStatusEl = document.getElementById("menu-conn-status");
+
+      var textOriginal = document.getElementById("text-original");
+
+      var textEasy = document.getElementById("text-easy");
+
+      var textTranslated = document.getElementById("text-translated");
+
+      var translationNote = document.getElementById("translation-note");
+
+      var localeBadge = document.getElementById("locale-badge");
+
+      var footerHint = document.getElementById("footer-hint");
+
+      var langRow = document.getElementById("lang-row");
+
+      var voicePanel = document.getElementById("voice-panel");
+
+      var voiceDone = document.getElementById("voice-done");
+
+
+
+      var activeLocale = "ja";
+
+      var lastInstruction = "";
+
+      var localeTargets = [];
+
+
+
+      var savedTok = sessionStorage.getItem("wb_worker_token");
+
+      var savedLabel = sessionStorage.getItem("wb_worker_label");
+
+      if (!joinToken && !savedTok) return;
+
+      gate.classList.add("hidden");
+
+      loading.classList.remove("hidden");
+
+
+
+      function setStatus(text, ok) {
+
+        connStatusEl.textContent = "接続: " + text;
+
+        connStatusEl.className =
+
+          "px-3 py-2 text-[11px] border-b border-gray-100 " +
+
+          (ok ? "text-emerald-800 bg-emerald-50/60" : "text-amber-900 bg-amber-50/60");
+
+      }
+
+
+
+      var workerMenuBound = false;
+
+      function setupWorkerMenu() {
+
+        if (workerMenuBound) return;
+
+        workerMenuBound = true;
+
+        var menuBtn = document.getElementById("menu-btn");
+
+        var menuDropdown = document.getElementById("menu-dropdown");
+
+        menuBtn.addEventListener("click", function (e) {
+
+          e.stopPropagation();
+
+          menuDropdown.classList.toggle("hidden");
+
+        });
+
+        document.addEventListener("click", function () {
+
+          menuDropdown.classList.add("hidden");
+
+        });
+
+        document.getElementById("m-logout").addEventListener("click", function () {
+
+          sessionStorage.removeItem("wb_worker_token");
+
+          sessionStorage.removeItem("wb_worker_label");
+
+          sessionStorage.removeItem("wb_workspace_id");
+
+          location.href = "/login?role=worker";
+
+        });
+
+      }
+
+
+
+      function escapeHtml(s) {
+
+        var d = document.createElement("div");
+
+        d.textContent = s;
+
+        return d.innerHTML;
+
+      }
+
+
+
+      function applyLocale(loc) {
+
+        if (!BTN[loc]) loc = "ja";
+
+        activeLocale = loc;
+
+        try { localStorage.setItem(STORAGE_LOCALE, loc); } catch (e) {}
+
+
+
+        var b = BTN[loc];
+
+        document.querySelectorAll(".btn-r[data-btn]").forEach(function (btn) {
+
+          var k = btn.getAttribute("data-btn");
+
+          var label = "";
+
+          if (k === "OK") label = b.ok;
+
+          else if (k === "REPEAT") label = b.repeat;
+
+          else if (k === "NG") label = b.ng;
+
+          else if (k === "CUSTOM") {
+
+            btn.innerHTML = "<span>" + escapeHtml(b.custom) + "</span><span class=\"text-[10px] opacity-70\">話す · Speak</span>";
+
+            return;
+
+          }
+
+          btn.textContent = label;
+
+        });
+
+
+
+        translationNote.textContent = NOTES[loc] || NOTES.ja;
+
+        langRow.querySelectorAll("[data-locale]").forEach(function (el) {
+
+          var on = el.getAttribute("data-locale") === loc;
+
+          el.className = on
+
+            ? "flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 bg-indigo-100 ring-2 ring-indigo-400 shadow-sm min-w-[3rem]"
+
+            : "flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 min-w-[3rem]";
+
+        });
+
+
+
+        var tInfo = localeTargets.find(function (x) { return x.locale === loc; });
+
+        localeBadge.textContent = tInfo ? tInfo.label : loc.toUpperCase();
+
+        refreshTranslatedPane();
+
+      }
+
+
+
+      function refreshTranslatedPane() {
+
+        if (!lastInstruction) {
+
+          textTranslated.textContent = WAITING[activeLocale] || WAITING.en;
+
+          return;
+
+        }
+
+        textTranslated.textContent = lastInstruction;
+
+      }
+
+
+
+      function setInstruction(text) {
+
+        lastInstruction = text;
+
+        textOriginal.textContent = text;
+
+        textEasy.textContent = "（やさしい日本語は後から表示できます）";
+
+        footerHint.textContent = "最新の指示を表示しています。";
+
+        refreshTranslatedPane();
+
+      }
+
+
+
+      function buildLangButtons(targets) {
+
+        localeTargets = targets || [];
+
+        langRow.innerHTML = "";
+
+        var saved = "";
+
+        try { saved = localStorage.getItem(STORAGE_LOCALE) || ""; } catch (e) {}
+
+        var first = (targets && targets[0] && targets[0].locale) || "ja";
+
+        if (saved && targets.some(function (t) { return t.locale === saved; })) {
+
+          activeLocale = saved;
+
+        } else {
+
+          activeLocale = first;
+
+        }
+
+
+
+        (targets || []).forEach(function (t) {
+
+          var btn = document.createElement("button");
+
+          btn.type = "button";
+
+          btn.setAttribute("data-locale", t.locale);
+
+          btn.className = "flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 border border-gray-200 bg-white hover:bg-gray-50 min-w-[3rem]";
+
+          var flag = FLAGS[t.locale] || "🌐";
+
+          var code = SHORT_CODES[t.locale] || String(t.locale).toUpperCase();
+
+          btn.setAttribute("title", t.label + " (" + code + ")");
+
+          btn.innerHTML =
+
+            "<span class=\"text-2xl leading-none select-none\" aria-hidden=\"true\">" + flag + "</span>"
+
+            + "<span class=\"text-[10px] font-semibold text-gray-800 tracking-tight\">" + escapeHtml(code) + "</span>"
+
+            + "<span class=\"text-[9px] text-gray-500 max-w-[4.5rem] truncate text-center leading-tight\">" + escapeHtml(t.label) + "</span>";
+
+          btn.addEventListener("click", function () {
+
+            applyLocale(t.locale);
+
+          });
+
+          langRow.appendChild(btn);
+
+        });
+
+        applyLocale(activeLocale);
+
+      }
+
+
+
+      fetch("/api/v1/meta/locale-config")
+
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+
+        .then(function (cfg) {
+
+          buildLangButtons(cfg.targets || []);
+
+        })
+
+        .catch(function () {
+
+          buildLangButtons([
+
+            { locale: "ja", label: "日本語" },
+
+            { locale: "en", label: "English" },
+
+            { locale: "vi", label: "Tiếng Việt" },
+
+            { locale: "id", label: "Bahasa Indonesia" },
+
+            { locale: "my", label: "မြန်မာဘာသာ" },
+
+            { locale: "ne", label: "नेपाली" }
+
+          ]);
+
+        });
+
+
+
+      function finishAuth(data) {
+
+        loading.classList.add("hidden");
+
+        app.classList.remove("hidden");
+
+        var wid = document.getElementById("worker-identity");
+
+        if (wid && data.worker_display_label) {
+
+          wid.textContent = data.worker_display_label;
+
+          wid.setAttribute("title", data.worker_display_label);
+
+        }
+
+        setupWorkerMenu();
+
+        connectWs(data.access_token);
+
+      }
+
+
+
+      if (savedTok && !joinToken) {
+
+        finishAuth({ access_token: savedTok, worker_display_label: savedLabel || "" });
+
+      } else {
+
+        (function () {
+
+          var joinQs = "token=" + encodeURIComponent(joinToken);
+
+          var nameParam = params.get("user_label");
+
+          if (nameParam) joinQs += "&user_label=" + encodeURIComponent(nameParam);
+
+          return fetch("/api/v1/auth/join?" + joinQs);
+
+        })()
+
+          .then(function (r) {
+
+            if (!r.ok) throw new Error("join failed");
+
+            return r.json();
+
+          })
+
+          .then(function (data) {
+
+            sessionStorage.setItem("wb_worker_token", data.access_token);
+
+            sessionStorage.setItem("wb_worker_label", data.worker_display_label || "");
+
+            finishAuth(data);
+
+          })
+
+          .catch(function () {
+
+            loading.innerHTML = "<p class=\"text-rose-600 text-sm\">参加に失敗しました。リンクの有効期限を確認してください。</p>";
+
+          });
+
+      }
+
+
+
+      function connectWs(accessToken) {
+
+        setStatus("確認中…", false);
+
+        var wsProto = location.protocol === "https:" ? "wss:" : "ws:";
+
+        var wsUrl = wsProto + "//" + location.host + "/api/v1/ws?token=" + encodeURIComponent(accessToken);
+
+        var ws = new WebSocket(wsUrl);
+
+
+
+        ws.onopen = function () { setStatus("済み", true); };
+
+        ws.onclose = function () { setStatus("切断", false); };
+
+        ws.onerror = function () { setStatus("エラー", false); };
+
+
+
+        ws.onmessage = function (ev) {
+
+          var data;
+
+          try { data = JSON.parse(ev.data); } catch (e) { return; }
+
+          if (data.type === "instruction" && typeof data.text === "string") {
+
+            setInstruction(data.text);
+
+          }
+
+        };
+
+
+
+        function sendBtn(code) {
+
+          if (ws.readyState !== WebSocket.OPEN) return;
+
+          ws.send(JSON.stringify({ type: "worker_response", button: code }));
+
+        }
+
+
+
+        document.querySelectorAll(".btn-r[data-btn]").forEach(function (btn) {
+
+          btn.addEventListener("click", function () {
+
+            var b = btn.getAttribute("data-btn");
+
+            if (b === "CUSTOM") {
+
+              sendBtn("CUSTOM");
+
+              voicePanel.classList.remove("hidden");
+
+              return;
+
+            }
+
+            sendBtn(b);
+
+          });
+
+        });
+
+
+
+        voiceDone.addEventListener("click", function () {
+
+          voicePanel.classList.add("hidden");
+
+        });
+
+
+
+        /* ----- glossary ----- */
+
+        var glossToggle = document.getElementById("glossary-toggle");
+
+        var glossPanel = document.getElementById("glossary-panel");
+
+        var glossChevron = document.getElementById("glossary-chevron");
+
+        var glossSearch = document.getElementById("glossary-search");
+
+        var glossStatus = document.getElementById("glossary-status");
+
+        var glossList = document.getElementById("glossary-list");
+
+        var glossRows = [];
+
+        var glossLoaded = false;
+
+
+
+        function pickCols(row) {
+
+          var keys = Object.keys(row);
+
+          var ja = keys.filter(function (k) { return /日本語|単語/i.test(k); });
+
+          var w = ja.length ? row[ja[0]] : (keys.length ? row[keys[0]] : "");
+
+          var meaning = keys.filter(function (k) { return /意味|説明|한국/i.test(k); });
+
+          var m = meaning.length ? row[meaning[0]] : (keys[1] ? row[keys[1]] : "");
+
+          var ex = keys.filter(function (k) { return /使用例|例|使い方/i.test(k); });
+
+          var e = ex.length ? row[ex[0]] : "";
+
+          return { w: w, m: m, e: e };
+
+        }
+
+
+
+        function renderGlossary(filtered) {
+
+          glossList.innerHTML = "";
+
+          filtered.forEach(function (row) {
+
+            var p = pickCols(row);
+
+            var li = document.createElement("li");
+
+            li.className = "px-3 py-2";
+
+            li.innerHTML = "<div class=\"font-medium text-gray-900\">" + escapeHtml(String(p.w || "")) + "</div>"
+
+              + (p.m ? "<div class=\"text-gray-500 text-xs mt-0.5\">" + escapeHtml(String(p.m)) + "</div>" : "")
+
+              + (p.e ? "<div class=\"text-gray-400 text-xs mt-1\">" + escapeHtml(String(p.e)) + "</div>" : "");
+
+            glossList.appendChild(li);
+
+          });
+
+        }
+
+
+
+        function applyGlossaryFilter() {
+
+          var q = (glossSearch.value || "").trim().toLowerCase();
+
+          if (!q) {
+
+            renderGlossary(glossRows);
+
+            glossStatus.textContent = glossRows.length ? glossRows.length + " 件" : "";
+
+            return;
+
+          }
+
+          var f = glossRows.filter(function (row) {
+
+            return JSON.stringify(row).toLowerCase().indexOf(q) !== -1;
+
+          });
+
+          renderGlossary(f);
+
+          glossStatus.textContent = "表示 " + f.length + " / " + glossRows.length + " 件";
+
+        }
+
+
+
+        glossToggle.addEventListener("click", function () {
+
+          var open = !glossPanel.classList.contains("hidden");
+
+          if (open) {
+
+            glossPanel.classList.add("hidden");
+
+            glossChevron.textContent = "▼";
+
+            return;
+
+          }
+
+          glossPanel.classList.remove("hidden");
+
+          glossChevron.textContent = "▲";
+
+          if (glossLoaded) {
+
+            applyGlossaryFilter();
+
+            return;
+
+          }
+
+          glossStatus.textContent = "読み込み中…";
+
+          fetch("/api/v1/curriculum/food-glossary")
+
+            .then(function (r) {
+
+              if (!r.ok) throw new Error(r.status);
+
+              return r.json();
+
+            })
+
+            .then(function (data) {
+
+              glossRows = data.rows || [];
+
+              glossLoaded = true;
+
+              glossStatus.textContent = glossRows.length + " 件";
+
+              renderGlossary(glossRows);
+
+              applyGlossaryFilter();
+
+            })
+
+            .catch(function () {
+
+              glossStatus.textContent = "読み込みに失敗しました";
+
+            });
+
+        });
+
+        glossSearch.addEventListener("input", applyGlossaryFilter);
+
+      }
+
+    })();
+
+  </script>
+
+</body>
+
+</html>
+
+

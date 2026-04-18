@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>WorkBridge — 管理者</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* 관리자·직원 페이지 공통: 일본어 UI 폰트 (Meiryo UI 우선) */
+    body,
+    button,
+    input,
+    textarea {
+      font-family: "Meiryo UI", "Meiryo", "MS PGothic", "Hiragino Kaku Gothic ProN", sans-serif;
+    }
+    .ja-text {
+      font-family: "Meiryo UI", sans-serif;
+      line-height: 1.5;
+    }
+    code {
+      font-family: ui-monospace, "Consolas", "Cascadia Mono", monospace;
+    }
+    html.admin-pc #app {
+      max-width: 80rem;
+    }
+    html.admin-pc #admin-main {
+      flex-direction: row;
+      align-items: flex-start;
+    }
+    html.admin-pc #admin-main > .admin-col {
+      flex: 1;
+      min-width: 0;
+    }
+    html.admin-pc .admin-pc-only {
+      display: block;
+    }
+    html:not(.admin-pc) .admin-pc-only {
+      display: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900 antialiased">
+  <div id="gate" class="max-w-md mx-auto px-5 py-12 hidden">
+    <h1 class="text-xl font-bold text-gray-900 mb-2">ログインが必要です</h1>
+    <p class="text-gray-600 text-sm leading-relaxed mb-4">
+      ログイン画面から管理者として入るか、<br />
+      <code class="bg-gray-100 px-1 rounded text-xs">/admin?token=…</code> で直接トークンを指定できます。
+    </p>
+    <a href="/login?role=admin" class="inline-flex w-full justify-center py-3 rounded-xl bg-indigo-900 text-white font-semibold text-sm shadow-md hover:bg-indigo-800 transition">ログイン画面へ</a>
+  </div>
+
+  <div id="app" class="max-w-md mx-auto px-4 pb-12 pt-6 flex flex-col gap-5 min-h-screen hidden">
+    <div id="super-banner" class="hidden rounded-xl bg-slate-800 text-white text-sm px-4 py-3 border border-slate-600">
+      総運営として、この顧客の管理者画面を閲覧中です。ログアウトでワークスペース一覧に戻ります。
+    </div>
+    <header class="flex items-start justify-between gap-3">
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">WorkBridge</p>
+        <h1 class="text-xl font-bold text-gray-900">管理者</h1>
+      </div>
+      <div class="relative shrink-0">
+        <button type="button" id="menu-btn" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50">
+          メニュー
+          <span class="text-gray-400 text-xs">▼</span>
+        </button>
+        <div id="menu-dropdown" class="hidden absolute right-0 mt-1 w-56 rounded-xl bg-white border border-gray-200 shadow-lg z-50 py-1 text-sm">
+          <p id="menu-conn-status" class="px-3 py-2 text-[11px] text-gray-600 border-b border-gray-100">接続: …</p>
+          <button type="button" id="m-layout-pc" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800">PCレイアウト（広い画面）</button>
+          <button type="button" id="m-layout-mobile" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800">スマホレイアウト（狭い画面）</button>
+          <button type="button" id="m-qr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100">QRコード（参加用）</button>
+          <button type="button" id="m-words" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800">用語・単語登録</button>
+          <button type="button" id="m-users" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800">ユーザー一覧</button>
+          <button type="button" id="m-myinfo" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100">マイ情報</button>
+          <button type="button" id="m-logout" class="w-full text-left px-3 py-2.5 text-rose-600 hover:bg-rose-50 border-t border-gray-100">ログアウト</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="admin-main" class="flex flex-col gap-5">
+    <div class="admin-col flex flex-col gap-5">
+    <p class="text-center text-sm text-gray-600 leading-relaxed px-2">
+      マイクを押すか、下の欄に<br />現場スタッフへ伝えたい日本語を入力してください。
+    </p>
+
+    <div class="flex justify-center py-2">
+      <button type="button" id="mic-btn" class="relative flex h-28 w-28 items-center justify-center rounded-full bg-gray-900 text-white shadow-xl shadow-gray-900/25 ring-4 ring-white active:scale-95 transition">
+        <svg class="h-14 w-14" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+        </svg>
+        <span class="sr-only">入力欄にフォーカス</span>
+      </button>
+    </div>
+
+    <section class="rounded-2xl bg-[#ebe4f8] border border-violet-100 px-4 py-4 shadow-sm">
+      <p class="text-[11px] font-semibold text-violet-900 mb-2">入力された日本語（現場の端末に送信）</p>
+      <label for="input" class="sr-only">指示テキスト</label>
+      <textarea id="input" rows="5" class="ja-text w-full rounded-xl bg-white/90 border border-violet-200 p-3 text-base text-gray-900 placeholder:text-gray-400 resize-y focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 outline-none" placeholder="例：3番テーブルに料理が出たか確認して、4番と5番の片付けも見ておいて。"></textarea>
+      <p class="text-[10px] text-violet-800/80 mt-2">※ 翻訳API接続後、スタッフ側は選択言語で表示されます。</p>
+    </section>
+
+    <section class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm">
+      <p class="text-[11px] font-semibold text-gray-800 mb-2">送信先</p>
+      <div class="flex flex-wrap gap-4 text-sm">
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="send-mode" value="all" checked class="text-indigo-900 focus:ring-indigo-500" />
+          <span>全員</span>
+        </label>
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <input type="radio" name="send-mode" value="selected" class="text-indigo-900 focus:ring-indigo-500" />
+          <span>選択したスタッフのみ</span>
+        </label>
+      </div>
+      <div id="worker-checkboxes" class="mt-3 space-y-2 text-sm hidden max-h-36 overflow-y-auto"></div>
+      <p id="worker-target-hint" class="text-[10px] text-gray-500 mt-2 min-h-[1rem]"></p>
+    </section>
+
+    <button type="button" id="send" disabled class="w-full py-4 rounded-2xl bg-indigo-900 hover:bg-indigo-800 disabled:opacity-40 disabled:pointer-events-none text-white font-semibold text-base shadow-md transition">
+      スタッフに送信
+    </button>
+
+    <p id="footer-hint" class="text-center text-[11px] text-gray-400">入力を待っています。</p>
+    </div>
+
+    <div class="admin-col flex flex-col gap-5">
+    <section class="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+      <div class="px-4 py-3 bg-[#ebe4f8] border-b border-violet-100">
+        <h2 class="text-sm font-semibold text-violet-950">作業者の応答</h2>
+      </div>
+      <ul id="responses" class="space-y-2 p-4 text-sm min-h-[5rem] max-h-52 overflow-y-auto bg-gray-50/80"></ul>
+    </section>
+
+    <details class="group rounded-2xl bg-white border border-gray-200 shadow-sm">
+      <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-800 flex justify-between items-center">
+        <span>シナリオ・用語（Google シート）</span>
+        <span class="text-gray-400 text-xs group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div class="border-t border-gray-100 px-4 pb-4 pt-2 space-y-3">
+        <p class="text-xs text-gray-500">参照のみ · <code class="bg-gray-100 px-1 rounded">/api/v1/curriculum/…</code></p>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" data-cur-key="kaigo" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">介護</button>
+          <button type="button" data-cur-key="food" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">外食</button>
+          <button type="button" data-cur-key="food-glossary" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">用語</button>
+          <button type="button" data-cur-key="course-list" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">コース一覧</button>
+          <button type="button" data-cur-key="extra" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200">その他</button>
+        </div>
+        <input type="search" id="cur-search" class="w-full rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-sm" placeholder="検索…" autocomplete="off" />
+        <p id="cur-status" class="text-xs text-gray-500 min-h-[1rem]"></p>
+        <div id="cur-table-wrap" class="overflow-x-auto max-h-56 overflow-y-auto rounded-xl border border-gray-200 bg-white hidden">
+          <table class="min-w-full text-[11px] text-left border-collapse">
+            <thead id="cur-thead" class="sticky top-0 bg-gray-100 text-gray-700"></thead>
+            <tbody id="cur-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+
+    <section class="admin-pc-only rounded-2xl bg-white border border-indigo-100 shadow-sm p-4">
+      <h3 class="text-sm font-semibold text-indigo-950 mb-2">追加の管理者（PC）</h3>
+      <p class="text-xs text-gray-600 leading-relaxed mb-2">
+        同じワークスペース名でログイン画面から「管理者」として入ると、同じ現場に別の管理者セッションが追加されます。パスワードは顧客向け共有パスワードです。
+      </p>
+      <h3 class="text-sm font-semibold text-indigo-950 mt-4 mb-2">用語・単語の登録（PC）</h3>
+      <p class="text-xs text-gray-600 leading-relaxed">
+        Google スプレッドシート側でシートを編集してください。下の「シナリオ・用語」から API 経由の参照を確認できます。
+      </p>
+    </section>
+    </div>
+    </div>
+  </div>
+
+  <div id="modal-qr" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
+      <h3 class="font-semibold text-gray-900 mb-2">参加用 QR</h3>
+      <img id="qr-img" alt="QR" class="mx-auto w-48 h-48 object-contain border rounded-lg bg-white" />
+      <p class="text-[11px] text-gray-500 mt-2 break-all" id="qr-url-text"></p>
+      <p class="text-[10px] text-amber-900 bg-amber-50 rounded-lg px-2 py-2 mt-2 leading-relaxed border border-amber-100">
+        スマホで読み取る場合: <code class="bg-white/80 px-0.5 rounded">.env</code> の <code class="bg-white/80 px-0.5 rounded">PUBLIC_BASE_URL</code> を PC の LAN アドレス（例: <code class="bg-white/80 px-0.5 rounded">http://192.168.0.5:8000</code>）にし、サーバーを <code class="bg-white/80 px-0.5 rounded">--host 0.0.0.0</code> で起動してください。<code class="bg-white/80 px-0.5 rounded">127.0.0.1</code> はスマホ自身を指します。
+      </p>
+      <button type="button" id="modal-qr-close" class="mt-4 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800">閉じる</button>
+    </div>
+  </div>
+  <div id="modal-words" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl text-sm text-gray-700">
+      <h3 class="font-semibold text-gray-900 mb-2">用語・単語登録</h3>
+      <p class="text-xs leading-relaxed mb-3">Google スプレッドシート連携のデータを API で参照しています。編集はスプレッドシート側で行い、サーバー設定のスプレッドシートIDを参照してください。</p>
+      <p class="text-xs text-gray-500 mb-2">参照API: <code class="bg-gray-100 px-1 rounded text-[10px]">/api/v1/curriculum/food-glossary</code> など</p>
+      <button type="button" id="modal-words-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800">閉じる</button>
+    </div>
+  </div>
+  <div id="modal-users" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl max-h-[80vh] flex flex-col">
+      <h3 class="font-semibold text-gray-900 mb-2">接続中のスタッフ</h3>
+      <ul id="modal-users-list" class="text-sm text-gray-800 overflow-y-auto flex-1 min-h-[4rem]"></ul>
+      <p id="modal-users-empty" class="text-xs text-gray-500 hidden">接続中のスタッフはいません。</p>
+      <button type="button" id="modal-users-close" class="mt-4 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800">閉じる</button>
+    </div>
+  </div>
+  <div id="modal-myinfo" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl text-sm text-gray-800">
+      <h3 class="font-semibold text-gray-900 mb-1">マイ情報</h3>
+      <p class="text-[11px] text-gray-500 mb-3">会社・店舗・部署は総運営のワークスペース一覧にも表示されます。</p>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[11px] font-medium text-gray-600 mb-1">ワークスペース名（ログインID）</label>
+          <p id="myinfo-ws-name" class="text-sm text-gray-900 bg-gray-50 rounded-lg px-3 py-2 border border-gray-100">—</p>
+        </div>
+        <div>
+          <label for="myinfo-company" class="block text-[11px] font-medium text-gray-600 mb-1">会社名</label>
+          <input id="myinfo-company" type="text" maxlength="200" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="例：株式会社〇〇" autocomplete="organization" />
+        </div>
+        <div>
+          <label for="myinfo-branch" class="block text-[11px] font-medium text-gray-600 mb-1">店舗・拠点名</label>
+          <input id="myinfo-branch" type="text" maxlength="200" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="例：渋谷店" />
+        </div>
+        <div>
+          <label for="myinfo-dept" class="block text-[11px] font-medium text-gray-600 mb-1">部署名</label>
+          <input id="myinfo-dept" type="text" maxlength="200" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm" placeholder="例：介護サービス部" />
+        </div>
+      </div>
+      <p id="myinfo-status" class="text-xs mt-2 min-h-[1.25rem] text-emerald-700"></p>
+      <button type="button" id="myinfo-save" class="mt-2 w-full py-2.5 rounded-xl bg-indigo-900 text-white font-medium text-sm hover:bg-indigo-800">保存</button>
+      <button type="button" id="modal-myinfo-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800">閉じる</button>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(location.search);
+      let token = (params.get("token") || "").trim() || sessionStorage.getItem("wb_admin_token") || "";
+      if (token) sessionStorage.setItem("wb_admin_token", token);
+      if (sessionStorage.getItem("wb_super_assumed")) {
+        var sb = document.getElementById("super-banner");
+        if (sb) sb.classList.remove("hidden");
+      }
+      var layoutPref = localStorage.getItem("wb_admin_layout") || "mobile";
+      if (layoutPref === "pc") document.documentElement.classList.add("admin-pc");
+      const gate = document.getElementById("gate");
+      const app = document.getElementById("app");
+      const connStatusEl = document.getElementById("menu-conn-status");
+      var workspaceId = sessionStorage.getItem("wb_workspace_id") || "";
+      const input = document.getElementById("input");
+      const sendBtn = document.getElementById("send");
+      const responses = document.getElementById("responses");
+      const micBtn = document.getElementById("mic-btn");
+      const footerHint = document.getElementById("footer-hint");
+      const workerCheckboxes = document.getElementById("worker-checkboxes");
+      const workerTargetHint = document.getElementById("worker-target-hint");
+      var selectedTokensSnapshot = {};
+
+      if (!token) {
+        gate.classList.remove("hidden");
+        return;
+      }
+
+      gate.classList.add("hidden");
+      app.classList.remove("hidden");
+
+      fetch("/api/v1/auth/session?token=" + encodeURIComponent(token))
+        .then(function (r) {
+          return r.ok ? r.json() : Promise.reject();
+        })
+        .then(function (d) {
+          if (d && d.workspace_id) {
+            workspaceId = d.workspace_id;
+            sessionStorage.setItem("wb_workspace_id", workspaceId);
+          }
+        })
+        .catch(function () {});
+
+      micBtn.addEventListener("click", function () {
+        input.focus();
+      });
+
+      const wsProto = location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = wsProto + "//" + location.host + "/api/v1/ws?token=" + encodeURIComponent(token);
+      const ws = new WebSocket(wsUrl);
+
+      setStatus("確認中…", false);
+
+      function setStatus(text, ok) {
+        connStatusEl.textContent = "接続: " + text;
+        connStatusEl.className =
+          "px-3 py-2 text-[11px] border-b border-gray-100 " +
+          (ok ? "text-emerald-800 bg-emerald-50/60" : "text-amber-900 bg-amber-50/60");
+      }
+
+      function refreshOnlineWorkers() {
+        fetch("/api/v1/workspaces/online-workers?admin_token=" + encodeURIComponent(token))
+          .then(function (r) {
+            if (!r.ok) throw new Error(String(r.status));
+            return r.json();
+          })
+          .then(function (data) {
+            renderWorkerTargets(data.workers || []);
+          })
+          .catch(function () {
+            workerTargetHint.textContent = "オンライン一覧の取得に失敗しました（再接続後にお試しください）。";
+          });
+      }
+
+      function renderWorkerTargets(workers) {
+        var modeSelected = document.querySelector('input[name="send-mode"]:checked');
+        var isSel = modeSelected && modeSelected.value === "selected";
+        if (!workers.length) {
+          workerCheckboxes.innerHTML = "";
+          workerCheckboxes.classList.add("hidden");
+          workerTargetHint.textContent = isSel ? "接続中のスタッフがいません。" : "";
+          return;
+        }
+        var preserve = {};
+        workers.forEach(function (w) {
+          if (selectedTokensSnapshot[w.token]) preserve[w.token] = true;
+        });
+        selectedTokensSnapshot = preserve;
+        workerCheckboxes.innerHTML = "";
+        workers.forEach(function (w) {
+          var lab = document.createElement("label");
+          lab.className = "flex items-center gap-2 cursor-pointer text-gray-800";
+          var cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.value = w.token;
+          cb.className = "rounded border-gray-300 text-indigo-900 focus:ring-indigo-500";
+          cb.checked = !!selectedTokensSnapshot[w.token];
+          cb.addEventListener("change", function () {
+            if (cb.checked) selectedTokensSnapshot[w.token] = true;
+            else delete selectedTokensSnapshot[w.token];
+          });
+          lab.appendChild(cb);
+          lab.appendChild(document.createTextNode(w.label));
+          workerCheckboxes.appendChild(lab);
+        });
+        workerTargetHint.textContent = isSel ? workers.length + "名が接続中です。" : "";
+      }
+
+      document.querySelectorAll('input[name="send-mode"]').forEach(function (el) {
+        el.addEventListener("change", function () {
+          var sel = document.querySelector('input[name="send-mode"]:checked');
+          if (sel && sel.value === "selected") {
+            workerCheckboxes.classList.remove("hidden");
+            refreshOnlineWorkers();
+          } else {
+            workerCheckboxes.classList.add("hidden");
+            workerTargetHint.textContent = "";
+          }
+        });
+      });
+
+      (function menuSetup() {
+        var menuBtn = document.getElementById("menu-btn");
+        var menuDropdown = document.getElementById("menu-dropdown");
+        menuBtn.addEventListener("click", function (e) {
+          e.stopPropagation();
+          menuDropdown.classList.toggle("hidden");
+        });
+        document.addEventListener("click", function () {
+          menuDropdown.classList.add("hidden");
+        });
+        document.getElementById("m-qr").addEventListener("click", function (e) {
+          e.stopPropagation();
+          menuDropdown.classList.add("hidden");
+          var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+          if (!wid) {
+            alert("ワークスペースIDを取得できません。ログインし直してください。");
+            return;
+          }
+          document.getElementById("qr-img").src =
+            "/api/v1/workspaces/" + encodeURIComponent(wid) + "/qr.png";
+          fetch("/api/v1/workspaces/" + encodeURIComponent(wid) + "/join-info")
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (j) {
+              document.getElementById("qr-url-text").textContent = j.join_url || "";
+            })
+            .catch(function () {
+              document.getElementById("qr-url-text").textContent = "リンク取得に失敗しました";
+            });
+          document.getElementById("modal-qr").classList.remove("hidden");
+        });
+        document.getElementById("modal-qr-close").addEventListener("click", function () {
+          document.getElementById("modal-qr").classList.add("hidden");
+        });
+        document.getElementById("m-words").addEventListener("click", function (e) {
+          e.stopPropagation();
+          menuDropdown.classList.add("hidden");
+          document.getElementById("modal-words").classList.remove("hidden");
+        });
+        document.getElementById("modal-words-close").addEventListener("click", function () {
+          document.getElementById("modal-words").classList.add("hidden");
+        });
+        document.getElementById("m-users").addEventListener("click", function (e) {
+          e.stopPropagation();
+          menuDropdown.classList.add("hidden");
+          var ul = document.getElementById("modal-users-list");
+          var empty = document.getElementById("modal-users-empty");
+          ul.innerHTML = "";
+          fetch("/api/v1/workspaces/online-workers?admin_token=" + encodeURIComponent(token))
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (data) {
+              var ws = data.workers || [];
+              if (!ws.length) {
+                empty.classList.remove("hidden");
+              } else {
+                empty.classList.add("hidden");
+                ws.forEach(function (w) {
+                  var li = document.createElement("li");
+                  li.className = "py-2 border-b border-gray-100";
+                  li.textContent = w.label;
+                  ul.appendChild(li);
+                });
+              }
+              document.getElementById("modal-users").classList.remove("hidden");
+            })
+            .catch(function () {
+              empty.classList.remove("hidden");
+              ul.innerHTML = "";
+              document.getElementById("modal-users").classList.remove("hidden");
+            });
+        });
+        document.getElementById("modal-users-close").addEventListener("click", function () {
+          document.getElementById("modal-users").classList.add("hidden");
+        });
+        function openModalMyInfo() {
+          var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+          var st = document.getElementById("myinfo-status");
+          st.textContent = "";
+          st.className = "text-xs mt-2 min-h-[1.25rem] text-emerald-700";
+          if (!wid) {
+            alert("ワークスペースIDを取得できません。ログインし直してください。");
+            return;
+          }
+          fetch("/api/v1/workspaces/" + encodeURIComponent(wid) + "/org?admin_token=" + encodeURIComponent(token))
+            .then(function (r) {
+              if (!r.ok) throw new Error(String(r.status));
+              return r.json();
+            })
+            .then(function (j) {
+              document.getElementById("myinfo-ws-name").textContent = j.name || "—";
+              document.getElementById("myinfo-company").value = j.company_name || "";
+              document.getElementById("myinfo-branch").value = j.branch_name || "";
+              document.getElementById("myinfo-dept").value = j.department_name || "";
+              document.getElementById("modal-myinfo").classList.remove("hidden");
+            })
+            .catch(function () {
+              alert("マイ情報の読み込みに失敗しました。");
+            });
+        }
+        document.getElementById("m-myinfo").addEventListener("click", function (e) {
+          e.stopPropagation();
+          menuDropdown.classList.add("hidden");
+          openModalMyInfo();
+        });
+        document.getElementById("modal-myinfo-close").addEventListener("click", function () {
+          document.getElementById("modal-myinfo").classList.add("hidden");
+        });
+        document.getElementById("myinfo-save").addEventListener("click", function () {
+          var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+          var st = document.getElementById("myinfo-status");
+          if (!wid) {
+            st.textContent = "ワークスペースIDを取得できません。";
+            st.className = "text-xs mt-2 min-h-[1.25rem] text-rose-600";
+            return;
+          }
+          st.className = "text-xs mt-2 min-h-[1.25rem] text-emerald-700";
+          st.textContent = "保存中…";
+          fetch("/api/v1/workspaces/" + encodeURIComponent(wid) + "/org?admin_token=" + encodeURIComponent(token), {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              company_name: document.getElementById("myinfo-company").value,
+              branch_name: document.getElementById("myinfo-branch").value,
+              department_name: document.getElementById("myinfo-dept").value,
+            }),
+          })
+            .then(function (r) {
+              if (!r.ok) throw new Error(String(r.status));
+              return r.json();
+            })
+            .then(function () {
+              st.textContent = "保存しました。";
+            })
+            .catch(function () {
+              st.textContent = "保存に失敗しました。";
+              st.className = "text-xs mt-2 min-h-[1.25rem] text-rose-600";
+            });
+        });
+        document.getElementById("m-layout-pc").addEventListener("click", function (e) {
+          e.stopPropagation();
+          localStorage.setItem("wb_admin_layout", "pc");
+          document.documentElement.classList.add("admin-pc");
+          menuDropdown.classList.add("hidden");
+        });
+        document.getElementById("m-layout-mobile").addEventListener("click", function (e) {
+          e.stopPropagation();
+          localStorage.setItem("wb_admin_layout", "mobile");
+          document.documentElement.classList.remove("admin-pc");
+          menuDropdown.classList.add("hidden");
+        });
+        document.getElementById("m-logout").addEventListener("click", function () {
+          if (sessionStorage.getItem("wb_super_assumed")) {
+            sessionStorage.removeItem("wb_admin_token");
+            sessionStorage.removeItem("wb_workspace_id");
+            sessionStorage.removeItem("wb_workspace_name");
+            sessionStorage.removeItem("wb_super_assumed");
+            location.href = "/super";
+            return;
+          }
+          sessionStorage.removeItem("wb_admin_token");
+          sessionStorage.removeItem("wb_workspace_id");
+          sessionStorage.removeItem("wb_workspace_name");
+          location.href = "/login?role=admin";
+        });
+      })();
+
+      ws.onopen = function () {
+        setStatus("済み", true);
+        sendBtn.disabled = false;
+        footerHint.textContent = "接続済み · 指示を入力して送信できます。";
+        refreshOnlineWorkers();
+        setInterval(refreshOnlineWorkers, 4000);
+      };
+
+      ws.onclose = function () {
+        setStatus("切断されました", false);
+        sendBtn.disabled = true;
+        footerHint.textContent = "切断されました。";
+      };
+
+      ws.onerror = function () {
+        setStatus("エラー", false);
+      };
+
+      ws.onmessage = function (ev) {
+        let data;
+        try {
+          data = JSON.parse(ev.data);
+        } catch (e) {
+          return;
+        }
+        if (data.type === "instruction_sent") {
+          var d = Number(data.delivered || 0);
+          var wo = Number(data.workers_online || 0);
+          var w = data.warning;
+          if (w === "no_workers_online") {
+            footerHint.textContent =
+              "送信しましたが、接続中のスタッフがいません（同じワークスペースで worker を開いていますか？）。";
+          } else if (w === "no_matching_recipients") {
+            footerHint.textContent =
+              "送信先スタッフに届きませんでした。一覧を更新し、選択または「全員」を確認してください。";
+          } else if (w === "delivery_failed") {
+            footerHint.textContent = "送信に失敗しました。再接続してください。";
+          } else if (d > 0) {
+            footerHint.textContent =
+              "スタッフ " +
+              d +
+              " 端末に送信しました。（接続中のスタッフ数: " +
+              wo +
+              "）";
+          } else {
+            footerHint.textContent = "処理しましたが、届いた端末はありませんでした。";
+          }
+          return;
+        }
+        if (data.type === "worker_response" && data.button) {
+          const labels = {
+            OK: "わかりました（OK）",
+            REPEAT: "もういちど（Repeat）",
+            NG: "わからない（NG）",
+            CUSTOM: "自分で答える（CUSTOM）",
+          };
+          const colors = {
+            OK: "border-l-4 border-l-emerald-500 bg-emerald-50/80",
+            REPEAT: "border-l-4 border-l-amber-400 bg-amber-50/80",
+            NG: "border-l-4 border-l-rose-400 bg-rose-50/80",
+            CUSTOM: "border-l-4 border-l-indigo-600 bg-indigo-50/80",
+          };
+          const li = document.createElement("li");
+          const t = new Date(data.ts ? data.ts * 1000 : Date.now()).toLocaleTimeString();
+          li.className = "rounded-lg px-3 py-2 " + (colors[data.button] || "border-l-4 border-l-gray-400 bg-gray-100");
+          li.textContent = "[" + t + "] " + (labels[data.button] || data.button);
+          responses.prepend(li);
+        }
+      };
+
+      function sendInstruction() {
+        const text = input.value.trim();
+        if (!text || ws.readyState !== WebSocket.OPEN) return;
+        var modeEl = document.querySelector('input[name="send-mode"]:checked');
+        var mode = modeEl ? modeEl.value : "all";
+        footerHint.textContent = "送信中…";
+        if (mode === "selected") {
+          var boxes = workerCheckboxes.querySelectorAll('input[type="checkbox"]:checked');
+          var target_tokens = [];
+          boxes.forEach(function (cb) {
+            target_tokens.push(cb.value);
+          });
+          if (!target_tokens.length) {
+            footerHint.textContent = "送信先にチェックを入れるか、「全員」に切り替えてください。";
+            return;
+          }
+          ws.send(JSON.stringify({ type: "instruction", text: text, target_tokens: target_tokens }));
+        } else {
+          ws.send(JSON.stringify({ type: "instruction", text: text }));
+        }
+      }
+
+      sendBtn.addEventListener("click", sendInstruction);
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          sendInstruction();
+        }
+      });
+
+      var curEndpoints = {
+        kaigo: "/api/v1/curriculum/kaigo",
+        food: "/api/v1/curriculum/food",
+        "food-glossary": "/api/v1/curriculum/food-glossary",
+        "course-list": "/api/v1/curriculum/course-list",
+        extra: "/api/v1/curriculum/extra",
+      };
+      var curRows = [];
+      var curStatus = document.getElementById("cur-status");
+      var curSearch = document.getElementById("cur-search");
+      var curTableWrap = document.getElementById("cur-table-wrap");
+      var curThead = document.getElementById("cur-thead");
+      var curTbody = document.getElementById("cur-tbody");
+
+      function setCurTabActive(key) {
+        document.querySelectorAll(".cur-tab").forEach(function (btn) {
+          var k = btn.getAttribute("data-cur-key");
+          var on = k === key;
+          btn.className =
+            "cur-tab px-3 py-1.5 rounded-lg text-xs font-medium border " +
+            (on ? "bg-indigo-100 border-indigo-400 text-indigo-950" : "bg-gray-100 hover:bg-gray-200 border-gray-200 text-gray-800");
+        });
+      }
+
+      function renderCurriculumTable(rows) {
+        curThead.innerHTML = "";
+        curTbody.innerHTML = "";
+        if (!rows.length) {
+          curTableWrap.classList.add("hidden");
+          return;
+        }
+        curTableWrap.classList.remove("hidden");
+        var keys = Object.keys(rows[0]);
+        var trh = document.createElement("tr");
+        keys.forEach(function (k) {
+          var th = document.createElement("th");
+          th.className = "px-2 py-2 border-b border-gray-200 font-medium max-w-[12rem] truncate text-gray-800";
+          th.title = k;
+          th.textContent = k;
+          trh.appendChild(th);
+        });
+        curThead.appendChild(trh);
+        rows.forEach(function (row) {
+          var tr = document.createElement("tr");
+          tr.className = "border-b border-gray-100 hover:bg-gray-50";
+          keys.forEach(function (k) {
+            var td = document.createElement("td");
+            td.className = "px-2 py-1.5 align-top text-gray-700 max-w-[12rem]";
+            var v = row[k];
+            td.textContent = v == null ? "" : String(v);
+            tr.appendChild(td);
+          });
+          curTbody.appendChild(tr);
+        });
+      }
+
+      function applyCurSearch() {
+        var q = (curSearch.value || "").trim().toLowerCase();
+        if (!q) {
+          renderCurriculumTable(curRows);
+          return;
+        }
+        var filtered = curRows.filter(function (row) {
+          return JSON.stringify(row).toLowerCase().indexOf(q) !== -1;
+        });
+        renderCurriculumTable(filtered);
+        curStatus.textContent = curRows.length ? "表示 " + filtered.length + " / " + curRows.length + " 行" : "";
+      }
+
+      function loadCurriculum(key) {
+        var url = curEndpoints[key];
+        if (!url) return;
+        setCurTabActive(key);
+        curStatus.textContent = "読み込み中…";
+        curTableWrap.classList.add("hidden");
+        curRows = [];
+        fetch(url)
+          .then(function (r) {
+            if (!r.ok) throw new Error(r.status + " " + r.statusText);
+            return r.json();
+          })
+          .then(function (data) {
+            curRows = data.rows || [];
+            curStatus.textContent =
+              data.row_count != null ? data.row_count + " 行" : curRows.length + " 行";
+            renderCurriculumTable(curRows);
+            applyCurSearch();
+          })
+          .catch(function (err) {
+            curStatus.textContent = "読み込み失敗: " + err.message;
+            curThead.innerHTML = "";
+            curTbody.innerHTML = "";
+          });
+      }
+
+      document.querySelectorAll(".cur-tab").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          loadCurriculum(btn.getAttribute("data-cur-key"));
+        });
+      });
+      curSearch.addEventListener("input", applyCurSearch);
+    })();
+  </script>
+</body>
+</html>
