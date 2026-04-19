@@ -6,21 +6,157 @@
   <title>WorkBridge — 総運営 · 顧客ワークスペース</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    body, button { font-family: "Meiryo UI", "Meiryo", sans-serif; }
+    body, button, input { font-family: "Meiryo UI", "Meiryo", sans-serif; }
   </style>
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
-  <div class="max-w-2xl mx-auto px-4 py-8">
-    <p class="text-[11px] font-semibold text-indigo-600">WorkBridge 総運営</p>
-    <h1 class="text-xl font-bold mt-1 mb-2">顧客ワークスペースを選択</h1>
-    <p class="text-sm text-gray-600 mb-6">選択すると、その現場の管理者画面と同じ権限で開きます。</p>
+  <div class="max-w-7xl mx-auto px-4 py-8">
     <p id="err" class="text-sm text-rose-600 hidden mb-4"></p>
-    <ul id="list" class="space-y-2"></ul>
-    <p id="empty" class="text-sm text-gray-500 hidden">ワークスペースがありません。顧客の管理者が一度ログインすると作成されます。</p>
-    <p class="mt-8 text-center">
-      <a href="/login" class="text-sm text-indigo-700 underline">ログインに戻る</a>
-    </p>
+    <p id="ok-msg" class="text-sm text-emerald-700 hidden mb-4"></p>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <!-- 左: 説明・新規作成 -->
+      <div class="lg:col-span-5 space-y-6">
+        <div>
+          <p class="text-[11px] font-semibold text-indigo-600">WorkBridge 総運営</p>
+          <h1 class="text-xl font-bold mt-1 mb-2">顧客ワークスペース</h1>
+          <p class="text-sm text-gray-600">
+            ワークスペースの新規作成、組織情報・スタッフ個人アカウントの登録、管理者用URLの発行ができます。右の一覧から開くと、その現場の管理者画面と同じ権限で入れます。
+          </p>
+        </div>
+
+        <section class="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <h2 class="text-sm font-semibold text-gray-900 mb-3">新規ワークスペース（現場・店舗）</h2>
+          <p class="text-xs text-gray-500 mb-4">名前はログイン時の「ワークスペース名」として使われます。会社名・店舗名・部署は一覧・管理者画面に表示されます。</p>
+          <div class="grid gap-3 sm:grid-cols-2">
+            <label class="block text-xs text-gray-600 sm:col-span-2">
+              表示名・ログイン名 <span class="text-rose-600">*</span>
+              <input id="new-name" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="例：渋谷デイサービス" autocomplete="organization" />
+            </label>
+            <label class="block text-xs text-gray-600">
+              会社名（任意）
+              <input id="new-company" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="株式会社〇〇" />
+            </label>
+            <label class="block text-xs text-gray-600">
+              店舗・拠点名（任意）
+              <input id="new-branch" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="渋谷店" />
+            </label>
+            <label class="block text-xs text-gray-600 sm:col-span-2">
+              部署名（任意）
+              <input id="new-dept" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="介護サービス部" />
+            </label>
+          </div>
+          <button type="button" id="btn-create-ws" class="mt-4 w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-900 text-white text-sm font-medium hover:bg-indigo-800 disabled:opacity-50">
+            ワークスペースを作成
+          </button>
+          <div id="create-result" class="mt-4 hidden rounded-xl bg-gray-50 border border-gray-100 p-4 text-xs space-y-2">
+            <p class="font-medium text-gray-800">作成しました。管理者に渡すURL（そのまま開けば管理者画面）：</p>
+            <p class="break-all font-mono text-[11px] text-indigo-900 bg-white rounded-lg px-2 py-2 border" id="create-admin-url"></p>
+            <button type="button" id="btn-copy-create-url" class="text-indigo-700 underline text-xs">URLをコピー</button>
+          </div>
+        </section>
+
+        <p class="text-center lg:text-left">
+          <a href="/login" class="text-sm text-indigo-700 underline">ログインに戻る</a>
+        </p>
+      </div>
+
+      <!-- 右: 一覧 -->
+      <aside class="lg:col-span-7 lg:sticky lg:top-6 space-y-3">
+        <div class="flex flex-col gap-2 border-b border-gray-200 pb-2 sm:flex-row sm:items-end sm:justify-between">
+          <h2 class="text-base font-semibold text-gray-900 shrink-0">ワークスペース一覧</h2>
+          <div class="flex flex-1 flex-col gap-1 min-w-0 sm:max-w-xs sm:ml-auto">
+            <label for="ws-search" class="sr-only">検索</label>
+            <input
+              id="ws-search"
+              type="search"
+              autocomplete="off"
+              placeholder="名前・会社・IDで検索…"
+              class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            />
+          </div>
+        </div>
+        <ul id="list" class="space-y-3 max-h-[calc(100vh-8rem)] overflow-y-auto pr-1"></ul>
+        <p id="empty" class="text-sm text-gray-500 hidden py-8 text-center border border-dashed border-gray-200 rounded-xl bg-white">
+          ワークスペースがありません。左のフォームから作成するか、既存の管理画面から作成されているか確認してください。
+        </p>
+      </aside>
+    </div>
   </div>
+
+  <!-- 組織情報 -->
+  <div id="modal-org" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5 max-h-[90vh] overflow-y-auto">
+      <h3 class="font-semibold text-gray-900 mb-1">組織情報の編集</h3>
+      <p id="modal-org-ws" class="text-xs text-gray-500 font-mono mb-4"></p>
+      <div class="space-y-3">
+        <label class="block text-xs text-gray-600">会社名
+          <input id="org-company" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+        </label>
+        <label class="block text-xs text-gray-600">店舗・拠点名
+          <input id="org-branch" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+        </label>
+        <label class="block text-xs text-gray-600">部署名
+          <input id="org-dept" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+        </label>
+      </div>
+      <p id="modal-org-status" class="text-xs min-h-[1rem] mt-3 text-rose-600"></p>
+      <div class="flex gap-2 mt-4">
+        <button type="button" id="modal-org-save" class="flex-1 py-2.5 rounded-xl bg-indigo-900 text-white text-sm font-medium hover:bg-indigo-800">保存</button>
+        <button type="button" id="modal-org-close" class="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-800 text-sm font-medium">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- スタッフアカウント -->
+  <div id="modal-staff" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5 max-h-[90vh] overflow-y-auto">
+      <h3 class="font-semibold text-gray-900 mb-1">スタッフ個人アカウント</h3>
+      <p id="modal-staff-ws" class="text-xs text-gray-500 mb-4"></p>
+      <p class="text-[11px] text-gray-600 mb-2">登録済み</p>
+      <ul id="staff-list" class="text-sm space-y-1 max-h-40 overflow-y-auto border border-gray-100 rounded-lg p-2 mb-4 bg-gray-50"></ul>
+      <p class="text-[11px] font-medium text-gray-700 mb-2">追加</p>
+      <div class="grid gap-2 sm:grid-cols-2">
+        <label class="block text-xs text-gray-600 sm:col-span-2">スタッフID（ログイン）
+          <input id="staff-login" type="text" maxlength="100" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm font-mono" autocomplete="off" />
+        </label>
+        <label class="block text-xs text-gray-600 sm:col-span-2">表示名
+          <input id="staff-display" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+        </label>
+        <label class="block text-xs text-gray-600 sm:col-span-2">パスワード（4文字以上）
+          <input id="staff-pw" type="password" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" autocomplete="new-password" />
+        </label>
+      </div>
+      <p id="modal-staff-status" class="text-xs min-h-[1rem] mt-2 text-rose-600"></p>
+      <div class="flex gap-2 mt-4">
+        <button type="button" id="modal-staff-add" class="flex-1 py-2.5 rounded-xl bg-indigo-900 text-white text-sm font-medium hover:bg-indigo-800">追加</button>
+        <button type="button" id="modal-staff-close" class="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-800 text-sm font-medium">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 参加用リンク -->
+  <div id="modal-join" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+      <h3 class="font-semibold text-gray-900 mb-2">スタッフ参加用リンク</h3>
+      <p class="text-xs text-gray-600 mb-3">共有パスワードで入るスタッフ向け。リンクは一定時間で切れます。</p>
+      <p class="break-all font-mono text-[11px] text-indigo-900 bg-gray-50 rounded-lg px-2 py-2 border" id="join-url-text"></p>
+      <button type="button" id="btn-copy-join" class="mt-3 text-indigo-700 underline text-sm">コピー</button>
+      <button type="button" id="modal-join-close" class="mt-4 w-full py-2.5 rounded-xl bg-gray-100 text-gray-800 text-sm font-medium">閉じる</button>
+    </div>
+  </div>
+
+  <!-- 管理者URL発行 -->
+  <div id="modal-admin" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
+      <h3 class="font-semibold text-gray-900 mb-2">管理者画面のURL（トークン付き）</h3>
+      <p class="text-xs text-gray-600 mb-3">現場マネージャーに渡してください。ポータルの管理者パスワードと組み合わせてログインします。</p>
+      <p class="break-all font-mono text-[11px] text-indigo-900 bg-gray-50 rounded-lg px-2 py-2 border" id="admin-url-text"></p>
+      <button type="button" id="btn-copy-admin" class="mt-3 text-indigo-700 underline text-sm">コピー</button>
+      <button type="button" id="modal-admin-close" class="mt-4 w-full py-2.5 rounded-xl bg-gray-100 text-gray-800 text-sm font-medium">閉じる</button>
+    </div>
+  </div>
+
   <script>
     (function () {
       var tok = sessionStorage.getItem("wb_super_token");
@@ -28,85 +164,613 @@
         location.href = "/login?role=super_admin";
         return;
       }
+
       var err = document.getElementById("err");
+      var okMsg = document.getElementById("ok-msg");
       var list = document.getElementById("list");
       var empty = document.getElementById("empty");
-      fetch("/api/v1/workspaces?super_token=" + encodeURIComponent(tok))
-        .then(function (r) {
-          if (r.status === 401 || r.status === 403) {
-            sessionStorage.removeItem("wb_super_token");
-            location.href = "/login?role=super_admin";
-            return Promise.reject();
-          }
-          if (!r.ok) throw new Error(String(r.status));
-          return r.json();
-        })
-        .then(function (rows) {
-          if (!rows || !rows.length) {
-            empty.classList.remove("hidden");
-            return;
-          }
-          rows.forEach(function (w) {
-            var li = document.createElement("li");
-            var btn = document.createElement("button");
-            btn.type = "button";
-            btn.className =
-              "w-full text-left px-4 py-3 rounded-xl bg-white border border-gray-200 shadow-sm hover:bg-indigo-50 hover:border-indigo-200 transition";
-            var metaParts = [];
-            if (w.company_name) metaParts.push("会社: " + w.company_name);
-            if (w.branch_name) metaParts.push("店舗: " + w.branch_name);
-            if (w.department_name) metaParts.push("部署: " + w.department_name);
-            var metaHtml =
-              metaParts.length > 0
-                ? "<span class=\"block text-[11px] text-gray-600 mt-1 leading-snug\">" +
-                  escapeHtml(metaParts.join(" · ")) +
-                  "</span>"
-                : "";
-            btn.innerHTML =
-              "<span class=\"font-semibold text-gray-900\">" +
-              escapeHtml(w.name) +
-              "</span><span class=\"block text-[11px] text-gray-500 font-mono mt-1\">" +
-              escapeHtml(w.id) +
-              "</span>" +
-              metaHtml;
-            btn.addEventListener("click", function () {
-              btn.disabled = true;
-              fetch("/api/v1/auth/super-assume", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ super_token: tok, workspace_id: w.id }),
-              })
-                .then(function (r) {
-                  if (!r.ok) return r.json().then(function (j) { throw new Error(j.detail || r.status); });
-                  return r.json();
-                })
-                .then(function (data) {
-                  sessionStorage.setItem("wb_admin_token", data.admin_token);
-                  sessionStorage.setItem("wb_workspace_id", data.workspace_id);
-                  sessionStorage.setItem("wb_workspace_name", data.workspace_name);
-                  sessionStorage.setItem("wb_super_assumed", "1");
-                  location.href = "/admin";
-                })
-                .catch(function (e) {
-                  err.textContent = String(e.message || e);
-                  err.classList.remove("hidden");
-                  btn.disabled = false;
-                });
-            });
-            li.appendChild(btn);
-            list.appendChild(li);
-          });
-        })
-        .catch(function (e) {
-          if (!e) return;
-          err.textContent = "一覧を取得できませんでした。";
-          err.classList.remove("hidden");
-        });
+      var wsSearch = document.getElementById("ws-search");
+      var workspaceRowsCache = [];
+
+      var modalOrg = document.getElementById("modal-org");
+      var modalStaff = document.getElementById("modal-staff");
+      var modalJoin = document.getElementById("modal-join");
+      var modalAdmin = document.getElementById("modal-admin");
+
+      var ctxOrg = { id: null };
+      var ctxStaff = { id: null, name: "" };
+
+      function showErr(msg) {
+        err.textContent = msg || "";
+        err.classList.toggle("hidden", !msg);
+      }
+      function showOk(msg) {
+        okMsg.textContent = msg || "";
+        okMsg.classList.toggle("hidden", !msg);
+      }
+
       function escapeHtml(s) {
         var d = document.createElement("div");
         d.textContent = s;
         return d.innerHTML;
       }
+
+      function copyText(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          return navigator.clipboard.writeText(text).then(function () {
+            showOk("コピーしました。");
+            setTimeout(function () { showOk(""); }, 2000);
+          });
+        }
+        return Promise.reject();
+      }
+
+      function api(path, opts) {
+        return fetch(path, opts).then(function (r) {
+          if (r.status === 401 || r.status === 403) {
+            sessionStorage.removeItem("wb_super_token");
+            location.href = "/login?role=super_admin";
+            return Promise.reject();
+          }
+          return r;
+        });
+      }
+
+      function wsFilterMatch(w, q) {
+        if (!q) return true;
+        var hay = (
+          (w.name || "") +
+          " " +
+          (w.id || "") +
+          " " +
+          (w.company_name || "") +
+          " " +
+          (w.branch_name || "") +
+          " " +
+          (w.department_name || "")
+        ).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      }
+
+      function apiReorder(orderedIds) {
+        return api("/api/v1/workspaces/reorder?super_token=" + encodeURIComponent(tok), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ordered_workspace_ids: orderedIds }),
+        }).then(function (r) {
+          if (!r.ok) throw new Error(String(r.status));
+        });
+      }
+
+      function renderWorkspaceList() {
+        var q = (wsSearch && wsSearch.value ? wsSearch.value : "").trim().toLowerCase();
+        list.innerHTML = "";
+        var rows = (workspaceRowsCache || []).filter(function (w) {
+          return wsFilterMatch(w, q);
+        });
+        if (!workspaceRowsCache.length) {
+          empty.classList.remove("hidden");
+          return;
+        }
+        empty.classList.add("hidden");
+        if (!rows.length) {
+          var noHit = document.createElement("p");
+          noHit.className = "text-sm text-gray-500 py-6 text-center border border-dashed border-gray-200 rounded-xl bg-white";
+          noHit.textContent = "検索に一致するワークスペースがありません。";
+          list.appendChild(noHit);
+          return;
+        }
+        rows.forEach(function (w) {
+          var fullIdx = workspaceRowsCache.findIndex(function (x) {
+            return x.id === w.id;
+          });
+          var li = document.createElement("li");
+          li.className = "rounded-xl bg-white border border-gray-200 shadow-sm overflow-hidden";
+          li.setAttribute("data-ws-id", w.id);
+          li.draggable = true;
+          li.addEventListener("dragstart", function (ev) {
+            ev.dataTransfer.setData("text/plain", w.id);
+            ev.dataTransfer.effectAllowed = "move";
+            li.classList.add("opacity-60");
+          });
+          li.addEventListener("dragend", function () {
+            li.classList.remove("opacity-60");
+          });
+          li.addEventListener("dragover", function (ev) {
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = "move";
+          });
+          li.addEventListener("drop", function (ev) {
+            ev.preventDefault();
+            var fromId = ev.dataTransfer.getData("text/plain");
+            if (!fromId || fromId === w.id) return;
+            var order = workspaceRowsCache.map(function (x) {
+              return x.id;
+            });
+            var fi = order.indexOf(fromId);
+            var ti = order.indexOf(w.id);
+            if (fi < 0 || ti < 0) return;
+            order.splice(fi, 1);
+            var insertAt = order.indexOf(w.id);
+            order.splice(insertAt, 0, fromId);
+            apiReorder(order)
+              .then(function () {
+                return loadList();
+              })
+              .catch(function () {
+                showErr("並び替えを保存できませんでした。");
+                loadList();
+              });
+          });
+
+          var metaParts = [];
+          if (w.company_name) metaParts.push("会社: " + w.company_name);
+          if (w.branch_name) metaParts.push("店舗: " + w.branch_name);
+          if (w.department_name) metaParts.push("部署: " + w.department_name);
+          var metaHtml =
+            metaParts.length > 0
+              ? "<p class=\"text-[11px] text-gray-600 mt-2 leading-snug\">" +
+                escapeHtml(metaParts.join(" · ")) +
+                "</p>"
+              : "";
+
+          var rowWrap = document.createElement("div");
+          rowWrap.className = "flex gap-2 items-stretch";
+
+          var moveCol = document.createElement("div");
+          moveCol.className =
+            "flex flex-col justify-center gap-1 shrink-0 py-3 pl-2 border-r border-gray-100 bg-gray-50/50";
+
+          function mkArrow(label, disabled, delta) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.setAttribute("aria-label", label);
+            b.disabled = !!disabled;
+            b.className =
+              "h-7 w-8 rounded border text-xs font-bold leading-none border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:pointer-events-none";
+            b.textContent = delta < 0 ? "↑" : "↓";
+            b.addEventListener("click", function () {
+              var order = workspaceRowsCache.map(function (x) {
+                return x.id;
+              });
+              var i = order.indexOf(w.id);
+              if (i < 0) return;
+              var j = i + delta;
+              if (j < 0 || j >= order.length) return;
+              var t = order[i];
+              order[i] = order[j];
+              order[j] = t;
+              apiReorder(order)
+                .then(function () {
+                  return loadList();
+                })
+                .catch(function () {
+                  showErr("並び替えを保存できませんでした。");
+                  loadList();
+                });
+            });
+            return b;
+          }
+
+          var atFirst = fullIdx <= 0;
+          var atLast = fullIdx < 0 || fullIdx >= workspaceRowsCache.length - 1;
+          moveCol.appendChild(mkArrow("上へ", atFirst, -1));
+          moveCol.appendChild(mkArrow("下へ", atLast, 1));
+
+          var main = document.createElement("div");
+          main.className = "flex-1 min-w-0";
+
+          var head = document.createElement("div");
+          head.className = "px-3 sm:px-4 py-3 border-b border-gray-100 bg-gray-50/80";
+          head.innerHTML =
+            "<p class=\"font-semibold text-gray-900\">" +
+            escapeHtml(w.name) +
+            "</p>" +
+            "<p class=\"text-[11px] text-gray-500 font-mono mt-1\">" +
+            escapeHtml(w.id) +
+            "</p>" +
+            metaHtml;
+
+          var actions = document.createElement("div");
+          actions.className = "px-3 py-2 flex flex-wrap gap-2";
+
+          function mkBtn(label, cls, onClick) {
+            var btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = cls;
+            btn.textContent = label;
+            btn.addEventListener("click", onClick);
+            return btn;
+          }
+
+          var btnBase =
+            "text-xs px-3 py-2 rounded-lg border font-medium transition disabled:opacity-50";
+
+          actions.appendChild(
+            mkBtn("管理者として開く", btnBase + " border-indigo-300 bg-indigo-50 text-indigo-900 hover:bg-indigo-100", function () {
+              openAsAdmin(w.id);
+            }),
+          );
+          actions.appendChild(
+            mkBtn("組織情報", btnBase + " border-gray-200 bg-white hover:bg-gray-50", function () {
+              openOrgModal(w);
+            }),
+          );
+          actions.appendChild(
+            mkBtn("スタッフ追加", btnBase + " border-gray-200 bg-white hover:bg-gray-50", function () {
+              openStaffModal(w);
+            }),
+          );
+          actions.appendChild(
+            mkBtn("参加リンク", btnBase + " border-gray-200 bg-white hover:bg-gray-50", function () {
+              openJoinModal(w.id);
+            }),
+          );
+          actions.appendChild(
+            mkBtn("管理者URL発行", btnBase + " border-gray-200 bg-white hover:bg-gray-50", function () {
+              openAdminUrlModal(w.id);
+            }),
+          );
+
+          main.appendChild(head);
+          main.appendChild(actions);
+          rowWrap.appendChild(moveCol);
+          rowWrap.appendChild(main);
+          li.appendChild(rowWrap);
+          list.appendChild(li);
+        });
+      }
+
+      function loadList() {
+        showErr("");
+        return api("/api/v1/workspaces?super_token=" + encodeURIComponent(tok))
+          .then(function (r) {
+            if (!r.ok) throw new Error(String(r.status));
+            return r.json();
+          })
+          .then(function (rows) {
+            workspaceRowsCache = rows || [];
+            if (!workspaceRowsCache.length) {
+              list.innerHTML = "";
+              empty.classList.remove("hidden");
+              return;
+            }
+            empty.classList.add("hidden");
+            renderWorkspaceList();
+          })
+          .catch(function (e) {
+            if (!e) return;
+            showErr("一覧を取得できませんでした。");
+          });
+      }
+
+      if (wsSearch) {
+        wsSearch.addEventListener("input", function () {
+          renderWorkspaceList();
+        });
+      }
+
+      function openAsAdmin(workspaceId) {
+        showErr("");
+        api("/api/v1/auth/super-assume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ super_token: tok, workspace_id: workspaceId }),
+        })
+          .then(function (r) {
+            if (!r.ok) return r.json().then(function (j) { throw new Error(j.detail || r.status); });
+            return r.json();
+          })
+          .then(function (data) {
+            sessionStorage.setItem("wb_admin_token", data.admin_token);
+            sessionStorage.setItem("wb_workspace_id", data.workspace_id);
+            sessionStorage.setItem("wb_workspace_name", data.workspace_name);
+            sessionStorage.setItem("wb_super_assumed", "1");
+            location.href = "/admin";
+          })
+          .catch(function (e) {
+            showErr(String(e.message || e));
+          });
+      }
+
+      function openOrgModal(w) {
+        ctxOrg.id = w.id;
+        document.getElementById("modal-org-ws").textContent = w.name + " · " + w.id;
+        document.getElementById("modal-org-status").textContent = "";
+        api(
+          "/api/v1/workspaces/" +
+            encodeURIComponent(w.id) +
+            "/org?super_token=" +
+            encodeURIComponent(tok),
+        )
+          .then(function (r) {
+            if (!r.ok) throw new Error();
+            return r.json();
+          })
+          .then(function (o) {
+            document.getElementById("org-company").value = o.company_name || "";
+            document.getElementById("org-branch").value = o.branch_name || "";
+            document.getElementById("org-dept").value = o.department_name || "";
+            modalOrg.classList.remove("hidden");
+          })
+          .catch(function () {
+            document.getElementById("org-company").value = w.company_name || "";
+            document.getElementById("org-branch").value = w.branch_name || "";
+            document.getElementById("org-dept").value = w.department_name || "";
+            modalOrg.classList.remove("hidden");
+          });
+      }
+
+      document.getElementById("modal-org-save").addEventListener("click", function () {
+        if (!ctxOrg.id) return;
+        var st = document.getElementById("modal-org-status");
+        st.textContent = "";
+        var body = {
+          company_name: document.getElementById("org-company").value.trim(),
+          branch_name: document.getElementById("org-branch").value.trim(),
+          department_name: document.getElementById("org-dept").value.trim(),
+        };
+        api(
+          "/api/v1/workspaces/" +
+            encodeURIComponent(ctxOrg.id) +
+            "/org?super_token=" +
+            encodeURIComponent(tok),
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        )
+          .then(function (r) {
+            if (!r.ok) return r.json().then(function (j) { throw new Error(j.detail || r.status); });
+            return r.json();
+          })
+          .then(function () {
+            st.textContent = "";
+            modalOrg.classList.add("hidden");
+            showOk("保存しました。");
+            setTimeout(function () { showOk(""); }, 2000);
+            loadList();
+          })
+          .catch(function (e) {
+            st.textContent = String(e.message || e);
+          });
+      });
+      document.getElementById("modal-org-close").addEventListener("click", function () {
+        modalOrg.classList.add("hidden");
+      });
+      modalOrg.addEventListener("click", function (ev) {
+        if (ev.target === modalOrg) modalOrg.classList.add("hidden");
+      });
+
+      function refreshStaffUl(wid) {
+        var ul = document.getElementById("staff-list");
+        ul.innerHTML = "";
+        return api(
+          "/api/v1/workspaces/" +
+            encodeURIComponent(wid) +
+            "/staff-accounts?super_token=" +
+            encodeURIComponent(tok),
+        )
+          .then(function (r) {
+            if (!r.ok) throw new Error();
+            return r.json();
+          })
+          .then(function (rows) {
+            if (!rows || !rows.length) {
+              ul.innerHTML = "<li class=\"text-gray-400 text-xs py-1\">（まだありません）</li>";
+              return;
+            }
+            rows.forEach(function (a) {
+              var li = document.createElement("li");
+              li.className = "flex justify-between gap-2 py-1 border-b border-gray-100 last:border-0";
+              li.innerHTML =
+                "<span class=\"font-mono text-[11px]\">" +
+                escapeHtml(a.login_id) +
+                "</span><span class=\"text-gray-700 truncate\">" +
+                escapeHtml(a.display_name || "") +
+                "</span>";
+              ul.appendChild(li);
+            });
+          });
+      }
+
+      function openStaffModal(w) {
+        ctxStaff.id = w.id;
+        ctxStaff.name = w.name;
+        document.getElementById("modal-staff-ws").textContent = w.name + " · " + w.id;
+        document.getElementById("staff-login").value = "";
+        document.getElementById("staff-display").value = "";
+        document.getElementById("staff-pw").value = "";
+        document.getElementById("modal-staff-status").textContent = "";
+        modalStaff.classList.remove("hidden");
+        refreshStaffUl(w.id).catch(function () {
+          document.getElementById("staff-list").innerHTML =
+            "<li class=\"text-rose-600 text-xs\">一覧を読み込めませんでした。</li>";
+        });
+      }
+
+      document.getElementById("modal-staff-add").addEventListener("click", function () {
+        if (!ctxStaff.id) return;
+        var st = document.getElementById("modal-staff-status");
+        st.textContent = "";
+        var loginId = (document.getElementById("staff-login").value || "").trim();
+        var disp = (document.getElementById("staff-display").value || "").trim();
+        var pw = document.getElementById("staff-pw").value || "";
+        if (!loginId || !pw || pw.length < 4) {
+          st.textContent = "スタッフIDとパスワード（4文字以上）を入力してください。";
+          return;
+        }
+        api(
+          "/api/v1/workspaces/" +
+            encodeURIComponent(ctxStaff.id) +
+            "/staff-accounts?super_token=" +
+            encodeURIComponent(tok),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              login_id: loginId,
+              display_name: disp,
+              password: pw,
+            }),
+          },
+        )
+          .then(function (r) {
+            if (!r.ok)
+              return r.json().then(function (j) {
+                throw new Error(typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail));
+              });
+            return r.json();
+          })
+          .then(function () {
+            document.getElementById("staff-login").value = "";
+            document.getElementById("staff-display").value = "";
+            document.getElementById("staff-pw").value = "";
+            showOk("スタッフを追加しました。");
+            setTimeout(function () { showOk(""); }, 2000);
+            return refreshStaffUl(ctxStaff.id);
+          })
+          .catch(function (e) {
+            st.textContent = String(e.message || e);
+          });
+      });
+      document.getElementById("modal-staff-close").addEventListener("click", function () {
+        modalStaff.classList.add("hidden");
+      });
+      modalStaff.addEventListener("click", function (ev) {
+        if (ev.target === modalStaff) modalStaff.classList.add("hidden");
+      });
+
+      function openJoinModal(workspaceId) {
+        api("/api/v1/workspaces/" + encodeURIComponent(workspaceId) + "/join-info")
+          .then(function (r) {
+            if (!r.ok) throw new Error();
+            return r.json();
+          })
+          .then(function (d) {
+            document.getElementById("join-url-text").textContent = d.join_url || "";
+            modalJoin.classList.remove("hidden");
+          })
+          .catch(function () {
+            showErr("参加リンクを取得できませんでした。");
+          });
+      }
+      document.getElementById("btn-copy-join").addEventListener("click", function () {
+        var t = document.getElementById("join-url-text").textContent || "";
+        if (t) copyText(t);
+      });
+      document.getElementById("modal-join-close").addEventListener("click", function () {
+        modalJoin.classList.add("hidden");
+      });
+      modalJoin.addEventListener("click", function (ev) {
+        if (ev.target === modalJoin) modalJoin.classList.add("hidden");
+      });
+
+      function openAdminUrlModal(workspaceId) {
+        api("/api/v1/auth/super-assume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ super_token: tok, workspace_id: workspaceId }),
+        })
+          .then(function (r) {
+            if (!r.ok) return r.json().then(function (j) { throw new Error(j.detail || r.status); });
+            return r.json();
+          })
+          .then(function (data) {
+            var url =
+              location.origin +
+              "/admin?token=" +
+              encodeURIComponent(data.admin_token);
+            document.getElementById("admin-url-text").textContent = url;
+            modalAdmin.classList.remove("hidden");
+          })
+          .catch(function (e) {
+            showErr(String(e.message || e));
+          });
+      }
+      document.getElementById("btn-copy-admin").addEventListener("click", function () {
+        var t = document.getElementById("admin-url-text").textContent || "";
+        if (t) copyText(t);
+      });
+      document.getElementById("modal-admin-close").addEventListener("click", function () {
+        modalAdmin.classList.add("hidden");
+      });
+      modalAdmin.addEventListener("click", function (ev) {
+        if (ev.target === modalAdmin) modalAdmin.classList.add("hidden");
+      });
+
+      document.getElementById("btn-create-ws").addEventListener("click", function () {
+        showErr("");
+        var name = (document.getElementById("new-name").value || "").trim();
+        if (!name) {
+          showErr("表示名・ログイン名を入力してください。");
+          return;
+        }
+        var btn = document.getElementById("btn-create-ws");
+        btn.disabled = true;
+        var company = (document.getElementById("new-company").value || "").trim();
+        var branch = (document.getElementById("new-branch").value || "").trim();
+        var dept = (document.getElementById("new-dept").value || "").trim();
+
+        api("/api/v1/workspaces", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name }),
+        })
+          .then(function (r) {
+            if (!r.ok) throw new Error(String(r.status));
+            return r.json();
+          })
+          .then(function (data) {
+            var wid = data.id;
+            var adminTok = data.admin_token;
+            var patchBody = {};
+            if (company) patchBody.company_name = company;
+            if (branch) patchBody.branch_name = branch;
+            if (dept) patchBody.department_name = dept;
+
+            function finishOrg() {
+              var adminUrl = location.origin + "/admin?token=" + encodeURIComponent(adminTok);
+              document.getElementById("create-admin-url").textContent = adminUrl;
+              document.getElementById("create-result").classList.remove("hidden");
+              document.getElementById("btn-copy-create-url").onclick = function () {
+                copyText(adminUrl);
+              };
+              showOk("ワークスペースを作成しました。");
+              setTimeout(function () { showOk(""); }, 3000);
+              loadList();
+            }
+
+            if (!Object.keys(patchBody).length) {
+              finishOrg();
+              return null;
+            }
+
+            return api(
+              "/api/v1/workspaces/" +
+                encodeURIComponent(wid) +
+                "/org?super_token=" +
+                encodeURIComponent(tok),
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(patchBody),
+              },
+            ).then(function (r) {
+              if (!r.ok) throw new Error("組織情報の保存に失敗しました");
+              return r.json();
+            }).then(finishOrg);
+          })
+          .catch(function (e) {
+            showErr(String(e.message || e) || "作成に失敗しました。");
+          })
+          .finally(function () {
+            btn.disabled = false;
+          });
+      });
+
+      loadList();
     })();
   </script>
 </body>

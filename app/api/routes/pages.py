@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
+import uuid
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 router = APIRouter(tags=["pages"])
@@ -100,6 +102,67 @@ def _admin_i18n_js() -> FileResponse:
 @router.get("/static/admin-i18n.js")
 async def admin_i18n_js() -> FileResponse:
     return _admin_i18n_js()
+
+
+@router.get("/static/login-i18n.js")
+async def login_i18n_js() -> FileResponse:
+    """ログイン画面の多言語辞書（ブラウザが /static/... で読み込む）。"""
+    return FileResponse(_STATIC / "login-i18n.js", media_type="application/javascript")
+
+
+@router.get("/static/worker-i18n.js")
+async def worker_i18n_js() -> FileResponse:
+    """スタッフ画面の多言語辞書。"""
+    return FileResponse(_STATIC / "worker-i18n.js", media_type="application/javascript")
+
+
+@router.get("/static/uploads/staff-avatars/{account_id}.jpg")
+async def staff_avatar_jpeg_file(account_id: str) -> FileResponse:
+    """スタッフプロフィール画像（管理者アップロード）。"""
+    try:
+        uuid.UUID(account_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="not found") from e
+    path = _STATIC / "uploads" / "staff-avatars" / f"{account_id}.jpg"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@router.get("/static/uploads/admin-avatars/{workspace_id}.jpg")
+async def admin_avatar_jpeg_file(workspace_id: str) -> FileResponse:
+    """管理者プロフィール画像（マイ情報でアップロード）。"""
+    try:
+        uuid.UUID(workspace_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="not found") from e
+    path = _STATIC / "uploads" / "admin-avatars" / f"{workspace_id}.jpg"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(path, media_type="image/jpeg")
+
+
+@router.get("/static/uploads/instruction-images/{workspace_id}/{filename}")
+async def instruction_image_file(workspace_id: str, filename: str) -> FileResponse:
+    """管理者が送信した指示用画像。"""
+    try:
+        uuid.UUID(workspace_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="not found") from e
+    if not re.match(r"^[0-9a-fA-F-]+\.(jpg|jpeg|png|webp|gif)$", filename, re.IGNORECASE):
+        raise HTTPException(status_code=404, detail="not found")
+    path = _STATIC / "uploads" / "instruction-images" / workspace_id / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    suf = filename.lower().rsplit(".", 1)[-1]
+    mt = {
+        "jpg": "image/jpeg",
+        "jpeg": "image/jpeg",
+        "png": "image/png",
+        "webp": "image/webp",
+        "gif": "image/gif",
+    }.get(suf, "application/octet-stream")
+    return FileResponse(path, media_type=mt)
 
 
 @router.get("/super")

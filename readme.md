@@ -1,4 +1,4 @@
-# WorkBridge Japan — 프로젝트 정의서 (v1.6)
+# WorkBridge Japan — 프로젝트 정의서 (v1.7)
 
 일본 현장 외국인 근로자 실시간 소통 및 일본어 학습 통합 플랫폼
 
@@ -49,6 +49,10 @@
    - **프론트:** `static/admin-i18n.js`가 `window.__WB_ADMIN_I18N__`로 6개 로케일 문자열을 제공하고, `GET /static/admin-i18n.js`로 배포된다. `static/admin.html`은 `data-i18n`과 `applyAdminLocale()`으로 즉시 반영한다. 로그인 전 게이트 화면은 `localStorage` 키 `wb_admin_ui_locale`으로 언어를 맞춘다.
    - **切替 UI:** **メニュー → マイ情報**에서 `<select>`로 저장하거나, **마이크 버튼 아래**와 **화면 하단 고정 바**의 6개 국기 버튼을 눌러 즉시 전환한다(화면 갱신 + `wb_admin_ui_locale` 동기화 + `PATCH`로 서버 저장).
 11. **근로자 쪽 번역·やさしい日本語 (API):** `POST /api/v1/i18n/translate`(일본어 원문 → 대상 언어), `POST /api/v1/i18n/easy-japanese`(쉬운 일본어 변환) 등 — 근로자 세션(`worker`)에서 사용. 서비스 모듈: `google_translate`, `easy_japanese`(GCP/설정은 `.env`·`google_key.json` 등, 저장소에는 비밀키 미포함).
+12. **관리자 표시 언어 탭 순서 (`locale-config`):** `GET /api/v1/meta/locale-config` 가 반환하는 번역 대상 언어 순서와 맞추되, 관리자 UI에 허용된 로케일(`ja`,`en`,`ko`,`zh`,`vi`,`id`)만 국기 버튼으로 표시한다. 세션 성공 후 설정을 다시 불러와 버튼 순서를 동기화한다.
+13. **시나리오·용어 (커리큘럼 참조):** Google Sheets를 `GET /api/v1/curriculum/{kaigo|food|food-glossary|course-list|extra}` 로 조회한다. 스프레드시트마다 **`GET .../{영역}-tabs`** 로 시트(탭) 목록과 `default_sheet_gid` 를 받고, 관리자 「シナリオ・用語」에서 상단 카테고리 선택 후 **탭이 2개 이상이면 가로 스크롤 칩**으로 시트를 고른다. 데이터 요청 시 **`?sheet_gid=`** 로 탭을 지정한다. 기본 표시는 **외식 용어(`food-glossary`)** 쪽을 연다.
+14. **지점 전용 용어·표현 (SQLite, 구글 시트 비변경):** 테이블 `workspace_glossary_terms`(용어), `workspace_expression_terms`(표현). 관리자가 분야 탭(`sheet_gid`)을 고르고 등록하면 **해당 워크스페이스 DB에만** 저장되며 공용 구글 시트 본문은 바꾸지 않는다. 시트에 이미 있는 머리글·가게 내 중복은 거절. API: `POST /api/v1/workspaces/{id}/glossary-terms`, `.../expression-terms` (쿼리 `admin_token`). 스태프: `GET /api/v1/auth/worker-food-glossary?token=…&sheet_gid=…` — 시트 행 + 지점 용어 + 지점 표현을 병합해 반환.
+15. **지시(指示)에 사진 첨부:** 관리자가 텍스트·STT뿐 아니라 **스크린샷·영수증 사진** 등을 보낼 수 있다. `POST /api/v1/workspaces/{workspace_id}/instruction-image?admin_token=…`(multipart)로 저장 후, WebSocket `instruction` 메시지에 **`text` + 선택적 `image_url`** 을 실어 보낸다. SQLite `instruction_rounds`에 `image_url` 컬럼. 정적 경로: `GET /static/uploads/instruction-images/{workspace_id}/{파일}`. 스태프는 메인·未返信·履歴에 이미지를 표시하고, **이미지 전용 지시**는 번역 API 대신 안내 문구를 쓴다(`worker-i18n`).
 
 ### 3.2 학습 및 게임화
 1. **스마트 플래시카드:** TTS 발음 재생 지원 및 업종별 커리큘럼(1차: 개호, 2차: 음식업).
@@ -68,7 +72,7 @@
 
 ## 5. 개발 로드맵
 
-1. **Phase 1 (MVP):** WebSocket·QR/조인·포털·슈퍼관리자(목록·`super-assume`)·`GET /auth/session`·관리자 PC/모바일 레이아웃·메뉴(QR·用語·ユーザー)·지시 전송(전원·그룹·개별)·스태프 계정·그룹(폴더)·`online-workers`·근로자 표시명·**지시/응답 SQLite 기록·관리자 집계 UI**·**관리자 UI 6개국어(`admin_ui_locale`, `admin-i18n.js`, マイ情報·국기 퀵 전환)**·근로자용 i18n 번역/easy-ja API.
+1. **Phase 1 (MVP):** WebSocket·QR/조인·포털·슈퍼관리자(목록·`super-assume`)·`GET /auth/session`·관리자 PC/모바일 레이아웃·메뉴(QR·用語·ユーザー)·지시 전송(전원·그룹·개별·**이미지 첨부**)·스태프 계정·그룹(폴더)·`online-workers`·근로자 표시명·**지시/응답 SQLite 기록·관리자 집계 UI**·**관리자 UI 6개국어 + `locale-config` 기반 국기 순서**·근로자용 i18n 번역/easy-ja API·**커리큘럼 시트 탭 UI + 지점 전용 용어/표현 DB**.
 2. **Phase 2 (LMS):** 개호 분야 학습 콘텐츠 연동 및 기초 게임화.
 3. **Phase 3 (고도화):** B2B 리포트 기능, giftee API 연동, PWA 최적화.
 
@@ -91,7 +95,7 @@
 
 - 워크스페이스(이름·회사·지점·부서 등)는 **Python 표준 `sqlite3`** 로 `data/workbridge.db` 파일에 저장됩니다. 별도 pip 패키지는 필요 없습니다.
 - 경로는 `.env`의 `DATABASE_URL`로 바꿀 수 있습니다 (기본 `sqlite:///./data/workbridge.db`). `data/`는 `.gitignore`에 포함되어 있습니다.
-- **영구 테이블(예시):** `staff_groups`, `workspace_staff_accounts`(컬럼 `group_id` 등), 지시 기록 `instruction_rounds` / 수신자 `instruction_recipients` / 응답 `instruction_replies`. 마이그레이션은 `app/db/sqlite.py`의 `init_db()`에서 `CREATE TABLE IF NOT EXISTS` 및 `ALTER TABLE`로 처리합니다.
+- **영구 테이블(예시):** `staff_groups`, `workspace_staff_accounts`(컬럼 `group_id` 등), 지시 기록 `instruction_rounds`(선택 **`image_url`**) / 수신자 `instruction_recipients` / 응답 `instruction_replies`, 지점 전용 용어 `workspace_glossary_terms`·`workspace_expression_terms` 등. 마이그레이션은 `app/db/sqlite.py`의 `get_connection()` 시 `CREATE TABLE IF NOT EXISTS` 및 `ALTER TABLE`로 처리합니다. 관리자·스태프 아바타·**지시용 이미지**는 `static/uploads/` 하위(일부는 `.gitignore`로 업로드 실제 파일 제외, `.gitkeep`만 유지).
 - 로그인 세션·참가 토큰은 여전히 **메모리**에만 있어 서버 재시작 시 끊깁니다.
 
 ### 6.3 브라우저에서 쓰는 로그인·대표 URL (로컬 PC, 포트 8000 예시)

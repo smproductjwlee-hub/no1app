@@ -47,10 +47,10 @@
       display: flex;
       flex-direction: column;
     }
-    #inline-staff-panel {
+    #inline-staff-stack {
       order: 99;
     }
-    html.admin-pc #inline-staff-panel {
+    html.admin-pc #inline-staff-stack {
       order: -1;
     }
     body.admin-locale-ko { font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
@@ -63,6 +63,12 @@
       box-shadow:
         0 0 0 4px #fecdd3,
         0 25px 25px -5px rgb(0 0 0 / 0.15);
+    }
+    details.wb-disclosure > summary {
+      list-style: none;
+    }
+    details.wb-disclosure > summary::-webkit-details-marker {
+      display: none;
     }
   </style>
 </head>
@@ -78,25 +84,53 @@
       総運営として、この顧客の管理者画面を閲覧中です。ログアウトでワークスペース一覧に戻ります。
     </div>
     <header class="flex items-start justify-between gap-3">
-      <div>
+      <div class="flex items-start gap-3 min-w-0 flex-1">
+        <div id="header-admin-avatar" class="shrink-0 w-12 h-12" aria-hidden="true"></div>
+        <div class="min-w-0">
         <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-600" data-i18n="page_subtitle">WorkBridge</p>
         <h1 class="text-xl font-bold text-gray-900" data-i18n="page_title">管理者</h1>
+        <p id="header-org-meta" class="text-[11px] text-gray-600 mt-0.5 leading-snug"></p>
+        </div>
       </div>
+      <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+        <div
+          class="inline-flex rounded-xl border border-gray-200 bg-white p-0.5 shadow-sm"
+          role="group"
+          aria-label="layout width"
+        >
+          <button
+            type="button"
+            id="header-layout-narrow"
+            class="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-900 text-white"
+            data-i18n="layout_narrow_short"
+          >
+            狭い
+          </button>
+          <button
+            type="button"
+            id="header-layout-wide"
+            class="px-2.5 py-1.5 text-xs font-semibold rounded-lg text-gray-700 hover:bg-gray-50"
+            data-i18n="layout_wide_short"
+          >
+            広い
+          </button>
+        </div>
       <div class="relative shrink-0">
         <button type="button" id="menu-btn" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50">
           <span data-i18n="menu">メニュー</span>
           <span class="text-gray-400 text-xs">▼</span>
         </button>
         <div id="menu-dropdown" class="hidden absolute right-0 mt-1 w-56 rounded-xl bg-white border border-gray-200 shadow-lg z-50 py-1 text-sm">
-          <p id="menu-conn-status" class="px-3 py-2 text-[11px] text-gray-600 border-b border-gray-100">接続: …</p>
-          <button type="button" id="m-layout-pc" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800" data-i18n="layout_pc">PCレイアウト（広い画面）</button>
-          <button type="button" id="m-layout-mobile" class="w-full text-left px-3 py-2 hover:bg-gray-50 text-gray-800" data-i18n="layout_mobile">スマホレイアウト（狭い画面）</button>
+          <button type="button" id="m-alarm-settings" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="menu_alarm">
+            通知・アラーム
+          </button>
           <button type="button" id="m-qr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100" data-i18n="qr">QRコード（参加用）</button>
           <button type="button" id="m-words" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="words">用語・単語登録</button>
-          <button type="button" id="m-users" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="users">ユーザー一覧</button>
+          <button type="button" id="m-users" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="users">スタッフ登録</button>
           <button type="button" id="m-myinfo" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100" data-i18n="myinfo">マイ情報</button>
           <button type="button" id="m-logout" class="w-full text-left px-3 py-2.5 text-rose-600 hover:bg-rose-50 border-t border-gray-100" data-i18n="logout">ログアウト</button>
         </div>
+      </div>
       </div>
     </header>
 
@@ -108,10 +142,87 @@
     </p>
 
     <section class="rounded-2xl bg-[#ebe4f8] border border-violet-100 px-4 py-4 shadow-sm">
+      <div
+        id="admin-conn-bar"
+        class="flex items-center gap-2 mb-3 rounded-xl border border-violet-200/90 bg-white/90 px-3 py-2 text-[11px] shadow-sm"
+      >
+        <span
+          id="admin-conn-dot"
+          class="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 animate-pulse"
+          aria-hidden="true"
+        ></span>
+        <span id="admin-conn-label" class="flex-1 min-w-0 text-gray-800 leading-snug"></span>
+        <button
+          type="button"
+          id="admin-ws-reconnect"
+          class="hidden shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-lg border border-violet-200 bg-white text-violet-800 shadow-sm hover:bg-violet-50 active:scale-95 transition"
+          title=""
+          aria-label=""
+        >
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+        </button>
+      </div>
       <p class="text-[11px] font-semibold text-violet-900 mb-2" data-i18n="section_input">入力された日本語（現場の端末に送信）</p>
       <label for="input" class="sr-only">指示テキスト</label>
-      <textarea id="input" rows="5" class="ja-text w-full rounded-xl bg-white/90 border border-violet-200 p-3 text-base text-gray-900 placeholder:text-gray-400 resize-y focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 outline-none" placeholder="例：3番テーブルに料理が出たか確認して、4番と5番の片付けも見ておいて。"></textarea>
+      <div class="relative">
+        <textarea
+          id="input"
+          rows="5"
+          class="ja-text w-full rounded-xl bg-white/90 border border-violet-200 pl-3 pr-11 pt-3 pb-10 text-base text-gray-900 placeholder:text-gray-400 resize-y focus:ring-2 focus:ring-indigo-500 focus:border-indigo-400 outline-none"
+          placeholder="例：3番テーブルに料理が出たか確認して、4番と5番の片付けも見ておいて。"
+        ></textarea>
+        <button
+          type="button"
+          id="input-clear-btn"
+          class="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-lg border border-violet-200/80 bg-white/95 text-violet-700 shadow-sm hover:bg-rose-50 hover:border-rose-200 hover:text-rose-700 active:scale-95 transition"
+          aria-label=""
+          title=""
+        >
+          <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.75"
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        </button>
+      </div>
       <p class="text-[10px] text-violet-800/80 mt-2" data-i18n="input_note">※ 翻訳API接続後、スタッフ側は選択言語で表示されます。</p>
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          type="file"
+          id="admin-inst-photo-input"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          class="hidden"
+        />
+        <button
+          type="button"
+          id="admin-inst-photo-btn"
+          class="text-xs font-medium px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-gray-800"
+          data-i18n="photo_attach_btn"
+        >
+          写真を添付
+        </button>
+        <button
+          type="button"
+          id="admin-inst-photo-clear"
+          class="hidden text-xs text-rose-600 hover:underline"
+          data-i18n="photo_clear"
+        >
+          添付を解除
+        </button>
+      </div>
+      <div id="admin-inst-photo-preview-wrap" class="hidden mt-2 rounded-xl border border-gray-200 bg-gray-50 p-2">
+        <img id="admin-inst-photo-preview" alt="" class="max-h-40 w-full object-contain rounded-lg" />
+      </div>
     </section>
 
     <section class="rounded-2xl bg-white border border-gray-200 px-4 py-3 shadow-sm">
@@ -131,19 +242,39 @@
         </label>
       </div>
       <div id="send-group-wrap" class="mt-3 hidden">
-        <label for="send-group-select" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="send_group_label"
-          >送信するグループ</label
-        >
-        <select
-          id="send-group-select"
-          class="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
-        ></select>
+        <details id="send-group-panel" class="wb-disclosure group rounded-xl border border-gray-200 bg-white shadow-sm" open>
+          <summary
+            class="cursor-pointer px-3 py-2.5 flex justify-between items-center gap-2 text-[11px] font-medium text-gray-800 bg-gray-50/90 rounded-t-xl border-b border-gray-100"
+          >
+            <span data-i18n="send_group_expand">送信するグループを選ぶ</span>
+            <span class="text-gray-400 text-xs shrink-0 group-open:rotate-180 transition">▼</span>
+          </summary>
+          <div class="px-3 py-2">
+            <div id="send-group-checkboxes" class="space-y-2 text-sm max-h-48 overflow-y-auto min-h-[2rem]"></div>
+            <p class="text-[10px] text-gray-500 mt-1.5" data-i18n="send_group_multi_hint">複数のグループに同時に送れます。</p>
+          </div>
+        </details>
       </div>
       <div id="send-selected-wrap" class="hidden mt-3">
-        <div id="worker-checkboxes" class="space-y-2 text-sm max-h-36 overflow-y-auto"></div>
-        <p id="worker-target-hint" class="text-[10px] text-gray-500 mt-2 min-h-[1rem]"></p>
+        <details id="send-selected-panel" class="wb-disclosure group rounded-xl border border-gray-200 bg-white shadow-sm" open>
+          <summary
+            class="cursor-pointer px-3 py-2.5 flex justify-between items-center gap-2 text-[11px] font-medium text-gray-800 bg-gray-50/90 rounded-t-xl border-b border-gray-100"
+          >
+            <span data-i18n="send_selected_expand">接続中のスタッフから選ぶ</span>
+            <span class="text-gray-400 text-xs shrink-0 group-open:rotate-180 transition">▼</span>
+          </summary>
+          <div class="px-3 py-2">
+            <div id="worker-checkboxes" class="space-y-2 text-sm max-h-48 overflow-y-auto min-h-[2rem]"></div>
+            <p id="worker-target-hint" class="text-[10px] text-gray-500 mt-2 min-h-[1rem]"></p>
+          </div>
+        </details>
       </div>
     </section>
+
+    <button type="button" id="send" disabled class="w-full py-4 rounded-2xl bg-indigo-900 hover:bg-indigo-800 disabled:opacity-40 disabled:pointer-events-none text-white font-semibold text-base shadow-md transition" data-i18n="send_btn">
+      送信
+    </button>
+    <p id="send-ws-hint" class="text-center text-[11px] text-amber-800 leading-snug px-1 mt-1 hidden"></p>
 
     <div class="flex justify-center pt-1 pb-1">
       <button type="button" id="mic-btn" class="relative flex h-28 w-28 items-center justify-center rounded-full bg-gray-900 text-white shadow-xl shadow-gray-900/25 ring-4 ring-white active:scale-95 transition">
@@ -158,80 +289,215 @@
       <div class="flex justify-center gap-1.5 flex-wrap max-w-full" id="admin-locale-buttons-micro"></div>
     </div>
 
-    <button type="button" id="send" disabled class="w-full py-4 rounded-2xl bg-indigo-900 hover:bg-indigo-800 disabled:opacity-40 disabled:pointer-events-none text-white font-semibold text-base shadow-md transition" data-i18n="send_btn">
-      スタッフに送信
-    </button>
-
     <p id="footer-hint" class="text-center text-[11px] text-gray-400" data-i18n="footer_wait">入力を待っています。</p>
     </div>
 
     <div id="admin-col-right" class="admin-col flex flex-col gap-5">
-    <section
-      id="inline-staff-panel"
-      class="rounded-2xl bg-white border border-indigo-100 shadow-sm overflow-hidden shrink-0"
-      aria-label="staff list"
+    <div id="inline-staff-stack" class="flex flex-col gap-3 shrink-0">
+    <details
+      class="wb-disclosure group rounded-2xl bg-white border border-indigo-100 shadow-sm overflow-hidden"
+      aria-label="groups"
+      open
     >
-      <div class="px-4 py-2.5 bg-indigo-50/90 border-b border-indigo-100">
-        <h2 class="text-sm font-semibold text-indigo-950" data-i18n="panel_staff_title">スタッフ一覧</h2>
-        <p class="text-[10px] text-indigo-900/80 mt-0.5 leading-snug" data-i18n="panel_staff_hint">
-          メニュー「ユーザー一覧」でアカウントの追加・削除ができます。
-        </p>
-      </div>
-      <div class="px-4 py-3 space-y-4 text-sm">
-        <div>
-          <p class="text-[11px] font-semibold text-gray-700 mb-1.5" data-i18n="modal_users_online_h">接続中</p>
-          <p id="inline-online-empty" class="text-xs text-gray-500 hidden" data-i18n="panel_online_empty">接続中のスタッフはいません。</p>
-          <ul id="inline-online-staff" class="space-y-1 max-h-36 overflow-y-auto text-gray-900 min-h-[1.5rem]"></ul>
-        </div>
-        <div class="border-t border-gray-100 pt-3">
-          <p class="text-[11px] font-semibold text-gray-700 mb-2" data-i18n="group_panel_title">グループ（フォルダ）</p>
-          <p class="text-[10px] text-gray-500 mb-2 leading-snug" data-i18n="group_panel_help">スタッフをグループに分け、「送信先」でグループ単位で送れます。</p>
-          <div class="flex flex-wrap gap-2 mb-3">
-            <input
-              type="text"
-              id="new-group-name"
-              maxlength="200"
-              class="flex-1 min-w-[8rem] rounded-lg border border-gray-200 px-2 py-1.5 text-sm"
-              autocomplete="off"
-            />
-            <button type="button" id="new-group-add" class="shrink-0 rounded-lg bg-indigo-100 text-indigo-900 px-3 py-1.5 text-xs font-medium hover:bg-indigo-200">
-              <span data-i18n="group_add_btn">グループ作成</span>
-            </button>
-          </div>
-          <ul id="inline-groups-list" class="text-sm space-y-2 max-h-40 overflow-y-auto mb-3"></ul>
-        </div>
-        <div class="border-t border-gray-100 pt-3">
-          <p class="text-[11px] font-semibold text-gray-700 mb-1.5" data-i18n="modal_users_accounts_h">個人ログイン用アカウント</p>
-          <p id="inline-staff-accounts-empty" class="text-xs text-gray-500 mb-2 hidden" data-i18n="staff_accounts_empty">
-            登録された個人アカウントはまだありません。
+      <summary
+        class="cursor-pointer list-none px-4 py-2.5 bg-indigo-50/90 border-b border-indigo-100 flex justify-between items-start gap-2"
+      >
+        <div class="min-w-0">
+          <h2 class="text-sm font-semibold text-indigo-950" data-i18n="group_panel_title">グループ（フォルダ）</h2>
+          <p class="text-[10px] text-indigo-900/80 mt-0.5 leading-snug" data-i18n="group_panel_help">
+            スタッフをグループに分け、「送信先」でグループ単位で送れます。
           </p>
-          <ul id="inline-staff-accounts-list" class="space-y-0.5 max-h-48 overflow-y-auto"></ul>
         </div>
+        <span class="text-gray-400 text-xs shrink-0 mt-0.5 group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div class="px-4 py-3 text-sm border-t border-indigo-50/50">
+        <div class="flex flex-wrap gap-2 mb-3">
+          <input
+            type="text"
+            id="new-group-name"
+            maxlength="200"
+            class="flex-1 min-w-[8rem] rounded-lg border border-gray-200 px-2 py-1.5 text-sm"
+            autocomplete="off"
+          />
+          <button type="button" id="new-group-add" class="shrink-0 rounded-lg bg-indigo-100 text-indigo-900 px-3 py-1.5 text-xs font-medium hover:bg-indigo-200">
+            <span data-i18n="group_add_btn">グループ作成</span>
+          </button>
+        </div>
+        <ul id="inline-groups-list" class="text-sm space-y-2 max-h-40 overflow-y-auto"></ul>
       </div>
-    </section>
+    </details>
 
-    <section class="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
-      <div class="px-4 py-3 bg-[#ebe4f8] border-b border-violet-100">
-        <h2 class="text-sm font-semibold text-violet-950" data-i18n="resp_title">作業者の応答</h2>
-      </div>
-      <ul id="responses" class="space-y-2 p-4 text-sm min-h-[5rem] max-h-52 overflow-y-auto bg-gray-50/80"></ul>
-    </section>
-
-    <section
-      id="instruction-history-section"
-      class="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden"
-      aria-label="instruction history"
+    <details
+      class="wb-disclosure group rounded-2xl bg-white border border-indigo-100 shadow-sm overflow-hidden"
+      aria-label="online staff"
+      open
     >
-      <div class="px-4 py-3 bg-slate-50 border-b border-slate-100">
-        <h2 class="text-sm font-semibold text-slate-900" data-i18n="hist_title">送信した指示の記録</h2>
-        <p class="text-[10px] text-slate-600 mt-1 leading-snug" data-i18n="hist_help">
-          色はスタッフの応答内容です。タップで名前を確認できます。約60日分を保存します。
-        </p>
+      <summary
+        class="cursor-pointer list-none px-4 py-2.5 bg-indigo-50/90 border-b border-indigo-100 flex justify-between items-start gap-2"
+      >
+        <div class="min-w-0">
+          <h2 class="text-sm font-semibold text-indigo-950" data-i18n="modal_users_online_h">接続中</h2>
+          <p class="text-[10px] text-indigo-900/80 mt-0.5 leading-snug" data-i18n="panel_online_hint"></p>
+        </div>
+        <span class="text-gray-400 text-xs shrink-0 mt-0.5 group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div class="px-4 py-3 text-sm border-t border-indigo-50/50">
+        <p id="inline-online-empty" class="text-xs text-gray-500 hidden mb-2" data-i18n="panel_online_empty">接続中のスタッフはいません。</p>
+        <ul id="inline-online-staff" class="space-y-1 max-h-36 overflow-y-auto text-gray-900 min-h-[1.5rem]"></ul>
       </div>
-      <div id="instruction-history-list" class="p-3 max-h-72 overflow-y-auto space-y-2 text-sm bg-white min-h-[3rem]"></div>
-    </section>
+    </details>
 
-    <details class="group rounded-2xl bg-white border border-gray-200 shadow-sm">
+    <details
+      class="wb-disclosure group rounded-2xl bg-white border border-indigo-100 shadow-sm overflow-hidden"
+      aria-label="staff accounts"
+      open
+    >
+      <summary
+        class="cursor-pointer list-none px-4 py-2.5 bg-indigo-50/90 border-b border-indigo-100 flex justify-between items-start gap-2"
+      >
+        <div class="min-w-0">
+          <h2 class="text-sm font-semibold text-indigo-950" data-i18n="modal_users_accounts_h">個人ログイン用アカウント</h2>
+          <p class="text-[10px] text-indigo-900/80 mt-0.5 leading-snug" data-i18n="panel_staff_accounts_hint"></p>
+        </div>
+        <span class="text-gray-400 text-xs shrink-0 mt-0.5 group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div class="px-4 py-3 text-sm border-t border-indigo-50/50">
+        <p id="inline-staff-accounts-empty" class="text-xs text-gray-500 mb-2 hidden" data-i18n="staff_accounts_empty">
+          登録された個人アカウントはまだありません。
+        </p>
+        <ul id="inline-staff-accounts-list" class="space-y-0.5 max-h-48 overflow-y-auto"></ul>
+      </div>
+    </details>
+    </div>
+
+    <details
+      id="instruction-history-section"
+      class="wb-disclosure group rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden"
+      aria-label="instruction history"
+      open
+    >
+      <summary
+        class="cursor-pointer list-none px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-start gap-2"
+      >
+        <div class="min-w-0">
+          <h2 class="text-sm font-semibold text-slate-900" data-i18n="hist_title">送信した指示の記録</h2>
+          <p class="text-[10px] text-slate-600 mt-1 leading-snug" data-i18n="hist_help">
+            色はスタッフの応答内容です。タップで名前を確認できます。約60日分を保存します。
+          </p>
+        </div>
+        <span class="text-gray-400 text-xs shrink-0 mt-0.5 group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div
+        id="instruction-history-list"
+        class="p-3 max-h-72 overflow-y-auto space-y-2 text-sm bg-white min-h-[3rem] border-t border-slate-100"
+      ></div>
+    </details>
+
+    <details class="group rounded-2xl bg-white border border-emerald-100 shadow-sm">
+      <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-800 flex justify-between items-center">
+        <span data-i18n="wg_section_title">現場スタッフ向け用語の追加</span>
+        <span class="text-gray-400 text-xs group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div class="border-t border-emerald-50 px-4 pb-4 pt-3 space-y-3 text-sm">
+        <p class="text-xs text-gray-600 leading-relaxed" data-i18n="wg_help">
+          分野（Google シートのタブ）を選んでから、日本語の単語・意味・説明を入力してください。Google シートに既にある語と同じ語は登録できません。この現場のスタッフの「用語」一覧・学習欄に反映されます。
+        </p>
+        <div>
+          <label for="admin-wg-field" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="wg_field">分野（シート）</label>
+          <select
+            id="admin-wg-field"
+            class="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm text-gray-900"
+          ></select>
+        </div>
+        <div>
+          <label for="admin-wg-word" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="wg_word">単語・表現（日本語）</label>
+          <input
+            id="admin-wg-word"
+            type="text"
+            maxlength="500"
+            class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            autocomplete="off"
+          />
+        </div>
+        <div>
+          <label for="admin-wg-meaning" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="wg_meaning">意味（日本語）</label>
+          <input
+            id="admin-wg-meaning"
+            type="text"
+            maxlength="2000"
+            class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            autocomplete="off"
+          />
+        </div>
+        <div>
+          <label for="admin-wg-note" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="wg_note">説明・補足（日本語）</label>
+          <textarea id="admin-wg-note" rows="2" maxlength="4000" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-y"></textarea>
+        </div>
+        <button
+          type="button"
+          id="admin-wg-submit"
+          class="w-full py-2.5 rounded-xl bg-emerald-800 text-white text-sm font-semibold hover:bg-emerald-900 shadow-sm"
+          data-i18n="wg_submit"
+        >
+          登録
+        </button>
+        <p id="admin-wg-status" class="text-xs min-h-[1.1rem] text-gray-600"></p>
+      </div>
+    </details>
+
+    <details class="group rounded-2xl bg-white border border-emerald-100 shadow-sm">
+      <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-800 flex justify-between items-center">
+        <span data-i18n="wg_expr_section_title">現場スタッフ向け表現の追加</span>
+        <span class="text-gray-400 text-xs group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div class="border-t border-emerald-50 px-4 pb-4 pt-3 space-y-3 text-sm">
+        <p class="text-xs text-gray-600 leading-relaxed" data-i18n="wg_expr_help">
+          用語シートと同じ分野タブを選び、店舗だけの決まり文句・よく使う言い回しを登録します（SQLite に保存・Google シートは変更しません）。用語側と表現側で同じ見出しは登録できません。
+        </p>
+        <div>
+          <label for="admin-expr-field" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="wg_field">分野（シート）</label>
+          <select
+            id="admin-expr-field"
+            class="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2.5 text-sm text-gray-900"
+          ></select>
+        </div>
+        <div>
+          <label for="admin-expr-phrase" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="wg_expr_phrase">表現・フレーズ（日本語）</label>
+          <input
+            id="admin-expr-phrase"
+            type="text"
+            maxlength="500"
+            class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            autocomplete="off"
+          />
+        </div>
+        <div>
+          <label for="admin-expr-meaning" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="wg_meaning">意味（日本語）</label>
+          <input
+            id="admin-expr-meaning"
+            type="text"
+            maxlength="2000"
+            class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm"
+            autocomplete="off"
+          />
+        </div>
+        <div>
+          <label for="admin-expr-note" class="block text-[11px] font-medium text-gray-700 mb-1" data-i18n="wg_note">説明・補足（日本語）</label>
+          <textarea id="admin-expr-note" rows="2" maxlength="4000" class="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm resize-y"></textarea>
+        </div>
+        <button
+          type="button"
+          id="admin-expr-submit"
+          class="w-full py-2.5 rounded-xl bg-teal-800 text-white text-sm font-semibold hover:bg-teal-900 shadow-sm"
+          data-i18n="wg_expr_submit"
+        >
+          登録（表現）
+        </button>
+        <p id="admin-expr-status" class="text-xs min-h-[1.1rem] text-gray-600"></p>
+      </div>
+    </details>
+
+    <details class="wb-disclosure group rounded-2xl bg-white border border-gray-200 shadow-sm" open>
       <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-gray-800 flex justify-between items-center">
         <span data-i18n="cur_summary">シナリオ・用語（Google シート）</span>
         <span class="text-gray-400 text-xs group-open:rotate-180 transition">▼</span>
@@ -239,11 +505,18 @@
       <div class="border-t border-gray-100 px-4 pb-4 pt-2 space-y-3">
         <p class="text-xs text-gray-500"><span data-i18n="cur_ref">参照のみ · </span><code class="bg-gray-100 px-1 rounded">/api/v1/curriculum/…</code></p>
         <div class="flex flex-wrap gap-2">
-          <button type="button" data-cur-key="kaigo" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_kaigo">介護</button>
-          <button type="button" data-cur-key="food" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_food">外食</button>
           <button type="button" data-cur-key="food-glossary" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_glossary">用語</button>
+          <button type="button" data-cur-key="food" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_food">外食</button>
+          <button type="button" data-cur-key="kaigo" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_kaigo">介護</button>
           <button type="button" data-cur-key="course-list" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_course">コース一覧</button>
           <button type="button" data-cur-key="extra" class="cur-tab px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 hover:bg-gray-200 border border-gray-200" data-i18n="tab_extra">その他</button>
+        </div>
+        <div id="cur-sheet-strip-wrap" class="hidden space-y-1">
+          <p class="text-[10px] text-gray-500" data-i18n="cur_sheet_sub">スプレッドシートのタブ（横スクロール）</p>
+          <div
+            id="cur-sheet-strip"
+            class="flex gap-1.5 overflow-x-auto pb-1 -mx-0.5 px-0.5 scroll-smooth snap-x snap-mandatory [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300"
+          ></div>
         </div>
         <input type="search" id="cur-search" class="w-full rounded-xl bg-gray-50 border border-gray-200 px-3 py-2 text-sm" placeholder="検索…" autocomplete="off" />
         <p id="cur-status" class="text-xs text-gray-500 min-h-[1rem]"></p>
@@ -263,7 +536,7 @@
       </p>
       <h3 class="text-sm font-semibold text-indigo-950 mt-4 mb-2" data-i18n="pc_words_title">用語・単語の登録（PC）</h3>
       <p class="text-xs text-gray-600 leading-relaxed" data-i18n="pc_words_p">
-        Google スプレッドシート側でシートを編集してください。下の「シナリオ・用語」から API 経由の参照を確認できます。
+        Google スプレッドシート側の編集に加え、上の「現場スタッフ向け用語の追加」からこの現場専用の語を登録できます（重複不可）。「シナリオ・用語」で API 参照を確認できます。
       </p>
     </section>
     </div>
@@ -298,6 +571,55 @@
     </div>
   </div>
 
+  <div id="modal-alarm-settings" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl text-sm text-gray-800 max-h-[90vh] overflow-y-auto">
+      <h3 class="font-semibold text-gray-900 mb-1" data-i18n="alarm_modal_title">通知・アラーム設定</h3>
+      <p class="text-[11px] text-gray-500 mb-4 leading-relaxed" data-i18n="alarm_admin_hint"></p>
+      <label class="flex items-center gap-2 mb-3 cursor-pointer">
+        <input type="checkbox" id="alarm-admin-master" class="rounded border-gray-300" checked />
+        <span data-i18n="alarm_master">通知を有効にする</span>
+      </label>
+      <div class="space-y-2 mb-4 pl-1 border-l-2 border-indigo-100">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="alarm-admin-bell" class="rounded border-gray-300" checked />
+          <span data-i18n="alarm_ch_bell">ベル音</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <span class="text-xs text-gray-600 w-28 shrink-0" data-i18n="alarm_sound_preset">ベルの種類</span>
+          <select id="alarm-admin-preset" class="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+            <option value="bell1" data-i18n="alarm_preset_bell1">ベル A</option>
+            <option value="bell2" data-i18n="alarm_preset_bell2">ベル B</option>
+            <option value="chime" data-i18n="alarm_preset_chime">チャイム</option>
+            <option value="beep" data-i18n="alarm_preset_beep">ビープ</option>
+          </select>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="alarm-admin-vibrate" class="rounded border-gray-300" />
+          <span data-i18n="alarm_ch_vibrate">振動</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="alarm-admin-notify" class="rounded border-gray-300" checked />
+          <span data-i18n="alarm_ch_notify">ブラウザ通知</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="alarm-admin-chat" class="rounded border-gray-300" />
+          <span data-i18n="alarm_chat_also">チャットでも通知</span>
+        </label>
+      </div>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button type="button" id="alarm-admin-test" class="px-3 py-2 rounded-xl bg-indigo-100 text-indigo-900 text-xs font-medium" data-i18n="alarm_test">
+          テスト再生
+        </button>
+        <button type="button" id="alarm-admin-perm" class="px-3 py-2 rounded-xl bg-gray-100 text-gray-800 text-xs font-medium" data-i18n="alarm_perm">
+          通知を許可
+        </button>
+      </div>
+      <button type="button" id="modal-alarm-close" class="w-full py-2.5 rounded-xl bg-gray-900 text-white font-medium text-sm" data-i18n="alarm_close">
+        閉じる
+      </button>
+    </div>
+  </div>
+
   <div id="modal-qr" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
     <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
       <h3 class="font-semibold text-gray-900 mb-2" data-i18n="modal_qr_title">参加用 QR</h3>
@@ -319,9 +641,16 @@
   </div>
   <div id="modal-users" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
     <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl max-h-[85vh] flex flex-col overflow-hidden">
-      <h3 class="font-semibold text-gray-900 mb-1" data-i18n="modal_users_title">ユーザー一覧</h3>
-      <p class="text-[11px] text-gray-500 mb-2" data-i18n="modal_users_online_h">接続中</p>
-      <ul id="modal-users-list" class="text-sm text-gray-800 overflow-y-auto max-h-36 min-h-[3rem] border border-gray-100 rounded-lg p-2"></ul>
+      <h3 class="font-semibold text-gray-900 mb-3" data-i18n="modal_users_title">スタッフ登録</h3>
+
+      <div class="border-b border-gray-100 pb-3 mb-3 shrink-0">
+        <p class="text-[11px] font-semibold text-gray-700 mb-1" data-i18n="group_panel_title">グループ（フォルダ）</p>
+        <p class="text-[10px] text-gray-500 mb-2 leading-snug" data-i18n="group_panel_help">スタッフをグループに分け、「送信先」でグループ単位で送れます。</p>
+        <ul id="modal-groups-list" class="text-sm space-y-2 max-h-32 overflow-y-auto text-gray-800"></ul>
+      </div>
+
+      <p class="text-[11px] text-gray-500 mb-2 shrink-0" data-i18n="modal_users_online_h">接続中</p>
+      <ul id="modal-users-list" class="text-sm text-gray-800 overflow-y-auto max-h-36 min-h-[3rem] border border-gray-100 rounded-lg p-2 shrink-0"></ul>
       <p id="modal-users-empty" class="text-xs text-gray-500 hidden py-2" data-i18n="modal_users_empty">接続中のスタッフはいません。</p>
 
       <p class="text-[11px] font-medium text-gray-800 mt-4 mb-1" data-i18n="modal_users_accounts_h">個人ログイン用アカウント</p>
@@ -347,10 +676,113 @@
       <button type="button" id="modal-users-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800" data-i18n="modal_users_close">閉じる</button>
     </div>
   </div>
+
+  <div id="modal-staff-profile" class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div
+      class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto p-5 shadow-xl text-sm text-gray-800"
+      role="dialog"
+      aria-labelledby="staff-manage-heading"
+    >
+      <input type="hidden" id="staff-manage-id" value="" />
+      <h3 id="staff-manage-heading" class="font-semibold text-gray-900 mb-1" data-i18n="staff_manage_title">スタッフアカウント管理</h3>
+      <p id="staff-manage-login-ro" class="text-xs text-gray-500 font-mono mb-3"></p>
+
+      <div class="flex flex-col items-center mb-4">
+        <p class="text-[10px] font-medium text-gray-600 mb-2" data-i18n="staff_manage_avatar">顔写真（任意）</p>
+        <div class="relative w-24 h-24 shrink-0">
+          <div
+            id="staff-manage-avatar-preview"
+            class="w-full h-full rounded-full overflow-hidden border-2 border-gray-200 shadow-inner bg-gray-100 flex items-center justify-center text-white text-2xl font-bold"
+          ></div>
+          <input
+            id="staff-manage-avatar-file"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            class="sr-only"
+            tabindex="-1"
+          />
+          <button
+            type="button"
+            id="staff-manage-avatar-picker"
+            class="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-white shadow-md hover:bg-indigo-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+            </svg>
+          </button>
+        </div>
+        <button type="button" id="staff-manage-remove-photo" class="mt-2 text-xs text-rose-600 hover:underline" data-i18n="staff_manage_remove_photo">写真を削除</button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-[10px] font-medium text-gray-600 mb-1" data-i18n="staff_manage_display">表示名</label>
+          <input id="staff-manage-display" type="text" maxlength="200" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" autocomplete="name" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-medium text-gray-600 mb-1" data-i18n="staff_manage_password_optional">新しいパスワード（変更する場合のみ・4文字以上）</label>
+          <input id="staff-manage-password" type="password" maxlength="200" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" autocomplete="new-password" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-medium text-gray-600 mb-1" data-i18n="staff_manage_phone">電話番号（任意）</label>
+          <input id="staff-manage-phone" type="tel" maxlength="80" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-medium text-gray-600 mb-1" data-i18n="staff_manage_email">メール（任意）</label>
+          <input id="staff-manage-email" type="email" maxlength="200" class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-medium text-gray-600 mb-1" data-i18n="staff_manage_theme">アイコン色（写真がないとき）</label>
+          <div id="staff-manage-colors" class="flex flex-wrap gap-2 mt-1"></div>
+        </div>
+      </div>
+
+      <p id="staff-manage-status" class="text-xs mt-3 min-h-[1.1rem]"></p>
+      <button type="button" id="staff-manage-save" class="mt-2 w-full py-2.5 rounded-xl bg-indigo-900 text-white font-medium text-sm hover:bg-indigo-800" data-i18n="staff_manage_save">
+        保存
+      </button>
+      <button type="button" id="staff-manage-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800" data-i18n="staff_manage_close">閉じる</button>
+    </div>
+  </div>
+
   <div id="modal-myinfo" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
     <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl text-sm text-gray-800">
       <h3 class="font-semibold text-gray-900 mb-1" data-i18n="myinfo_title">マイ情報</h3>
       <p class="text-[11px] text-gray-500 mb-3" data-i18n="myinfo_note">会社・店舗・部署は総運営のワークスペース一覧にも表示されます。</p>
+      <div class="border-b border-gray-100 pb-4 mb-4 space-y-3">
+        <p class="text-[10px] font-medium text-gray-600 text-center sm:text-left" data-i18n="staff_manage_avatar">顔写真（任意）</p>
+        <div class="flex flex-col sm:flex-row gap-4 items-start">
+          <div class="relative w-24 h-24 shrink-0 mx-auto sm:mx-0">
+            <div
+              id="myinfo-admin-avatar-preview"
+              class="w-full h-full rounded-full overflow-hidden border-2 border-gray-200 shadow-inner bg-gray-100 flex items-center justify-center text-white text-2xl font-bold"
+            ></div>
+            <input
+              id="myinfo-avatar-file"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              class="sr-only"
+              tabindex="-1"
+            />
+            <button
+              type="button"
+              id="myinfo-avatar-picker"
+              class="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-white shadow-md hover:bg-indigo-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          </div>
+          <div class="flex-1 w-full space-y-3 min-w-0">
+            <div>
+              <label class="block text-[10px] font-medium text-gray-600 mb-1" data-i18n="staff_manage_theme">アイコン色（写真がないとき）</label>
+              <div id="myinfo-admin-colors" class="flex flex-wrap gap-2"></div>
+            </div>
+            <button type="button" id="myinfo-remove-photo" class="text-xs text-rose-600 hover:underline sm:ml-0" data-i18n="staff_manage_remove_photo">写真を削除</button>
+          </div>
+        </div>
+      </div>
       <div class="space-y-3">
         <div>
           <label class="block text-[11px] font-medium text-gray-600 mb-1" data-i18n="myinfo_ws_label">ワークスペース名（ログインID）</label>
@@ -400,29 +832,89 @@
       if (layoutPref === "pc") document.documentElement.classList.add("admin-pc");
       const gate = document.getElementById("gate");
       const app = document.getElementById("app");
-      const connStatusEl = document.getElementById("menu-conn-status");
       var workspaceId = sessionStorage.getItem("wb_workspace_id") || "";
       const input = document.getElementById("input");
       const sendBtn = document.getElementById("send");
-      const responses = document.getElementById("responses");
+      var adminInstPhotoFile = null;
       const micBtn = document.getElementById("mic-btn");
       const footerHint = document.getElementById("footer-hint");
       const workerCheckboxes = document.getElementById("worker-checkboxes");
       const workerTargetHint = document.getElementById("worker-target-hint");
       var selectedTokensSnapshot = {};
       var staffGroupsCache = [];
+      /** アイコン色（バックエンド staff_accounts.AVATAR_COLOR_COUNT と同一順） */
+      var AVATAR_THEME_COLORS = [
+        "#6366f1",
+        "#8b5cf6",
+        "#ec4899",
+        "#f97316",
+        "#14b8a6",
+        "#0ea5e9",
+        "#84cc16",
+        "#f59e0b",
+      ];
+      var staffAccountById = {};
+      /** 個人ログインのアカウント ID が現在オンラインか（online-workers の staff_account_id） */
+      var onlineStaffAccountIds = new Set();
+      var staffManageColorIdx = 0;
+      var staffManageClearAvatar = false;
+      var lastWorkspaceOrg = null;
+      var myinfoOrgBase = null;
+      var myinfoAdminColorIdx = 0;
+      var myinfoAdminClearAvatar = false;
       var ws = null;
+      var adminWsPingTimer = null;
 
       const ADMIN_I18N = window.__WB_ADMIN_I18N__ || {};
+      /** 관리자 저장 가능 로케일(API workspaces 와 동일) — 스태프 locale-config 순서와 교집합 후 표시 */
       const ALLOWED_LOCALES = ["ja", "en", "ko", "zh", "vi", "id"];
-      var LOCALE_FLAGS = [
-        { code: "ja", flag: "🇯🇵", label: "日本語" },
-        { code: "en", flag: "🇺🇸", label: "English" },
-        { code: "ko", flag: "🇰🇷", label: "한국어" },
-        { code: "zh", flag: "🇨🇳", label: "中文" },
-        { code: "vi", flag: "🇻🇳", label: "Tiếng Việt" },
-        { code: "id", flag: "🇮🇩", label: "Bahasa Indonesia" },
-      ];
+      var LOCALE_FLAG_BY_CODE = {
+        ja: "🇯🇵",
+        en: "🇺🇸",
+        ko: "🇰🇷",
+        zh: "🇨🇳",
+        vi: "🇻🇳",
+        id: "🇮🇩",
+      };
+      var LOCALE_LABEL_FALLBACK = {
+        ja: "日本語",
+        en: "English",
+        ko: "한국어",
+        zh: "中文",
+        vi: "Tiếng Việt",
+        id: "Bahasa Indonesia",
+      };
+
+      function mergeAdminLocaleTargets(cfg) {
+        var allowed = {};
+        ALLOWED_LOCALES.forEach(function (c) {
+          allowed[c] = true;
+        });
+        var seen = {};
+        var out = [];
+        var targets = cfg && cfg.targets ? cfg.targets : [];
+        targets.forEach(function (t) {
+          var loc = t && t.locale;
+          if (!loc || !allowed[loc] || seen[loc]) return;
+          seen[loc] = true;
+          var lab = (t.label || "").trim();
+          out.push({
+            code: loc,
+            flag: LOCALE_FLAG_BY_CODE[loc] || "🌐",
+            label: lab || LOCALE_LABEL_FALLBACK[loc] || loc,
+          });
+        });
+        ALLOWED_LOCALES.forEach(function (loc) {
+          if (seen[loc]) return;
+          seen[loc] = true;
+          out.push({
+            code: loc,
+            flag: LOCALE_FLAG_BY_CODE[loc] || "🌐",
+            label: LOCALE_LABEL_FALLBACK[loc] || loc,
+          });
+        });
+        return out;
+      }
       var adminLocale = "ja";
       var lastConnKind = "checking";
       var lastConnOk = false;
@@ -439,6 +931,117 @@
         var v = pack && pack[key];
         if (v !== undefined && v !== null) return v;
         return ja[key] || key;
+      }
+
+      function wbEnsureAudioCtxAdmin() {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        var ctx = window.__wb_audio_ctx;
+        if (!ctx) ctx = window.__wb_audio_ctx = new AC();
+        if (ctx.state === "suspended") ctx.resume().catch(function () {});
+        return ctx;
+      }
+
+      function wbPlaySoundPresetAdmin(preset, intensity) {
+        intensity = intensity == null ? 1 : intensity;
+        var ctx = wbEnsureAudioCtxAdmin();
+        if (!ctx) return;
+        var now = ctx.currentTime;
+        function tone(freq, t0, dur, vol) {
+          var o = ctx.createOscillator();
+          var g = ctx.createGain();
+          o.type = "sine";
+          o.frequency.value = freq;
+          g.gain.value = Math.min(0.38, vol * intensity);
+          o.connect(g);
+          g.connect(ctx.destination);
+          o.start(t0);
+          try {
+            g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+          } catch (e) {
+            g.gain.linearRampToValueAtTime(0.001, t0 + dur);
+          }
+          o.stop(t0 + dur + 0.06);
+        }
+        if (preset === "bell2") {
+          for (var i = 0; i < 3; i++) tone(660, now + i * 0.13, 0.07, 0.22);
+        } else if (preset === "chime") {
+          tone(523.25, now, 0.14, 0.2);
+          tone(659.25, now + 0.11, 0.14, 0.16);
+          tone(783.99, now + 0.22, 0.16, 0.14);
+        } else if (preset === "beep") {
+          tone(440, now, 0.09, 0.24);
+        } else {
+          tone(740, now, 0.12, 0.24);
+          tone(988, now + 0.13, 0.12, 0.2);
+        }
+      }
+
+      function syncAdminHeaderLayoutButtons() {
+        var isPc = localStorage.getItem("wb_admin_layout") === "pc";
+        var nm = document.getElementById("header-layout-narrow");
+        var wd = document.getElementById("header-layout-wide");
+        if (!nm || !wd) return;
+        nm.classList.toggle("bg-indigo-900", !isPc);
+        nm.classList.toggle("text-white", !isPc);
+        nm.classList.toggle("text-gray-700", isPc);
+        nm.classList.toggle("hover:bg-gray-50", isPc);
+        wd.classList.toggle("bg-indigo-900", isPc);
+        wd.classList.toggle("text-white", isPc);
+        wd.classList.toggle("text-gray-700", !isPc);
+        wd.classList.toggle("hover:bg-gray-50", !isPc);
+      }
+
+      function getAdminAlarmPrefs() {
+        return {
+          master: localStorage.getItem("wb_admin_alarm_master") !== "0",
+          bell: localStorage.getItem("wb_admin_ch_bell") !== "0",
+          vibrate: localStorage.getItem("wb_admin_ch_vibrate") === "1",
+          notify: localStorage.getItem("wb_admin_ch_notify") !== "0",
+          chatAlso: localStorage.getItem("wb_admin_chat_notify") === "1",
+          preset: localStorage.getItem("wb_admin_alarm_preset") || "bell1",
+        };
+      }
+
+      function playAdminNotify(kind) {
+        var p = getAdminAlarmPrefs();
+        if (!p.master) return;
+        if (kind === "chat" && !p.chatAlso) return;
+        if (p.bell) wbPlaySoundPresetAdmin(p.preset, kind === "chat" ? 0.5 : 0.72);
+        if (p.vibrate && navigator.vibrate) navigator.vibrate(kind === "chat" ? 70 : [90, 45, 110]);
+        if (
+          p.notify &&
+          typeof Notification !== "undefined" &&
+          Notification.permission === "granted" &&
+          document.hidden
+        ) {
+          try {
+            new Notification(
+              kind === "chat" ? "スタッフからのメッセージ" : "スタッフからの応答",
+              {
+                body:
+                  kind === "chat"
+                    ? "チャットを確認してください。"
+                    : "指示へのボタン応答がありました。",
+                silent: true,
+              }
+            );
+          } catch (e) {}
+        }
+      }
+
+      /** API が HTML/プレーンテキストで返す 500 でもメッセージを取り出す */
+      function fetchErrorMessage(r) {
+        return r.text().then(function (text) {
+          try {
+            var j = JSON.parse(text);
+            if (j && j.detail !== undefined && j.detail !== null) {
+              return typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail);
+            }
+          } catch (e) {}
+          var s = (text || "").trim();
+          return s ? s.slice(0, 400) : "HTTP " + r.status;
+        });
       }
 
       function applyFooter() {
@@ -477,10 +1080,12 @@
         });
       }
 
-      function setupLocaleButtons(container) {
-        if (!container || container.dataset.bound) return;
+      function setupLocaleButtons(container, localeRows) {
+        if (!container) return;
+        var rows = localeRows || mergeAdminLocaleTargets(null);
+        container.innerHTML = "";
         container.dataset.bound = "1";
-        LOCALE_FLAGS.forEach(function (L) {
+        rows.forEach(function (L) {
           var b = document.createElement("button");
           b.type = "button";
           b.className =
@@ -543,6 +1148,14 @@
         });
         var inputEl = document.getElementById("input");
         if (inputEl) inputEl.placeholder = t("input_placeholder");
+        var clearInp = document.getElementById("input-clear-btn");
+        if (clearInp) {
+          var cl = t("input_clear_aria");
+          clearInp.setAttribute("aria-label", cl);
+          clearInp.setAttribute("title", cl);
+        }
+        var sendWsHint = document.getElementById("send-ws-hint");
+        if (sendWsHint && !sendWsHint.classList.contains("hidden")) sendWsHint.textContent = t("send_needs_ws");
         var curSearchEl = document.getElementById("cur-search");
         if (curSearchEl) curSearchEl.placeholder = t("cur_search_ph");
         var mc = document.getElementById("myinfo-company");
@@ -551,11 +1164,51 @@
         if (mb) mb.placeholder = t("myinfo_ph_branch");
         var md = document.getElementById("myinfo-dept");
         if (md) md.placeholder = t("myinfo_ph_dept");
+        var staffAvPick = document.getElementById("staff-manage-avatar-picker");
+        if (staffAvPick) {
+          var pickLbl = t("staff_manage_change_photo");
+          staffAvPick.setAttribute("aria-label", pickLbl);
+          staffAvPick.setAttribute("title", pickLbl);
+        }
+        var myAvPick = document.getElementById("myinfo-avatar-picker");
+        if (myAvPick) {
+          var pickLbl2 = t("staff_manage_change_photo");
+          myAvPick.setAttribute("aria-label", pickLbl2);
+          myAvPick.setAttribute("title", pickLbl2);
+        }
         var mySel = document.getElementById("myinfo-admin-locale");
         if (mySel) mySel.value = adminLocale;
         syncLocaleQuickButtons();
         setStatus(lastConnKind, lastConnOk);
         applyFooter();
+        if (lastWorkspaceOrg) refreshHeaderFromOrg(lastWorkspaceOrg);
+        syncAdminHeaderLayoutButtons();
+      }
+
+      function refreshHeaderFromOrg(j) {
+        if (!j) return;
+        lastWorkspaceOrg = j;
+        var meta = document.getElementById("header-org-meta");
+        if (meta) {
+          var parts = [];
+          if ((j.company_name || "").trim()) parts.push((j.company_name || "").trim());
+          if ((j.branch_name || "").trim()) parts.push((j.branch_name || "").trim());
+          if ((j.department_name || "").trim()) parts.push((j.department_name || "").trim());
+          meta.textContent = parts.length ? parts.join(" · ") : "";
+        }
+        var hav = document.getElementById("header-admin-avatar");
+        if (hav) {
+          var label =
+            (j.company_name || "").trim() ||
+            (j.name || "").trim() ||
+            t("page_title");
+          staffAvatarFill(hav, {
+            avatar_url: j.admin_avatar_url,
+            avatar_color_index: j.admin_avatar_color_index,
+            display_name: label,
+            login_id: "",
+          }, 48);
+        }
       }
 
       function loadOrgLocale() {
@@ -569,6 +1222,7 @@
           })
           .then(function (j) {
             if (j && j.admin_ui_locale) applyAdminLocale(j.admin_ui_locale);
+            refreshHeaderFromOrg(j);
           })
           .catch(function () {});
       }
@@ -583,52 +1237,196 @@
           err: "status_err",
         };
         var text = t(map[kind] || "status_checking");
-        connStatusEl.textContent = t("conn_prefix") + text;
-        connStatusEl.className =
-          "px-3 py-2 text-[11px] border-b border-gray-100 " +
-          (ok ? "text-emerald-800 bg-emerald-50/60" : "text-amber-900 bg-amber-50/60");
+        var adminConnLabel = document.getElementById("admin-conn-label");
+        if (adminConnLabel) adminConnLabel.textContent = t("conn_prefix") + text;
+        var adminConnDot = document.getElementById("admin-conn-dot");
+        if (adminConnDot) {
+          adminConnDot.className =
+            "h-2.5 w-2.5 shrink-0 rounded-full " +
+            (kind === "ok"
+              ? "bg-emerald-500"
+              : kind === "checking"
+                ? "bg-amber-400 animate-pulse"
+                : "bg-rose-500");
+        }
+        var adminWsReconnect = document.getElementById("admin-ws-reconnect");
+        if (adminWsReconnect) {
+          var showReconnect = kind === "off" || kind === "err";
+          adminWsReconnect.classList.toggle("hidden", !showReconnect);
+          adminWsReconnect.setAttribute("title", t("conn_reconnect"));
+          adminWsReconnect.setAttribute("aria-label", t("conn_reconnect"));
+        }
       }
 
       applyAdminLocale(localStorage.getItem("wb_admin_ui_locale") || "ja");
 
       if (!token) {
         gate.classList.remove("hidden");
+        app.classList.add("hidden");
         return;
       }
 
-      gate.classList.add("hidden");
-      app.classList.remove("hidden");
+      var gatePEl = document.getElementById("gate-p");
+      var gatePHtmlSaved = gatePEl ? gatePEl.innerHTML : "";
+      gate.classList.remove("hidden");
+      app.classList.add("hidden");
+      if (gatePEl) gatePEl.textContent = "セッションを確認しています…";
 
-      setupLocaleButtons(document.getElementById("admin-locale-buttons-micro"));
-      setupLocaleButtons(document.getElementById("admin-locale-buttons-dock"));
+      var _adminLocaleRowsInit = mergeAdminLocaleTargets(null);
+      setupLocaleButtons(document.getElementById("admin-locale-buttons-micro"), _adminLocaleRowsInit);
+      setupLocaleButtons(document.getElementById("admin-locale-buttons-dock"), _adminLocaleRowsInit);
       syncLocaleQuickButtons();
       syncSendTargetVisibility();
 
       fetch("/api/v1/auth/session?token=" + encodeURIComponent(token))
         .then(function (r) {
-          return r.ok ? r.json() : Promise.reject();
+          if (r.status === 401) return Promise.reject("invalid");
+          if (!r.ok) return Promise.reject("bad");
+          return r.json();
         })
         .then(function (d) {
-          if (d && d.workspace_id) {
-            workspaceId = d.workspace_id;
-            sessionStorage.setItem("wb_workspace_id", workspaceId);
+          if (!d || d.role !== "admin") {
+            if (d && d.role === "super_admin") return Promise.reject("super");
+            return Promise.reject("role");
           }
+          if (!d.workspace_id) return Promise.reject("no_workspace");
+          workspaceId = d.workspace_id;
+          sessionStorage.setItem("wb_workspace_id", workspaceId);
+          if (gatePEl) gatePEl.innerHTML = gatePHtmlSaved;
+          gate.classList.add("hidden");
+          app.classList.remove("hidden");
           loadOrgLocale();
+          fetch("/api/v1/meta/locale-config")
+            .then(function (r) {
+              return r.ok ? r.json() : Promise.reject();
+            })
+            .then(function (cfg) {
+              return mergeAdminLocaleTargets(cfg);
+            })
+            .catch(function () {
+              return mergeAdminLocaleTargets(null);
+            })
+            .then(function (localeRows) {
+              setupLocaleButtons(document.getElementById("admin-locale-buttons-micro"), localeRows);
+              setupLocaleButtons(document.getElementById("admin-locale-buttons-dock"), localeRows);
+              syncLocaleQuickButtons();
+              applyAdminLocale(adminLocale);
+            });
           loadStaffGroups()
             .then(function () {
               return loadStaffAccountsList();
             })
             .catch(function () {});
+          connectAdminWebSocket();
+          loadInstructionHistory().catch(function () {});
+          initAdminWorkspaceGlossary();
+          initAdminWorkspaceExpressions();
+          try {
+            loadCurriculum("food-glossary");
+          } catch (e) {}
         })
-        .catch(function () {});
+        .catch(function (reason) {
+          sessionStorage.removeItem("wb_admin_token");
+          sessionStorage.removeItem("wb_workspace_id");
+          if (gatePEl) {
+            gatePEl.innerHTML = gatePHtmlSaved;
+            if (reason === "super") {
+              gatePEl.textContent =
+                "スーパー管理者セッションでは現場WSに接続できません。店舗の管理URL（token付き）で開いてください。";
+            } else if (reason === "no_workspace") {
+              gatePEl.textContent = "店舗が特定できません。ログインし直してください。";
+            } else if (reason === "role") {
+              gatePEl.textContent = "この画面は店舗管理者のみ利用できます。";
+            } else {
+              gatePEl.textContent =
+                "セッションが無効または期限切れです。ログイン画面から再度ログインしてください。";
+            }
+          }
+          gate.classList.remove("hidden");
+          app.classList.add("hidden");
+        });
+
+      function clearInstPhoto() {
+        adminInstPhotoFile = null;
+        var finp = document.getElementById("admin-inst-photo-input");
+        if (finp) finp.value = "";
+        var w = document.getElementById("admin-inst-photo-preview-wrap");
+        var im = document.getElementById("admin-inst-photo-preview");
+        var cl = document.getElementById("admin-inst-photo-clear");
+        if (w) w.classList.add("hidden");
+        if (im) {
+          im.removeAttribute("src");
+        }
+        if (cl) cl.classList.add("hidden");
+        syncSendButton();
+      }
 
       function syncSendButton() {
         var open = ws && ws.readyState === WebSocket.OPEN;
         var hasText = (input.value || "").trim().length > 0;
-        sendBtn.disabled = !open || !hasText;
+        var hasPhoto = !!adminInstPhotoFile;
+        sendBtn.disabled = !open || (!hasText && !hasPhoto);
+        var sendWsHint = document.getElementById("send-ws-hint");
+        if (sendWsHint) {
+          var wantSend = hasText || hasPhoto;
+          var showWsHint = wantSend && !open;
+          sendWsHint.classList.toggle("hidden", !showWsHint);
+          if (showWsHint) sendWsHint.textContent = t("send_needs_ws");
+        }
+        var clearBtn = document.getElementById("input-clear-btn");
+        if (clearBtn) {
+          var hasAny = (input.value || "").length > 0;
+          clearBtn.disabled = !hasAny;
+          clearBtn.classList.toggle("opacity-40", !hasAny);
+          clearBtn.classList.toggle("pointer-events-none", !hasAny);
+        }
       }
 
       input.addEventListener("input", syncSendButton);
+      (function setupInstPhotoPick() {
+        var btn = document.getElementById("admin-inst-photo-btn");
+        var finp = document.getElementById("admin-inst-photo-input");
+        var clr = document.getElementById("admin-inst-photo-clear");
+        if (btn && finp) {
+          btn.addEventListener("click", function () {
+            try {
+              finp.click();
+            } catch (e) {}
+          });
+          finp.addEventListener("change", function () {
+            var f = finp.files && finp.files[0];
+            adminInstPhotoFile = f || null;
+            var w = document.getElementById("admin-inst-photo-preview-wrap");
+            var im = document.getElementById("admin-inst-photo-preview");
+            if (!adminInstPhotoFile || !w || !im) {
+              clearInstPhoto();
+              return;
+            }
+            try {
+              im.src = URL.createObjectURL(adminInstPhotoFile);
+            } catch (e) {
+              im.src = "";
+            }
+            w.classList.remove("hidden");
+            if (clr) clr.classList.remove("hidden");
+            syncSendButton();
+          });
+        }
+        if (clr) {
+          clr.addEventListener("click", function () {
+            clearInstPhoto();
+          });
+        }
+      })();
+      document.getElementById("input-clear-btn").addEventListener("click", function () {
+        if (!(input.value || "").length) return;
+        input.value = "";
+        try {
+          input.focus();
+        } catch (e) {}
+        syncSendButton();
+      });
+      syncSendButton();
 
       (function setupSpeechMic() {
         var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -693,9 +1491,7 @@
 
       var wsProto = location.protocol === "https:" ? "wss:" : "ws:";
       var wsUrl = wsProto + "//" + location.host + "/api/v1/ws?token=" + encodeURIComponent(token);
-      ws = new WebSocket(wsUrl);
-
-      setStatus("checking", false);
+      var onlinePollInterval = null;
 
       function refreshOnlineWorkers() {
         fetch("/api/v1/workspaces/online-workers?admin_token=" + encodeURIComponent(token))
@@ -708,6 +1504,16 @@
           })
           .catch(function () {
             workerTargetHint.textContent = t("conn_fail_online");
+            var inlineOn = document.getElementById("inline-online-staff");
+            var inlineOnEmpty = document.getElementById("inline-online-empty");
+            if (inlineOn) {
+              inlineOn.innerHTML = "";
+              var errLi = document.createElement("li");
+              errLi.className = "py-1 text-xs text-rose-600 leading-snug";
+              errLi.textContent = t("conn_fail_online");
+              inlineOn.appendChild(errLi);
+            }
+            if (inlineOnEmpty) inlineOnEmpty.classList.add("hidden");
           });
       }
 
@@ -718,7 +1524,10 @@
         inlineOn.innerHTML = "";
         var list = workers || [];
         if (!list.length) {
-          if (inlineOnEmpty) inlineOnEmpty.classList.remove("hidden");
+          if (inlineOnEmpty) {
+            inlineOnEmpty.textContent = t("panel_online_empty");
+            inlineOnEmpty.classList.remove("hidden");
+          }
           return;
         }
         if (inlineOnEmpty) inlineOnEmpty.classList.add("hidden");
@@ -732,6 +1541,10 @@
 
       function renderWorkerTargets(workers) {
         workers = workers || [];
+        onlineStaffAccountIds = new Set();
+        workers.forEach(function (w) {
+          if (w.staff_account_id) onlineStaffAccountIds.add(w.staff_account_id);
+        });
         updateInlineOnlineList(workers);
         var modeSelected = document.querySelector('input[name="send-mode"]:checked');
         var isSel = modeSelected && modeSelected.value === "selected";
@@ -763,6 +1576,7 @@
           workerCheckboxes.appendChild(lab);
         });
         workerTargetHint.textContent = isSel ? workers.length + t("n_staff_suffix") : "";
+        if (lastStaffAccountsItems.length) renderStaffAccountsRows(lastStaffAccountsItems);
       }
 
       function syncSendTargetVisibility() {
@@ -772,6 +1586,7 @@
         var sw = document.getElementById("send-selected-wrap");
         if (gw) gw.classList.toggle("hidden", v !== "group");
         if (sw) sw.classList.toggle("hidden", v !== "selected");
+        if (v === "group") fillSendGroupCheckboxes();
         if (v === "selected") refreshOnlineWorkers();
       }
 
@@ -783,34 +1598,39 @@
         });
       });
 
-      function fillSendGroupSelect() {
-        var s = document.getElementById("send-group-select");
-        if (!s) return;
-        var cur = s.value;
-        s.innerHTML = "";
-        var ph = document.createElement("option");
-        ph.value = "";
-        ph.textContent = t("send_group_placeholder");
-        s.appendChild(ph);
-        staffGroupsCache.forEach(function (g) {
-          var o = document.createElement("option");
-          o.value = g.id;
-          o.textContent = g.name;
-          s.appendChild(o);
+      function fillSendGroupCheckboxes() {
+        var box = document.getElementById("send-group-checkboxes");
+        if (!box) return;
+        var checked = {};
+        box.querySelectorAll('input[type="checkbox"]').forEach(function (cb) {
+          if (cb.checked) checked[cb.value] = true;
         });
-        if (cur) {
-          for (var i = 0; i < s.options.length; i++) {
-            if (s.options[i].value === cur) {
-              s.selectedIndex = i;
-              break;
-            }
-          }
+        box.innerHTML = "";
+        if (!staffGroupsCache.length) {
+          var p = document.createElement("p");
+          p.className = "text-xs text-gray-500 py-1";
+          p.textContent = t("group_list_empty");
+          box.appendChild(p);
+          return;
         }
+        staffGroupsCache.forEach(function (g) {
+          var lab = document.createElement("label");
+          lab.className = "flex items-center gap-2 cursor-pointer text-gray-800";
+          var cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.value = g.id;
+          cb.className = "rounded border-gray-300 text-indigo-900 focus:ring-indigo-500";
+          cb.checked = !!checked[g.id];
+          var span = document.createElement("span");
+          span.className = "text-[13px]";
+          span.textContent = g.name;
+          lab.appendChild(cb);
+          lab.appendChild(span);
+          box.appendChild(lab);
+        });
       }
 
-      function renderGroupsPanel() {
-        var ul = document.getElementById("inline-groups-list");
-        if (!ul) return;
+      function renderGroupsIntoUl(ul) {
         ul.innerHTML = "";
         if (!staffGroupsCache.length) {
           var li0 = document.createElement("li");
@@ -892,6 +1712,13 @@
         });
       }
 
+      function renderGroupsPanel() {
+        ["inline-groups-list", "modal-groups-list"].forEach(function (id) {
+          var ul = document.getElementById(id);
+          if (ul) renderGroupsIntoUl(ul);
+        });
+      }
+
       function loadStaffGroups() {
         var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
         if (!wid || !token) return Promise.reject();
@@ -905,9 +1732,223 @@
           .then(function (data) {
             staffGroupsCache = data || [];
             renderGroupsPanel();
-            fillSendGroupSelect();
+            fillSendGroupCheckboxes();
           });
       }
+
+      function staffAvatarFill(container, acc, sizePx) {
+        container.innerHTML = "";
+        var sz = sizePx || 40;
+        container.style.width = sz + "px";
+        container.style.height = sz + "px";
+        var inner = document.createElement("div");
+        inner.className =
+          "rounded-full overflow-hidden border border-gray-200 shadow-sm w-full h-full flex items-center justify-center bg-gray-100";
+        if (acc.avatar_url) {
+          var im = document.createElement("img");
+          im.src = acc.avatar_url;
+          im.alt = "";
+          im.className = "w-full h-full object-cover";
+          inner.appendChild(im);
+        } else {
+          var c = document.createElement("div");
+          c.className = "w-full h-full flex items-center justify-center text-white text-xs font-bold";
+          var ci = Number(acc.avatar_color_index || 0) % AVATAR_THEME_COLORS.length;
+          c.style.backgroundColor = AVATAR_THEME_COLORS[ci];
+          var label = (acc.display_name || acc.login_id || "?").trim();
+          c.textContent = label ? label.charAt(0).toUpperCase() : "?";
+          inner.appendChild(c);
+        }
+        container.appendChild(inner);
+      }
+
+      function myinfoAdminPreviewRefresh(baseJ) {
+        var prev = document.getElementById("myinfo-admin-avatar-preview");
+        if (!prev) return;
+        var fileEl = document.getElementById("myinfo-avatar-file");
+        var file = fileEl && fileEl.files && fileEl.files[0];
+        prev.innerHTML = "";
+        prev.style.width = "96px";
+        prev.style.height = "96px";
+        if (file && !myinfoAdminClearAvatar) {
+          var url = URL.createObjectURL(file);
+          var im = document.createElement("img");
+          im.src = url;
+          im.alt = "";
+          im.className = "w-full h-full object-cover rounded-full";
+          prev.appendChild(im);
+          return;
+        }
+        var label =
+          (document.getElementById("myinfo-company") &&
+            (document.getElementById("myinfo-company").value || "").trim()) ||
+          (baseJ && (baseJ.company_name || "").trim()) ||
+          (baseJ && (baseJ.name || "").trim()) ||
+          t("page_title");
+        staffAvatarFill(
+          prev,
+          {
+            avatar_url: myinfoAdminClearAvatar ? null : baseJ && baseJ.admin_avatar_url,
+            avatar_color_index: myinfoAdminColorIdx,
+            display_name: label,
+            login_id: "",
+          },
+          96
+        );
+      }
+
+      function openStaffProfileModal(acc) {
+        if (!acc || !acc.id) return;
+        staffManageColorIdx = Number(acc.avatar_color_index || 0) % AVATAR_THEME_COLORS.length;
+        staffManageClearAvatar = false;
+        document.getElementById("staff-manage-id").value = acc.id;
+        document.getElementById("staff-manage-login-ro").textContent =
+          (t("staff_form_login_id") || "") + ": " + (acc.login_id || "");
+        document.getElementById("staff-manage-display").value = acc.display_name || "";
+        document.getElementById("staff-manage-phone").value = acc.profile_phone || "";
+        document.getElementById("staff-manage-email").value = acc.profile_email || "";
+        document.getElementById("staff-manage-password").value = "";
+        document.getElementById("staff-manage-avatar-file").value = "";
+        document.getElementById("staff-manage-status").textContent = "";
+        var colBox = document.getElementById("staff-manage-colors");
+        colBox.innerHTML = "";
+        AVATAR_THEME_COLORS.forEach(function (hex, i) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className =
+            "w-8 h-8 rounded-full border-2 border-transparent ring-offset-1 hover:opacity-90 transition";
+          b.style.backgroundColor = hex;
+          if (i === staffManageColorIdx) b.classList.add("ring-2", "ring-indigo-600");
+          b.addEventListener("click", function () {
+            staffManageColorIdx = i;
+            Array.prototype.forEach.call(colBox.querySelectorAll("button"), function (x) {
+              x.classList.remove("ring-2", "ring-indigo-600");
+            });
+            b.classList.add("ring-2", "ring-indigo-600");
+            staffManagePreviewRefresh(acc);
+          });
+          colBox.appendChild(b);
+        });
+        staffManagePreviewRefresh(acc);
+        document.getElementById("modal-staff-profile").classList.remove("hidden");
+      }
+
+      function staffManagePreviewRefresh(baseAcc) {
+        var prev = document.getElementById("staff-manage-avatar-preview");
+        prev.innerHTML = "";
+        var fileEl = document.getElementById("staff-manage-avatar-file");
+        var file = fileEl && fileEl.files && fileEl.files[0];
+        if (file && !staffManageClearAvatar) {
+          var url = URL.createObjectURL(file);
+          var im = document.createElement("img");
+          im.src = url;
+          im.className = "w-full h-full object-cover";
+          prev.appendChild(im);
+          return;
+        }
+        if (staffManageClearAvatar || !baseAcc.avatar_url) {
+          var d = document.createElement("div");
+          d.className = "w-full h-full flex items-center justify-center text-white text-3xl font-bold";
+          d.style.backgroundColor = AVATAR_THEME_COLORS[staffManageColorIdx];
+          var dn = (document.getElementById("staff-manage-display").value || baseAcc.display_name || baseAcc.login_id || "?").trim();
+          d.textContent = dn ? dn.charAt(0).toUpperCase() : "?";
+          prev.appendChild(d);
+          return;
+        }
+        var im2 = document.createElement("img");
+        im2.src = baseAcc.avatar_url;
+        im2.className = "w-full h-full object-cover";
+        prev.appendChild(im2);
+      }
+
+      document.getElementById("staff-manage-avatar-file").addEventListener("change", function () {
+        staffManageClearAvatar = false;
+        var id = document.getElementById("staff-manage-id").value;
+        var acc = staffAccountById[id] || {};
+        staffManagePreviewRefresh(acc);
+      });
+      document.getElementById("staff-manage-avatar-picker").addEventListener("click", function () {
+        document.getElementById("staff-manage-avatar-file").click();
+      });
+      document.getElementById("staff-manage-remove-photo").addEventListener("click", function () {
+        staffManageClearAvatar = true;
+        document.getElementById("staff-manage-avatar-file").value = "";
+        var id = document.getElementById("staff-manage-id").value;
+        staffManagePreviewRefresh(staffAccountById[id] || {});
+      });
+      document.getElementById("staff-manage-display").addEventListener("input", function () {
+        var id = document.getElementById("staff-manage-id").value;
+        staffManagePreviewRefresh(staffAccountById[id] || {});
+      });
+      document.getElementById("staff-manage-close").addEventListener("click", function () {
+        document.getElementById("modal-staff-profile").classList.add("hidden");
+      });
+      document.getElementById("staff-manage-save").addEventListener("click", function () {
+        var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+        var id = document.getElementById("staff-manage-id").value;
+        var st = document.getElementById("staff-manage-status");
+        if (!wid || !id || !token) {
+          st.textContent = t("save_err_ws");
+          st.className = "text-xs mt-3 min-h-[1.1rem] text-rose-600";
+          return;
+        }
+        var body = {
+          display_name: (document.getElementById("staff-manage-display").value || "").trim(),
+          profile_phone: (document.getElementById("staff-manage-phone").value || "").trim(),
+          profile_email: (document.getElementById("staff-manage-email").value || "").trim(),
+          avatar_color_index: staffManageColorIdx,
+        };
+        var pw = (document.getElementById("staff-manage-password").value || "").trim();
+        if (pw.length) {
+          if (pw.length < 4) {
+            st.textContent = t("staff_pw_short");
+            st.className = "text-xs mt-3 min-h-[1.1rem] text-rose-600";
+            return;
+          }
+          body.password = pw;
+        }
+        var newFile = document.getElementById("staff-manage-avatar-file").files && document.getElementById("staff-manage-avatar-file").files[0];
+        if (staffManageClearAvatar && !newFile) body.clear_avatar = true;
+        st.textContent = t("staff_manage_saving");
+        st.className = "text-xs mt-3 min-h-[1.1rem] text-emerald-800";
+        fetch(
+          "/api/v1/workspaces/" + encodeURIComponent(wid) + "/staff-accounts/" + encodeURIComponent(id) + "?admin_token=" + encodeURIComponent(token),
+          { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+        )
+          .then(function (r) {
+            if (!r.ok) return fetchErrorMessage(r).then(function (msg) {
+              throw new Error(msg);
+            });
+            return r.json();
+          })
+          .then(function () {
+            if (newFile) {
+              var fd = new FormData();
+              fd.append("file", newFile);
+              return fetch(
+                "/api/v1/workspaces/" +
+                  encodeURIComponent(wid) +
+                  "/staff-accounts/" +
+                  encodeURIComponent(id) +
+                  "/avatar?admin_token=" +
+                  encodeURIComponent(token),
+                { method: "POST", body: fd }
+              ).then(function (r2) {
+                if (!r2.ok) return fetchErrorMessage(r2).then(function (msg) {
+                  throw new Error(msg);
+                });
+              });
+            }
+          })
+          .then(function () {
+            st.textContent = t("staff_manage_saved");
+            return loadStaffAccountsList();
+          })
+          .catch(function (err) {
+            st.textContent = (t("staff_manage_fail") || "") + " " + (err.message || "");
+            st.className = "text-xs mt-3 min-h-[1.1rem] text-rose-600";
+          });
+      });
 
       function renderStaffAccountsInto(listId, emptyId, items) {
         var listEl = document.getElementById(listId);
@@ -922,46 +1963,39 @@
         items.forEach(function (a) {
           var acc = a;
           var row = document.createElement("li");
-          row.className = "border-b border-gray-100 py-2 text-[13px]";
-          var top = document.createElement("div");
-          top.className = "flex items-start justify-between gap-2";
-          var lab = document.createElement("span");
-          lab.className = "text-gray-900";
-          lab.textContent = (acc.login_id || "") + (acc.display_name ? " · " + acc.display_name : "");
-          var del = document.createElement("button");
-          del.type = "button";
-          del.className = "shrink-0 text-rose-600 text-xs font-medium hover:underline";
-          del.textContent = t("staff_delete");
-          del.addEventListener("click", function () {
-            var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
-            if (!wid || !acc.id) return;
-            if (!window.confirm(t("staff_delete_confirm"))) return;
-            fetch(
-              "/api/v1/workspaces/" +
-                encodeURIComponent(wid) +
-                "/staff-accounts/" +
-                encodeURIComponent(acc.id) +
-                "?admin_token=" +
-                encodeURIComponent(token),
-              { method: "DELETE" }
-            )
-              .then(function (r) {
-                if (!r.ok) throw new Error(String(r.status));
-                return loadStaffAccountsList();
-              })
-              .catch(function () {
-                alert(t("staff_delete_fail"));
-              });
+          row.className = "border-b border-gray-100 py-2.5 text-[13px]";
+          var wrap = document.createElement("div");
+          wrap.className = "flex items-center gap-2 w-full min-w-0";
+
+          var online = onlineStaffAccountIds.has(acc.id);
+          var dot = document.createElement("span");
+          dot.className =
+            "inline-block h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-white " +
+            (online ? "bg-emerald-500" : "bg-rose-500");
+          dot.setAttribute("aria-hidden", "true");
+
+          var avBtn = document.createElement("button");
+          avBtn.type = "button";
+          avBtn.className = "p-0 border-0 bg-transparent cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded-full";
+          staffAvatarFill(avBtn, acc, 40);
+          avBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            openStaffProfileModal(acc);
           });
-          top.appendChild(lab);
-          top.appendChild(del);
-          var sub = document.createElement("div");
-          sub.className = "flex flex-wrap items-center gap-2 mt-1.5";
-          var glab = document.createElement("span");
-          glab.className = "text-[10px] text-gray-500 shrink-0";
-          glab.textContent = t("acct_group_label");
+
+          var mid = document.createElement("div");
+          mid.className = "flex-1 min-w-0 flex flex-wrap items-center gap-x-2 gap-y-1";
+          var lab = document.createElement("span");
+          lab.className =
+            (online ? "text-gray-900 font-semibold " : "text-gray-400 ") +
+            "truncate min-w-0 text-[13px]";
+          lab.textContent = (acc.login_id || "") + (acc.display_name ? " · " + acc.display_name : "");
+
           var sel = document.createElement("select");
-          sel.className = "text-xs rounded border border-gray-200 px-2 py-1 bg-white min-w-[7rem] max-w-full";
+          sel.setAttribute("aria-label", t("acct_group_label"));
+          sel.title = t("acct_group_label");
+          sel.className =
+            "text-xs rounded border border-gray-200 px-2 py-1.5 bg-white shrink-0 w-[9.5rem] max-w-[45vw] sm:max-w-[11rem]";
           var o0 = document.createElement("option");
           o0.value = "";
           o0.textContent = t("group_option_none");
@@ -999,17 +2033,73 @@
                 alert(t("acct_group_move_fail"));
               });
           });
-          sub.appendChild(glab);
-          sub.appendChild(sel);
-          row.appendChild(top);
-          row.appendChild(sub);
+          mid.appendChild(lab);
+          mid.appendChild(sel);
+
+          var actions = document.createElement("div");
+          actions.className = "flex items-center gap-1 shrink-0";
+          var mBtn = document.createElement("button");
+          mBtn.type = "button";
+          mBtn.className =
+            "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-900 hover:bg-indigo-100 active:scale-95 transition";
+          mBtn.setAttribute("aria-label", t("staff_manage_btn"));
+          mBtn.title = t("staff_manage_btn");
+          mBtn.innerHTML =
+            "<svg class=\"h-5 w-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.372.996.608 2.296.07 2.572-1.065z\"/><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M15 12a3 3 0 11-6 0 3 3 0 016 0z\"/></svg>";
+          mBtn.addEventListener("click", function () {
+            openStaffProfileModal(acc);
+          });
+          var del = document.createElement("button");
+          del.type = "button";
+          del.className =
+            "inline-flex h-9 w-9 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-700 hover:bg-rose-100 active:scale-95 transition";
+          del.setAttribute("aria-label", t("staff_delete"));
+          del.title = t("staff_delete");
+          del.innerHTML =
+            "<svg class=\"h-5 w-5\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16\"/></svg>";
+          del.addEventListener("click", function () {
+            var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+            if (!wid || !acc.id) return;
+            if (!window.confirm(t("staff_delete_confirm"))) return;
+            fetch(
+              "/api/v1/workspaces/" +
+                encodeURIComponent(wid) +
+                "/staff-accounts/" +
+                encodeURIComponent(acc.id) +
+                "?admin_token=" +
+                encodeURIComponent(token),
+              { method: "DELETE" }
+            )
+              .then(function (r) {
+                if (!r.ok) throw new Error(String(r.status));
+                return loadStaffAccountsList();
+              })
+              .catch(function () {
+                alert(t("staff_delete_fail"));
+              });
+          });
+          actions.appendChild(mBtn);
+          actions.appendChild(del);
+
+          wrap.appendChild(dot);
+          wrap.appendChild(avBtn);
+          wrap.appendChild(mid);
+          wrap.appendChild(actions);
+          row.appendChild(wrap);
           listEl.appendChild(row);
         });
       }
 
+      var lastStaffAccountsItems = [];
+
       function renderStaffAccountsRows(items) {
-        renderStaffAccountsInto("modal-staff-accounts-list", "modal-staff-accounts-empty", items);
-        renderStaffAccountsInto("inline-staff-accounts-list", "inline-staff-accounts-empty", items);
+        lastStaffAccountsItems = items || [];
+        staffAccountById = {};
+        lastStaffAccountsItems.forEach(function (a) {
+          if (a && a.id) staffAccountById[a.id] = a;
+        });
+        renderStaffAccountsInto("modal-staff-accounts-list", "modal-staff-accounts-empty", lastStaffAccountsItems);
+        renderStaffAccountsInto("inline-staff-accounts-list", "inline-staff-accounts-empty", lastStaffAccountsItems);
       }
 
       function loadStaffAccountsList() {
@@ -1136,9 +2226,11 @@
             }
           )
             .then(function (r) {
-              if (!r.ok) return r.json().then(function (j) {
-                throw new Error((j && j.detail) || String(r.status));
-              });
+              if (!r.ok) {
+                return fetchErrorMessage(r).then(function (msg) {
+                  throw new Error(msg);
+                });
+              }
               return r.json();
             })
             .then(function () {
@@ -1203,12 +2295,36 @@
               return r.json();
             })
             .then(function (j) {
+              myinfoOrgBase = j;
               document.getElementById("myinfo-ws-name").textContent = j.name || "—";
               document.getElementById("myinfo-company").value = j.company_name || "";
               document.getElementById("myinfo-branch").value = j.branch_name || "";
               document.getElementById("myinfo-dept").value = j.department_name || "";
               var locSel = document.getElementById("myinfo-admin-locale");
               if (locSel) locSel.value = normalizeLocale(j.admin_ui_locale || "ja");
+              myinfoAdminColorIdx = Number(j.admin_avatar_color_index || 0) % AVATAR_THEME_COLORS.length;
+              myinfoAdminClearAvatar = false;
+              document.getElementById("myinfo-avatar-file").value = "";
+              var colBox = document.getElementById("myinfo-admin-colors");
+              colBox.innerHTML = "";
+              AVATAR_THEME_COLORS.forEach(function (hex, i) {
+                var b = document.createElement("button");
+                b.type = "button";
+                b.className =
+                  "w-8 h-8 rounded-full border-2 border-transparent ring-offset-1 hover:opacity-90 transition";
+                b.style.backgroundColor = hex;
+                if (i === myinfoAdminColorIdx) b.classList.add("ring-2", "ring-indigo-600");
+                b.addEventListener("click", function () {
+                  myinfoAdminColorIdx = i;
+                  Array.prototype.forEach.call(colBox.querySelectorAll("button"), function (x) {
+                    x.classList.remove("ring-2", "ring-indigo-600");
+                  });
+                  b.classList.add("ring-2", "ring-indigo-600");
+                  myinfoAdminPreviewRefresh(myinfoOrgBase);
+                });
+                colBox.appendChild(b);
+              });
+              myinfoAdminPreviewRefresh(j);
               document.getElementById("modal-myinfo").classList.remove("hidden");
             })
             .catch(function () {
@@ -1223,6 +2339,21 @@
         document.getElementById("modal-myinfo-close").addEventListener("click", function () {
           document.getElementById("modal-myinfo").classList.add("hidden");
         });
+        document.getElementById("myinfo-avatar-file").addEventListener("change", function () {
+          myinfoAdminClearAvatar = false;
+          myinfoAdminPreviewRefresh(myinfoOrgBase);
+        });
+        document.getElementById("myinfo-avatar-picker").addEventListener("click", function () {
+          document.getElementById("myinfo-avatar-file").click();
+        });
+        document.getElementById("myinfo-remove-photo").addEventListener("click", function () {
+          myinfoAdminClearAvatar = true;
+          document.getElementById("myinfo-avatar-file").value = "";
+          myinfoAdminPreviewRefresh(myinfoOrgBase);
+        });
+        document.getElementById("myinfo-company").addEventListener("input", function () {
+          myinfoAdminPreviewRefresh(myinfoOrgBase);
+        });
         document.getElementById("myinfo-save").addEventListener("click", function () {
           var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
           var st = document.getElementById("myinfo-status");
@@ -1233,41 +2364,133 @@
           }
           st.className = "text-xs mt-2 min-h-[1.25rem] text-emerald-700";
           st.textContent = t("save_saving");
+          var newFile =
+            document.getElementById("myinfo-avatar-file").files && document.getElementById("myinfo-avatar-file").files[0];
+          var body = {
+            company_name: document.getElementById("myinfo-company").value,
+            branch_name: document.getElementById("myinfo-branch").value,
+            department_name: document.getElementById("myinfo-dept").value,
+            admin_ui_locale: normalizeLocale(document.getElementById("myinfo-admin-locale").value),
+            admin_avatar_color_index: myinfoAdminColorIdx,
+          };
+          if (myinfoAdminClearAvatar && !newFile) body.clear_admin_avatar = true;
           fetch("/api/v1/workspaces/" + encodeURIComponent(wid) + "/org?admin_token=" + encodeURIComponent(token), {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              company_name: document.getElementById("myinfo-company").value,
-              branch_name: document.getElementById("myinfo-branch").value,
-              department_name: document.getElementById("myinfo-dept").value,
-              admin_ui_locale: normalizeLocale(document.getElementById("myinfo-admin-locale").value),
-            }),
+            body: JSON.stringify(body),
           })
             .then(function (r) {
-              if (!r.ok) throw new Error(String(r.status));
+              if (!r.ok) return fetchErrorMessage(r).then(function (m) { throw new Error(m); });
               return r.json();
             })
             .then(function (j) {
+              if (newFile) {
+                var fd = new FormData();
+                fd.append("file", newFile);
+                return fetch(
+                  "/api/v1/workspaces/" +
+                    encodeURIComponent(wid) +
+                    "/admin-avatar?admin_token=" +
+                    encodeURIComponent(token),
+                  { method: "POST", body: fd }
+                ).then(function (r) {
+                  if (!r.ok) return fetchErrorMessage(r).then(function (m) { throw new Error(m); });
+                  return r.json();
+                });
+              }
+              return j;
+            })
+            .then(function (fj) {
               st.textContent = t("save_ok");
-              if (j && j.admin_ui_locale) applyAdminLocale(j.admin_ui_locale);
+              myinfoOrgBase = fj;
+              lastWorkspaceOrg = fj;
+              refreshHeaderFromOrg(fj);
+              if (fj && fj.admin_ui_locale) applyAdminLocale(fj.admin_ui_locale);
+              myinfoAdminClearAvatar = false;
+              document.getElementById("myinfo-avatar-file").value = "";
+              myinfoAdminPreviewRefresh(fj);
             })
             .catch(function () {
               st.textContent = t("save_fail");
               st.className = "text-xs mt-2 min-h-[1.25rem] text-rose-600";
             });
         });
-        document.getElementById("m-layout-pc").addEventListener("click", function (e) {
+        function applyAdminLayoutFromStorage(isPc) {
+          localStorage.setItem("wb_admin_layout", isPc ? "pc" : "mobile");
+          document.documentElement.classList.toggle("admin-pc", isPc);
+          syncAdminHeaderLayoutButtons();
+        }
+        document.getElementById("header-layout-narrow").addEventListener("click", function (e) {
           e.stopPropagation();
-          localStorage.setItem("wb_admin_layout", "pc");
-          document.documentElement.classList.add("admin-pc");
-          menuDropdown.classList.add("hidden");
+          applyAdminLayoutFromStorage(false);
         });
-        document.getElementById("m-layout-mobile").addEventListener("click", function (e) {
+        document.getElementById("header-layout-wide").addEventListener("click", function (e) {
           e.stopPropagation();
-          localStorage.setItem("wb_admin_layout", "mobile");
-          document.documentElement.classList.remove("admin-pc");
-          menuDropdown.classList.add("hidden");
+          applyAdminLayoutFromStorage(true);
         });
+        syncAdminHeaderLayoutButtons();
+
+        function loadAdminAlarmForm() {
+          var p = getAdminAlarmPrefs();
+          var m = document.getElementById("alarm-admin-master");
+          var b = document.getElementById("alarm-admin-bell");
+          var v = document.getElementById("alarm-admin-vibrate");
+          var n = document.getElementById("alarm-admin-notify");
+          var c = document.getElementById("alarm-admin-chat");
+          var s = document.getElementById("alarm-admin-preset");
+          if (m) m.checked = p.master;
+          if (b) b.checked = p.bell;
+          if (v) v.checked = p.vibrate;
+          if (n) n.checked = p.notify;
+          if (c) c.checked = p.chatAlso;
+          if (s) {
+            var pv = (p.preset || "bell1").trim();
+            if (!s.querySelector('option[value="' + pv + '"]')) pv = "bell1";
+            s.value = pv;
+          }
+        }
+        function saveAdminAlarmFromForm() {
+          var m = document.getElementById("alarm-admin-master");
+          var b = document.getElementById("alarm-admin-bell");
+          var v = document.getElementById("alarm-admin-vibrate");
+          var n = document.getElementById("alarm-admin-notify");
+          var c = document.getElementById("alarm-admin-chat");
+          var s = document.getElementById("alarm-admin-preset");
+          if (m) localStorage.setItem("wb_admin_alarm_master", m.checked ? "1" : "0");
+          if (b) localStorage.setItem("wb_admin_ch_bell", b.checked ? "1" : "0");
+          if (v) localStorage.setItem("wb_admin_ch_vibrate", v.checked ? "1" : "0");
+          if (n) localStorage.setItem("wb_admin_ch_notify", n.checked ? "1" : "0");
+          if (c) localStorage.setItem("wb_admin_chat_notify", c.checked ? "1" : "0");
+          if (s && s.value) localStorage.setItem("wb_admin_alarm_preset", s.value);
+        }
+        document.getElementById("m-alarm-settings").addEventListener("click", function (e) {
+          e.stopPropagation();
+          menuDropdown.classList.add("hidden");
+          loadAdminAlarmForm();
+          document.getElementById("modal-alarm-settings").classList.remove("hidden");
+          wbEnsureAudioCtxAdmin();
+        });
+        document.getElementById("modal-alarm-close").addEventListener("click", function () {
+          saveAdminAlarmFromForm();
+          document.getElementById("modal-alarm-settings").classList.add("hidden");
+        });
+        ["alarm-admin-master", "alarm-admin-bell", "alarm-admin-vibrate", "alarm-admin-notify", "alarm-admin-chat"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (el) el.addEventListener("change", saveAdminAlarmFromForm);
+        });
+        var alarmPresetSel = document.getElementById("alarm-admin-preset");
+        if (alarmPresetSel) alarmPresetSel.addEventListener("change", saveAdminAlarmFromForm);
+        document.getElementById("alarm-admin-test").addEventListener("click", function () {
+          saveAdminAlarmFromForm();
+          var pr = getAdminAlarmPrefs();
+          if (pr.master && pr.bell) wbPlaySoundPresetAdmin(pr.preset, 0.85);
+          if (pr.master && pr.vibrate && navigator.vibrate) navigator.vibrate([120, 60, 120]);
+        });
+        document.getElementById("alarm-admin-perm").addEventListener("click", function () {
+          if (typeof Notification === "undefined") return;
+          Notification.requestPermission().catch(function () {});
+        });
+
         document.getElementById("m-logout").addEventListener("click", function () {
           if (sessionStorage.getItem("wb_super_assumed")) {
             sessionStorage.removeItem("wb_admin_token");
@@ -1337,6 +2560,13 @@
         rows.forEach(function (row) {
           var card = document.createElement("div");
           card.className = "rounded-xl border border-gray-100 bg-gray-50/50 p-2.5 space-y-1.5";
+          if (row.image_url) {
+            var hi = document.createElement("img");
+            hi.src = row.image_url;
+            hi.alt = "";
+            hi.className = "w-full max-h-32 object-contain rounded-lg border border-gray-200 bg-white";
+            card.appendChild(hi);
+          }
           var tx = document.createElement("p");
           tx.className = "text-[13px] text-gray-900 line-clamp-3";
           tx.textContent = row.text || "";
@@ -1403,6 +2633,13 @@
             document.getElementById("modal-inst-detail-text").textContent = d.text || "";
             var body = document.getElementById("modal-inst-detail-body");
             body.innerHTML = "";
+            if (d.image_url) {
+              var hi = document.createElement("img");
+              hi.src = d.image_url;
+              hi.alt = "";
+              hi.className = "w-full max-h-56 object-contain rounded-xl border border-gray-200 mb-3 bg-white";
+              body.appendChild(hi);
+            }
             function section(titleCls, titleText, items) {
               var sec = document.createElement("div");
               var h = document.createElement("p");
@@ -1438,92 +2675,128 @@
           });
       }
 
-      ws.onopen = function () {
-        setStatus("ok", true);
-        syncSendButton();
-        setFooterState({ type: "connected" });
-        refreshOnlineWorkers();
-        loadStaffGroups()
-          .then(function () {
-            return loadStaffAccountsList();
-          })
-          .catch(function () {});
-        loadInstructionHistory().catch(function () {});
-        setInterval(refreshOnlineWorkers, 4000);
-      };
-
-      ws.onclose = function () {
-        setStatus("off", false);
-        syncSendButton();
-        setFooterState({ type: "disconnected" });
-      };
-
-      ws.onerror = function () {
-        setStatus("err", false);
-      };
-
-      ws.onmessage = function (ev) {
-        let data;
-        try {
-          data = JSON.parse(ev.data);
-        } catch (e) {
-          return;
+      function connectAdminWebSocket() {
+        if (adminWsPingTimer) {
+          clearInterval(adminWsPingTimer);
+          adminWsPingTimer = null;
         }
-        if (data.type === "instruction_sent") {
-          var d = Number(data.delivered || 0);
-          var wo = Number(data.workers_online || 0);
-          var w = data.warning;
-          if (w === "no_workers_online") {
-            setFooterState({ type: "no_workers" });
-          } else if (w === "no_matching_recipients") {
-            setFooterState({ type: "no_match" });
-          } else if (w === "delivery_failed") {
-            setFooterState({ type: "delivery_failed" });
-          } else if (d > 0) {
-            setFooterState({ type: "sent", d: d, wo: wo });
-          } else {
-            setFooterState({ type: "empty" });
+        if (onlinePollInterval) {
+          clearInterval(onlinePollInterval);
+          onlinePollInterval = null;
+        }
+        if (ws) {
+          try {
+            ws.onopen = null;
+            ws.onclose = null;
+            ws.onerror = null;
+            ws.onmessage = null;
+            if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) ws.close();
+          } catch (e) {}
+        }
+        ws = new WebSocket(wsUrl);
+        setStatus("checking", false);
+        ws.onopen = function () {
+          setStatus("ok", true);
+          syncSendButton();
+          setFooterState({ type: "connected" });
+          refreshOnlineWorkers();
+          loadStaffGroups()
+            .then(function () {
+              return loadStaffAccountsList();
+            })
+            .catch(function () {});
+          loadInstructionHistory().catch(function () {});
+          onlinePollInterval = setInterval(refreshOnlineWorkers, 4000);
+          adminWsPingTimer = setInterval(function () {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(JSON.stringify({ type: "ping" }));
+              } catch (e) {}
+            }
+          }, 25000);
+        };
+        ws.onclose = function () {
+          if (adminWsPingTimer) {
+            clearInterval(adminWsPingTimer);
+            adminWsPingTimer = null;
           }
-          scheduleHistRefresh();
-          return;
-        }
-        if (data.type === "worker_response" && data.button) {
-          const labels = {
-            OK: t("resp_ok"),
-            REPEAT: t("resp_repeat"),
-            NG: t("resp_ng"),
-            CUSTOM: t("resp_custom"),
-          };
-          const colors = {
-            OK: "border-l-4 border-l-emerald-500 bg-emerald-50/80",
-            REPEAT: "border-l-4 border-l-amber-400 bg-amber-50/80",
-            NG: "border-l-4 border-l-rose-400 bg-rose-50/80",
-            CUSTOM: "border-l-4 border-l-indigo-600 bg-indigo-50/80",
-          };
-          const li = document.createElement("li");
-          const timeStr = new Date(data.ts ? data.ts * 1000 : Date.now()).toLocaleTimeString();
-          li.className = "rounded-lg px-3 py-2 " + (colors[data.button] || "border-l-4 border-l-gray-400 bg-gray-100");
-          var who = data.worker_label ? String(data.worker_label) + " · " : "";
-          li.textContent = "[" + timeStr + "] " + who + (labels[data.button] || data.button);
-          responses.prepend(li);
-          scheduleHistRefresh();
-        }
-      };
+          if (onlinePollInterval) {
+            clearInterval(onlinePollInterval);
+            onlinePollInterval = null;
+          }
+          setStatus("off", false);
+          syncSendButton();
+          setFooterState({ type: "disconnected" });
+        };
+        ws.onerror = function () {
+          setStatus("err", false);
+          syncSendButton();
+          setFooterState({ type: "disconnected" });
+        };
+        ws.onmessage = function (ev) {
+          let data;
+          try {
+            data = JSON.parse(ev.data);
+          } catch (e) {
+            return;
+          }
+          if (data.type === "presence") {
+            refreshOnlineWorkers();
+            return;
+          }
+          if (data.type === "staff_message" && typeof data.text === "string") {
+            playAdminNotify("chat");
+            return;
+          }
+          if (data.type === "instruction_sent") {
+            var d = Number(data.delivered || 0);
+            var wo = Number(data.workers_online || 0);
+            var w = data.warning;
+            if (w === "no_workers_online") {
+              setFooterState({ type: "no_workers" });
+            } else if (w === "no_matching_recipients") {
+              setFooterState({ type: "no_match" });
+            } else if (w === "delivery_failed") {
+              setFooterState({ type: "delivery_failed" });
+            } else if (d > 0) {
+              setFooterState({ type: "sent", d: d, wo: wo });
+            } else {
+              setFooterState({ type: "empty" });
+            }
+            scheduleHistRefresh();
+            return;
+          }
+          if (data.type === "worker_response" && data.button) {
+            playAdminNotify("response");
+            scheduleHistRefresh();
+          }
+        };
+      }
+      var adminReconnectBtn = document.getElementById("admin-ws-reconnect");
+      if (adminReconnectBtn) {
+        adminReconnectBtn.addEventListener("click", function () {
+          connectAdminWebSocket();
+        });
+      }
 
-      function sendInstruction() {
-        const text = input.value.trim();
-        if (!text || ws.readyState !== WebSocket.OPEN) return;
+      function sendInstructionPayload(imageUrl, text) {
         var modeEl = document.querySelector('input[name="send-mode"]:checked');
         var mode = modeEl ? modeEl.value : "all";
+        var payload = { type: "instruction", text: text };
+        if (imageUrl) payload.image_url = imageUrl;
         setFooterState({ type: "sending" });
         if (mode === "group") {
-          var gid = (document.getElementById("send-group-select") && document.getElementById("send-group-select").value) || "";
-          gid = (gid || "").trim();
-          if (!gid) {
+          var gboxes = document.querySelectorAll("#send-group-checkboxes input[type=\"checkbox\"]:checked");
+          var gids = [];
+          gboxes.forEach(function (cb) {
+            gids.push(cb.value);
+          });
+          if (!gids.length) {
             setFooterState({ type: "send_no_group" });
             return;
           }
-          ws.send(JSON.stringify({ type: "instruction", text: text, target_group_id: gid }));
+          payload.target_group_ids = gids;
+          ws.send(JSON.stringify(payload));
           return;
         }
         if (mode === "selected") {
@@ -1536,10 +2809,49 @@
             setFooterState({ type: "send_no_target" });
             return;
           }
-          ws.send(JSON.stringify({ type: "instruction", text: text, target_tokens: target_tokens }));
+          payload.target_tokens = target_tokens;
+          ws.send(JSON.stringify(payload));
         } else {
-          ws.send(JSON.stringify({ type: "instruction", text: text }));
+          ws.send(JSON.stringify(payload));
         }
+        try {
+          input.value = "";
+        } catch (e) {}
+        clearInstPhoto();
+        syncSendButton();
+      }
+
+      function sendInstruction() {
+        var text = (input.value || "").trim();
+        if (ws.readyState !== WebSocket.OPEN) return;
+        if (!text && !adminInstPhotoFile) return;
+        var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+        if (adminInstPhotoFile) {
+          if (!wid || !token) return;
+          var fd = new FormData();
+          fd.append("file", adminInstPhotoFile);
+          fetch(
+            "/api/v1/workspaces/" + encodeURIComponent(wid) + "/instruction-image?admin_token=" + encodeURIComponent(token),
+            { method: "POST", body: fd }
+          )
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, body: j };
+              });
+            })
+            .then(function (x) {
+              if (!x.ok || !x.body || !x.body.url) {
+                setFooterState({ type: "delivery_failed" });
+                return;
+              }
+              sendInstructionPayload(x.body.url, text);
+            })
+            .catch(function () {
+              setFooterState({ type: "delivery_failed" });
+            });
+          return;
+        }
+        sendInstructionPayload(null, text);
       }
 
       sendBtn.addEventListener("click", sendInstruction);
@@ -1550,13 +2862,238 @@
         }
       });
 
-      var curEndpoints = {
-        kaigo: "/api/v1/curriculum/kaigo",
-        food: "/api/v1/curriculum/food",
-        "food-glossary": "/api/v1/curriculum/food-glossary",
-        "course-list": "/api/v1/curriculum/course-list",
-        extra: "/api/v1/curriculum/extra",
+      function populateFoodGlossarySheetSelects(sheets) {
+        ["admin-wg-field", "admin-expr-field"].forEach(function (id) {
+          var sel = document.getElementById(id);
+          if (!sel) return;
+          sel.innerHTML = "";
+          if (!sheets || !sheets.length) {
+            var ox = document.createElement("option");
+            ox.value = "";
+            ox.textContent = "—";
+            sel.appendChild(ox);
+            return;
+          }
+          sheets.forEach(function (s) {
+            var o = document.createElement("option");
+            o.value = String(s.sheet_gid);
+            o.textContent = s.title || String(s.sheet_gid);
+            sel.appendChild(o);
+          });
+        });
+      }
+
+      function syncTermSheetDropdowns(gidStr) {
+        ["admin-wg-field", "admin-expr-field"].forEach(function (id) {
+          var sel = document.getElementById(id);
+          if (!sel || !gidStr) return;
+          var ok = Array.prototype.some.call(sel.options, function (o) {
+            return o.value === gidStr;
+          });
+          if (ok) sel.value = gidStr;
+        });
+      }
+
+      function initAdminWorkspaceGlossary() {
+        var sel = document.getElementById("admin-wg-field");
+        var btn = document.getElementById("admin-wg-submit");
+        var st = document.getElementById("admin-wg-status");
+        if (!sel || !btn) return;
+        if (btn.getAttribute("data-wg-wired") === "1") return;
+        btn.setAttribute("data-wg-wired", "1");
+        fetch("/api/v1/curriculum/food-glossary-tabs")
+          .then(function (r) {
+            return r.ok ? r.json() : Promise.reject();
+          })
+          .then(function (data) {
+            populateFoodGlossarySheetSelects((data && data.sheets) || []);
+          })
+          .catch(function () {
+            populateFoodGlossarySheetSelects([]);
+          });
+        btn.addEventListener("click", function () {
+          var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+          if (!wid || !token) return;
+          var gid = sel.value;
+          if (!gid) {
+            if (st) st.textContent = t("wg_pick_field");
+            return;
+          }
+          var wordEl = document.getElementById("admin-wg-word");
+          var meanEl = document.getElementById("admin-wg-meaning");
+          var noteEl = document.getElementById("admin-wg-note");
+          var word = wordEl ? wordEl.value : "";
+          var mean = meanEl ? meanEl.value : "";
+          var note = noteEl ? noteEl.value : "";
+          if (!(String(word).trim() && String(mean).trim())) {
+            if (st) st.textContent = t("wg_need_fields");
+            return;
+          }
+          if (st) st.textContent = "";
+          fetch(
+            "/api/v1/workspaces/" +
+              encodeURIComponent(wid) +
+              "/glossary-terms?admin_token=" +
+              encodeURIComponent(token),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sheet_gid: parseInt(gid, 10),
+                word_ja: String(word).trim(),
+                meaning_ja: String(mean).trim(),
+                note_ja: String(note || "").trim(),
+              }),
+            }
+          )
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, status: r.status, body: j };
+              });
+            })
+            .then(function (x) {
+              if (!st) return;
+              if (x.ok) {
+                st.textContent = t("wg_ok");
+                if (wordEl) wordEl.value = "";
+                if (meanEl) meanEl.value = "";
+                if (noteEl) noteEl.value = "";
+                return;
+              }
+              var d = x.body && x.body.detail;
+              if (x.status === 409 && d === "duplicate_sheet") st.textContent = t("wg_dup_sheet");
+              else if (x.status === 409 && d === "duplicate_workspace") st.textContent = t("wg_dup_ws");
+              else if (x.status === 409 && d === "duplicate_expression_workspace")
+                st.textContent = t("wg_dup_expr_conflict");
+              else st.textContent = t("wg_fail") + (typeof d === "string" ? d : String(x.status));
+            })
+            .catch(function () {
+              if (st) st.textContent = t("wg_fail");
+            });
+        });
+      }
+
+      function initAdminWorkspaceExpressions() {
+        var sel = document.getElementById("admin-expr-field");
+        var btn = document.getElementById("admin-expr-submit");
+        var st = document.getElementById("admin-expr-status");
+        if (!sel || !btn) return;
+        if (btn.getAttribute("data-we-wired") === "1") return;
+        btn.setAttribute("data-we-wired", "1");
+        btn.addEventListener("click", function () {
+          var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+          if (!wid || !token) return;
+          var gid = sel.value;
+          if (!gid) {
+            if (st) st.textContent = t("wg_pick_field");
+            return;
+          }
+          var phEl = document.getElementById("admin-expr-phrase");
+          var meanEl = document.getElementById("admin-expr-meaning");
+          var noteEl = document.getElementById("admin-expr-note");
+          var phrase = phEl ? phEl.value : "";
+          var mean = meanEl ? meanEl.value : "";
+          var note = noteEl ? noteEl.value : "";
+          if (!(String(phrase).trim() && String(mean).trim())) {
+            if (st) st.textContent = t("wg_need_fields");
+            return;
+          }
+          if (st) st.textContent = "";
+          fetch(
+            "/api/v1/workspaces/" +
+              encodeURIComponent(wid) +
+              "/expression-terms?admin_token=" +
+              encodeURIComponent(token),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                sheet_gid: parseInt(gid, 10),
+                word_ja: String(phrase).trim(),
+                meaning_ja: String(mean).trim(),
+                note_ja: String(note || "").trim(),
+              }),
+            }
+          )
+            .then(function (r) {
+              return r.json().then(function (j) {
+                return { ok: r.ok, status: r.status, body: j };
+              });
+            })
+            .then(function (x) {
+              if (!st) return;
+              if (x.ok) {
+                st.textContent = t("wg_expr_ok");
+                if (phEl) phEl.value = "";
+                if (meanEl) meanEl.value = "";
+                if (noteEl) noteEl.value = "";
+                return;
+              }
+              var d = x.body && x.body.detail;
+              if (x.status === 409 && d === "duplicate_sheet") st.textContent = t("wg_dup_sheet");
+              else if (x.status === 409 && d === "duplicate_workspace") st.textContent = t("wg_dup_ws");
+              else if (x.status === 409 && d === "duplicate_glossary_workspace")
+                st.textContent = t("wg_dup_gloss_conflict");
+              else st.textContent = t("wg_fail") + (typeof d === "string" ? d : String(x.status));
+            })
+            .catch(function () {
+              if (st) st.textContent = t("wg_fail");
+            });
+        });
+      }
+
+      var curActiveKey = "food-glossary";
+      var curTabConfig = {
+        "food-glossary": {
+          data: "/api/v1/curriculum/food-glossary",
+          tabs: "/api/v1/curriculum/food-glossary-tabs",
+        },
+        food: { data: "/api/v1/curriculum/food", tabs: "/api/v1/curriculum/food-tabs" },
+        kaigo: { data: "/api/v1/curriculum/kaigo", tabs: "/api/v1/curriculum/kaigo-tabs" },
+        "course-list": {
+          data: "/api/v1/curriculum/course-list",
+          tabs: "/api/v1/curriculum/course-list-tabs",
+        },
+        extra: { data: "/api/v1/curriculum/extra", tabs: "/api/v1/curriculum/extra-tabs" },
       };
+
+      function pickSheetGid(sheets, defaultGid, preferredGid) {
+        if (!sheets || !sheets.length) return null;
+        var want =
+          preferredGid != null && preferredGid !== ""
+            ? parseInt(preferredGid, 10)
+            : NaN;
+        if (!isNaN(want) && sheets.some(function (s) { return s.sheet_gid === want; })) return want;
+        var def = defaultGid != null ? parseInt(defaultGid, 10) : NaN;
+        if (!isNaN(def) && sheets.some(function (s) { return s.sheet_gid === def; })) return def;
+        return sheets[0].sheet_gid;
+      }
+
+      function renderCurSheetStrip(sheets, activeGid) {
+        var wrap = document.getElementById("cur-sheet-strip-wrap");
+        var strip = document.getElementById("cur-sheet-strip");
+        if (!wrap || !strip) return;
+        strip.innerHTML = "";
+        if (!sheets || sheets.length <= 1) {
+          wrap.classList.add("hidden");
+          return;
+        }
+        wrap.classList.remove("hidden");
+        sheets.forEach(function (s) {
+          var gid = s.sheet_gid;
+          var on = gid === activeGid;
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className =
+            "snap-start shrink-0 whitespace-nowrap px-2.5 py-1 text-xs rounded-lg border font-medium transition " +
+            (on ? "bg-indigo-900 text-white border-indigo-900" : "bg-white text-gray-800 border-gray-200 hover:bg-indigo-50");
+          b.textContent = s.title || String(gid);
+          b.addEventListener("click", function () {
+            loadCurriculum(curActiveKey, gid);
+          });
+          strip.appendChild(b);
+        });
+      }
       var curRows = [];
       var curStatus = document.getElementById("cur-status");
       var curSearch = document.getElementById("cur-search");
@@ -1621,14 +3158,29 @@
           : "";
       }
 
-      function loadCurriculum(key) {
-        var url = curEndpoints[key];
-        if (!url) return;
+      function loadCurriculum(key, preferredSheetGid) {
+        var cfg = curTabConfig[key];
+        if (!cfg) return;
+        curActiveKey = key;
         setCurTabActive(key);
         curStatus.textContent = t("cur_loading");
         curTableWrap.classList.add("hidden");
         curRows = [];
-        fetch(url)
+        fetch(cfg.tabs)
+          .then(function (r) {
+            if (!r.ok) throw new Error(String(r.status));
+            return r.json();
+          })
+          .then(function (meta) {
+            var sheets = (meta && meta.sheets) || [];
+            var defGid = meta && meta.default_sheet_gid != null ? meta.default_sheet_gid : null;
+            var gid = pickSheetGid(sheets, defGid, preferredSheetGid);
+            renderCurSheetStrip(sheets, gid);
+            if (key === "food-glossary" && gid != null) syncTermSheetDropdowns(String(gid));
+            var url = cfg.data;
+            if (gid != null) url += "?sheet_gid=" + encodeURIComponent(gid);
+            return fetch(url);
+          })
           .then(function (r) {
             if (!r.ok) throw new Error(r.status + " " + r.statusText);
             return r.json();
@@ -1641,9 +3193,28 @@
             applyCurSearch();
           })
           .catch(function (err) {
-            curStatus.textContent = t("cur_fail") + err.message;
+            var sw = document.getElementById("cur-sheet-strip-wrap");
+            if (sw) sw.classList.add("hidden");
+            curStatus.textContent = t("cur_fail") + (err && err.message ? err.message : err);
             curThead.innerHTML = "";
             curTbody.innerHTML = "";
+            if (cfg) {
+              fetch(cfg.data)
+                .then(function (r) {
+                  if (!r.ok) throw new Error(r.status + " " + r.statusText);
+                  return r.json();
+                })
+                .then(function (data) {
+                  curRows = data.rows || [];
+                  curStatus.textContent =
+                    (data.row_count != null ? data.row_count : curRows.length) + t("cur_rows");
+                  renderCurriculumTable(curRows);
+                  applyCurSearch();
+                })
+                .catch(function (e2) {
+                  curStatus.textContent = t("cur_fail") + (e2 && e2.message ? e2.message : e2);
+                });
+            }
           });
       }
 
@@ -1653,6 +3224,15 @@
         });
       });
       curSearch.addEventListener("input", applyCurSearch);
+
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState !== "visible") return;
+        if (!token) return;
+        if (ws && ws.readyState === WebSocket.OPEN) return;
+        try {
+          connectAdminWebSocket();
+        } catch (e) {}
+      });
     })();
   </script>
 </body>

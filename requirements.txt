@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+websockets
 pandas
 openpyxl
 python-multipart
@@ -8,3 +9,4 @@ passlib[bcrypt]
 google-api-python-client
 google-auth
 pydantic-settings
+Pillow>=9.0.0

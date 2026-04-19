@@ -90,6 +90,28 @@ class ConnectionManager:
             self.disconnect(workspace_id, ws)
         return sent
 
+    async def broadcast_json_to_admins(
+        self, workspace_id: str, message: dict[str, Any]
+    ) -> int:
+        """スタッフ→管理者メッセージなど: ADMIN ロールの接続のみ。"""
+        raw = json.dumps(message, ensure_ascii=False)
+        dead: list[WebSocket] = []
+        sent = 0
+        for sess_token, ws in list(self._rooms.get(workspace_id, [])):
+            if not sess_token:
+                continue
+            s = sessions.get(sess_token)
+            if s is None or s.role != Role.ADMIN:
+                continue
+            try:
+                await ws.send_text(raw)
+                sent += 1
+            except Exception:
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(workspace_id, ws)
+        return sent
+
     def iter_connections(self, workspace_id: str) -> list[tuple[Optional[str], WebSocket]]:
         return list(self._rooms.get(workspace_id, []))
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from googleapiclient.discovery import build
 
@@ -51,6 +51,23 @@ def get_sheets_service(settings: "Settings") -> Any:
         )
     resolved = str(resolve_credentials_path(settings.google_credentials_path))
     return _build_sheets_service(False, resolved, "")
+
+
+def list_spreadsheet_sheets_meta(service: Any, spreadsheet_id: str) -> list[dict[str, Any]]:
+    """Return [{sheet_gid, title}, ...] for all sheets in a spreadsheet."""
+    meta = (
+        service.spreadsheets()
+        .get(spreadsheetId=spreadsheet_id, fields="sheets(properties(sheetId,title))")
+        .execute()
+    )
+    out: list[dict[str, Any]] = []
+    for sheet in meta.get("sheets", []):
+        props = sheet.get("properties") or {}
+        sid = props.get("sheetId")
+        title = props.get("title")
+        if sid is not None and title:
+            out.append({"sheet_gid": int(sid), "title": str(title)})
+    return out
 
 
 def sheet_title_for_gid(service: Any, spreadsheet_id: str, gid: int) -> str:

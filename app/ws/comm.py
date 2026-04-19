@@ -8,8 +8,11 @@ from fastapi import APIRouter, WebSocket, status
 from starlette.websockets import WebSocketDisconnect
 
 from app.services.instruction_history import create_round, record_reply
+from app.services.instruction_images import is_allowed_instruction_image_url
 from app.services.staff_accounts import staff_accounts
 from app.services.stores import Role, sessions
+from app.services.workspace_chat import append as chat_append
+from app.services.ws_presence import ws_presence
 from app.ws.manager import manager
 
 router = APIRouter(tags=["realtime"])
@@ -86,6 +89,13 @@ async def comm_websocket(websocket: WebSocket) -> None:
 
     workspace_id = sess.workspace_id
     await manager.connect(workspace_id, websocket, sess.token)
+    ws_presence.upsert(
+        workspace_id,
+        session_token=sess.token,
+        role=sess.role,
+        user_label=sess.user_label,
+        staff_account_id=sess.staff_account_id,
+    )
     try:
         await manager.broadcast_json(
             workspace_id,
@@ -105,6 +115,7 @@ async def comm_websocket(websocket: WebSocket) -> None:
                 continue
 
             msg_type = payload.get("type")
+            ws_presence.touch(workspace_id, session_token=sess.token)
             if msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
                 continue
@@ -114,16 +125,33 @@ async def comm_websocket(websocket: WebSocket) -> None:
                     await websocket.send_json({"type": "error", "detail": "admin_only"})
                     continue
                 raw = payload.get("text", "")
-                body = raw if isinstance(raw, str) else str(raw)
+                body = (raw if isinstance(raw, str) else str(raw)).strip()
+                raw_img = payload.get("image_url", "")
+                img = raw_img.strip() if isinstance(raw_img, str) else ""
+                if img and not is_allowed_instruction_image_url(workspace_id, img):
+                    await websocket.send_json({"type": "error", "detail": "invalid_image_url"})
+                    continue
+                if not body and not img:
+                    await websocket.send_json({"type": "error", "detail": "empty_instruction"})
+                    continue
                 ts = time.time()
                 workers_online = _count_workers_online(workspace_id)
                 raw_group = payload.get("target_group_id")
+                raw_groups = payload.get("target_group_ids")
                 targets = payload.get("target_tokens")
                 delivered = 0
                 mode_str = "broadcast"
                 token_set: set[str] = set()
                 target_gid: Optional[str] = None
-                if isinstance(raw_group, str) and raw_group.strip():
+                if isinstance(raw_groups, list):
+                    gids = [str(x).strip() for x in raw_groups if isinstance(x, str) and str(x).strip()]
+                    gids = list(dict.fromkeys(gids))
+                    if gids:
+                        for gid in gids:
+                            token_set |= _worker_tokens_in_group(workspace_id, gid)
+                        mode_str = "group"
+                        target_gid = ",".join(gids) if len(gids) > 1 else gids[0]
+                elif isinstance(raw_group, str) and raw_group.strip():
                     target_gid = raw_group.strip()
                     token_set = _worker_tokens_in_group(workspace_id, target_gid)
                     mode_str = "group"
@@ -145,8 +173,16 @@ async def comm_websocket(websocket: WebSocket) -> None:
                     mode_str,
                     rec_payload,
                     target_group_id=target_gid,
+                    image_url=img or None,
                 )
-                msg = {"type": "instruction", "text": body, "ts": ts, "instruction_id": instruction_id}
+                msg: dict[str, Any] = {
+                    "type": "instruction",
+                    "text": body,
+                    "ts": ts,
+                    "instruction_id": instruction_id,
+                }
+                if img:
+                    msg["image_url"] = img
                 if mode_str == "group":
                     if not token_set:
                         delivered = 0
@@ -191,6 +227,13 @@ async def comm_websocket(websocket: WebSocket) -> None:
                 iid: Optional[str] = None
                 if isinstance(raw_iid, str) and raw_iid.strip():
                     iid = raw_iid.strip()
+                custom_raw = payload.get("custom_text")
+                custom_text: Optional[str] = None
+                if btn == "CUSTOM" and isinstance(custom_raw, str):
+                    custom_text = custom_raw.strip()[:4000] or None
+                elif btn == "CUSTOM":
+                    custom_text = None
+                if iid:
                     record_reply(
                         workspace_id,
                         iid,
@@ -198,6 +241,7 @@ async def comm_websocket(websocket: WebSocket) -> None:
                         sess.user_label or "?",
                         sess.staff_account_id,
                         btn,
+                        custom_text=custom_text,
                     )
                 wlab = (sess.user_label or "").strip() or "?"
                 out: dict[str, Any] = {
@@ -210,16 +254,89 @@ async def comm_websocket(websocket: WebSocket) -> None:
                     out["instruction_id"] = iid
                 if sess.staff_account_id:
                     out["staff_account_id"] = sess.staff_account_id
+                if btn == "CUSTOM" and custom_text:
+                    out["custom_text"] = custom_text
                 await manager.broadcast_json(workspace_id, out)
                 continue
 
+            if msg_type == "admin_message":
+                if sess.role != Role.ADMIN:
+                    await websocket.send_json({"type": "error", "detail": "admin_only"})
+                    continue
+                raw_txt = payload.get("text", "")
+                body = raw_txt if isinstance(raw_txt, str) else str(raw_txt)
+                body = body.strip()[:4000]
+                if not body:
+                    await websocket.send_json({"type": "error", "detail": "empty_text"})
+                    continue
+                lab = (sess.user_label or "").strip() or "管理者"
+                row = chat_append(
+                    workspace_id,
+                    from_role="admin",
+                    from_label=lab,
+                    text=body,
+                )
+                await manager.broadcast_json_to_workers(
+                    workspace_id,
+                    {
+                        "type": "admin_message",
+                        "text": body,
+                        "ts": time.time(),
+                        "from_label": lab,
+                        "chat_id": row["id"],
+                    },
+                )
+                continue
+
+            if msg_type == "staff_message":
+                if sess.role != Role.WORKER:
+                    await websocket.send_json({"type": "error", "detail": "worker_only"})
+                    continue
+                raw_txt = payload.get("text", "")
+                body = raw_txt if isinstance(raw_txt, str) else str(raw_txt)
+                body = body.strip()[:4000]
+                if not body:
+                    await websocket.send_json({"type": "error", "detail": "empty_text"})
+                    continue
+                wlab = (sess.user_label or "").strip() or "?"
+                row = chat_append(
+                    workspace_id,
+                    from_role="worker",
+                    from_label=wlab,
+                    text=body,
+                    staff_account_id=sess.staff_account_id,
+                    worker_session_token=sess.token,
+                )
+                out_msg: dict[str, Any] = {
+                    "type": "staff_message",
+                    "text": body,
+                    "ts": time.time(),
+                    "worker_label": wlab,
+                    "chat_id": row["id"],
+                }
+                if sess.staff_account_id:
+                    out_msg["staff_account_id"] = sess.staff_account_id
+                await manager.broadcast_json_to_admins(workspace_id, out_msg)
+                continue
+
             await websocket.send_json(
-                {"type": "error", "detail": "unknown_type", "allowed": ["ping", "instruction", "worker_response"]},
+                {
+                    "type": "error",
+                    "detail": "unknown_type",
+                    "allowed": [
+                        "ping",
+                        "instruction",
+                        "worker_response",
+                        "staff_message",
+                        "admin_message",
+                    ],
+                },
             )
     except WebSocketDisconnect:
         pass
     finally:
         manager.disconnect(workspace_id, websocket)
+        ws_presence.delete(workspace_id, session_token=sess.token)
         await manager.broadcast_json(
             workspace_id,
             {

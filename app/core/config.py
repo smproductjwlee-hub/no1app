@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 LOCALE_DISPLAY_NAMES: dict[str, str] = {
     "ja": "日本語",
     "vi": "Tiếng Việt",
-    "en": "English",
+    "en": "US English",
     "id": "Bahasa Indonesia",
     "my": "မြန်မာဘာသာ",
     "ne": "नेपाली",

@@ -6,3 +6,7 @@ venv/
 __pycache__/
 *.py[cod]
 *.pyc
+static/uploads/staff-avatars/*.jpg
+static/uploads/admin-avatars/*.jpg
+static/uploads/instruction-images/*
+!static/uploads/instruction-images/.gitkeep

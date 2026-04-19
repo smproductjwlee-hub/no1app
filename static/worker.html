@@ -10,6 +10,8 @@
 
   <title>WorkBridge — 現場スタッフ</title>
 
+  <script src="/static/worker-i18n.js"></script>
+
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
@@ -55,6 +57,14 @@
     code {
 
       font-family: ui-monospace, "Consolas", "Cascadia Mono", monospace;
+
+    }
+
+    #custom-mic-btn.mic-active {
+
+      background-color: #be123c;
+
+      box-shadow: 0 0 0 4px #fecdd3;
 
     }
 
@@ -112,33 +122,53 @@
 
 
 
-  <div id="app" class="max-w-md mx-auto px-4 pb-10 pt-5 flex flex-col gap-4 min-h-screen hidden">
+  <div id="app" class="max-w-md lg:max-w-6xl mx-auto px-4 pb-10 pt-5 flex flex-col gap-4 min-h-screen hidden" data-worker-layout="narrow">
 
-    <header class="flex items-center justify-between gap-3">
+    <header class="flex items-start justify-between gap-3 flex-wrap">
 
       <div>
 
         <p class="text-[11px] uppercase tracking-wide text-indigo-600 font-semibold">WorkBridge</p>
 
-        <h1 class="text-lg font-bold text-gray-900 flex flex-wrap items-baseline gap-x-1.5 gap-y-0">
+        <h1 class="text-lg font-bold text-gray-900 flex flex-wrap items-center gap-2 min-w-0">
 
-          <span>スタッフ</span>
+          <span data-worker-i18n="staff_heading">スタッフ</span>
 
-          <span id="worker-identity" class="text-indigo-700 font-semibold tabular-nums tracking-tight" title="">—</span>
+          <button
+            type="button"
+            id="worker-header-profile-btn"
+            class="flex items-center gap-2 min-w-0 max-w-full rounded-xl border border-indigo-100 bg-indigo-50/50 pl-1 pr-2 py-1 hover:bg-indigo-100/80 transition text-left"
+            title=""
+          >
+            <span
+              id="worker-header-avatar"
+              class="w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-sm bg-indigo-200 flex items-center justify-center text-white text-sm font-bold"
+            ></span>
+            <span id="worker-identity" class="text-indigo-700 font-semibold tabular-nums tracking-tight truncate" title="">—</span>
+          </button>
 
         </h1>
 
       </div>
 
+      <div class="flex items-center gap-2 shrink-0 ml-auto">
+        <div class="inline-flex rounded-xl border border-gray-200 bg-white p-0.5 shadow-sm" role="group" aria-label="画面幅">
+          <button type="button" id="layout-btn-narrow" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-900 text-white"><span data-worker-i18n="layout_narrow">狭い</span></button>
+          <button type="button" id="layout-btn-wide" class="px-3 py-1.5 text-xs font-semibold rounded-lg text-gray-700 hover:bg-gray-50"><span data-worker-i18n="layout_wide">広い</span></button>
+        </div>
       <div class="relative shrink-0">
         <button type="button" id="menu-btn" class="flex items-center gap-1 px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50">
-          メニュー
+          <span data-worker-i18n="menu">メニュー</span>
           <span class="text-gray-400 text-xs">▼</span>
         </button>
-        <div id="menu-dropdown" class="hidden absolute right-0 mt-1 w-48 rounded-xl bg-white border border-gray-200 shadow-lg z-50 py-1 text-sm">
+        <div id="menu-dropdown" class="hidden absolute right-0 mt-1 w-52 rounded-xl bg-white border border-gray-200 shadow-lg z-50 py-1 text-sm">
           <p id="menu-conn-status" class="px-3 py-2 text-[11px] text-gray-600 border-b border-gray-100">接続: …</p>
-          <button type="button" id="m-logout" class="w-full text-left px-3 py-2.5 text-rose-600 hover:bg-rose-50">ログアウト</button>
+          <button type="button" id="m-alarm-settings" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100">
+            <span data-worker-i18n="alarm_settings">通知・アラーム設定</span>
+          </button>
+          <button type="button" id="m-logout" class="w-full text-left px-3 py-2.5 text-rose-600 hover:bg-rose-50 border-t border-gray-100"><span data-worker-i18n="logout">ログアウト</span></button>
         </div>
+      </div>
       </div>
 
     </header>
@@ -149,63 +179,93 @@
 
     <div>
 
-      <p class="text-xs text-gray-500 mb-2 font-medium">表示する言語 / Ngôn ngữ hiển thị</p>
+      <p id="worker-lang-caption" class="text-xs text-gray-500 mb-2 font-medium" data-worker-i18n="lang_caption">表示する言語</p>
 
       <div id="lang-row" class="flex flex-wrap gap-2 justify-between items-center"></div>
 
     </div>
 
+    <nav id="worker-main-tabs" class="flex flex-wrap gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm" role="tablist">
+      <button type="button" id="worker-tab-home" role="tab" aria-selected="true" class="flex-1 min-w-[5rem] px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-900 text-white" data-worker-i18n="main_tab_home">ホーム</button>
+      <button type="button" id="worker-tab-word" role="tab" aria-selected="false" class="flex-1 min-w-[5rem] px-3 py-2 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50" data-worker-i18n="main_tab_wordbook">マイ単語帳</button>
+      <button type="button" id="worker-tab-expr" role="tab" aria-selected="false" class="flex-1 min-w-[5rem] px-3 py-2 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50" data-worker-i18n="main_tab_exprbook">マイ表現集</button>
+    </nav>
 
+    <div id="worker-panel-home" class="flex flex-col gap-4">
 
-    <!-- 原文（日本語） -->
+    <!-- PC: 2 columns (left = instruction / right = staff actions) -->
+    <div id="worker-layout-grid" class="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-    <section class="rounded-2xl bg-[#ebe4f8] px-4 py-3 border border-violet-100 shadow-sm">
+      <!-- Left column: admin instruction (original on top, translation below) -->
+      <div id="worker-col-left" class="lg:col-span-7 flex flex-col gap-4">
 
-      <p class="text-[11px] font-semibold text-violet-900 mb-1.5 tracking-tight">入力された原文（日本語）</p>
+        <section id="pending-instructions-section" class="rounded-2xl border border-amber-200 bg-amber-50/95 shadow-sm overflow-hidden">
+          <button type="button" id="pending-toggle" class="w-full px-4 py-3 text-left text-sm font-semibold text-amber-950 hover:bg-amber-100/80 flex justify-between items-center">
+            <span data-worker-i18n="pending_title">未返信の指示（遅れて届いた分）</span>
+            <span id="pending-chevron" class="text-amber-700/60 text-xs">▼</span>
+          </button>
+          <div id="pending-panel" class="border-t border-amber-100 px-4 pb-4 pt-2">
+            <ul id="pending-instructions-list" class="space-y-3 max-h-64 overflow-y-auto text-sm"></ul>
+            <p id="pending-instructions-empty" class="text-xs text-amber-900/70 py-2 hidden" data-worker-i18n="pending_empty">未返信の指示はありません。</p>
+          </div>
+        </section>
 
-      <p id="text-original" class="ja-text text-sm text-gray-900 whitespace-pre-wrap break-words min-h-[2.75rem]">—</p>
+        <section class="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+          <button type="button" id="inst-toggle" class="w-full px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:bg-gray-50 flex justify-between items-center">
+            <span data-worker-i18n="admin_instr_title">管理者の指示</span>
+            <span id="inst-chevron" class="text-gray-400 text-xs">▼</span>
+          </button>
+          <div id="inst-panel" class="border-t border-gray-100 px-4 pb-4 pt-3 flex flex-col gap-3">
+            <div id="inst-image-box" class="hidden rounded-xl overflow-hidden border border-violet-200 bg-gray-50">
+              <img id="inst-image" src="" alt="" class="w-full max-h-64 object-contain" loading="lazy" decoding="async" />
+            </div>
+            <!-- 原文（日本語） -->
+            <div class="rounded-xl bg-[#ebe4f8] px-4 py-3 border border-violet-100">
+              <p class="text-[11px] font-semibold text-violet-900 mb-1.5 tracking-tight" data-worker-i18n="original_label">原文（日本語）</p>
+              <p id="text-original" class="ja-text text-sm text-gray-900 whitespace-pre-wrap break-words min-h-[2.75rem]">—</p>
+            </div>
 
-    </section>
+            <!-- やさしい日本語：分野・매장 용어 시트 기반 치환 -->
+            <div class="rounded-xl bg-white px-4 py-3 border border-gray-100">
+              <p class="text-[11px] font-semibold text-gray-500 mb-1" data-worker-i18n="easy_ja_label">やさしい日本語（用語シート）</p>
+              <p id="text-easy" class="ja-text text-sm text-gray-600 whitespace-pre-wrap break-words">—</p>
+            </div>
+          </div>
+        </section>
 
+        <!-- メイン：既定は日本語。自動＝タブ言語で API 翻訳、手動＝ボタンで翻訳 -->
+        <section class="rounded-2xl bg-white px-5 py-6 border-2 border-indigo-100 shadow-md min-h-[14rem] flex flex-col justify-center">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <p class="text-[11px] font-semibold text-gray-500" data-worker-i18n="translate_title">翻訳（選択した言語）</p>
+            <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-[11px] font-semibold" role="group" aria-label="translation mode">
+              <button type="button" id="translate-mode-auto" class="px-2.5 py-1 rounded-md bg-white text-indigo-900 shadow-sm"><span data-worker-i18n="translate_auto">自動</span></button>
+              <button type="button" id="translate-mode-manual" class="px-2.5 py-1 rounded-md text-gray-600 hover:bg-white/80"><span data-worker-i18n="translate_manual">手動</span></button>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+            <p id="locale-badge" class="text-[10px] text-indigo-600 font-semibold uppercase tracking-wide">Tiếng Việt</p>
+            <button
+              type="button"
+              id="translation-run-btn"
+              class="hidden inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-900 hover:bg-indigo-100"
+              title="この内容を翻訳"
+            >
+              <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-5-5-5M19 11V9a2 2 0 00-2-2h-2M6 12H4a2 2 0 01-2-2V7a2 2 0 012-2h2" />
+              </svg>
+              <span data-worker-i18n="translate_run">翻訳する</span>
+            </button>
+          </div>
+          <p id="text-translated" class="ja-text-lead text-[1.45rem] md:text-[1.55rem] text-gray-900 whitespace-pre-wrap break-words">
+            指示を待っています。
+          </p>
+          <p id="translation-note" class="text-[11px] text-amber-800 mt-4 leading-relaxed bg-amber-50 rounded-lg px-3 py-2 border border-amber-100" data-worker-i18n="translate_hint">
+            既定は日本語（管理員の原文）です。言語タブで表示言語を選べます。自動ではタブに合わせて翻訳します。手動では「翻訳する」を押したときだけ API で翻訳します。
+          </p>
+        </section>
 
-
-    <!-- やさしい日本語：分野・매장 용어 시트 기반 치환 -->
-
-    <section class="rounded-2xl bg-white px-4 py-3 border border-gray-100 shadow-sm">
-
-      <p class="text-[11px] font-semibold text-gray-500 mb-1">やさしい日本語（用語シート）</p>
-
-      <p id="text-easy" class="ja-text text-sm text-gray-600 whitespace-pre-wrap break-words">—</p>
-
-    </section>
-
-
-
-    <!-- メイン：既定は日本語。英語・VI などのタブを押したときだけ翻訳 -->
-
-    <section class="rounded-2xl bg-white px-5 py-5 border-2 border-indigo-100 shadow-md min-h-[11rem] flex flex-col justify-center">
-
-      <p id="locale-badge" class="text-[10px] text-indigo-600 font-semibold mb-2 uppercase tracking-wide">Tiếng Việt</p>
-
-      <p id="text-translated" class="ja-text-lead text-[1.35rem] md:text-[1.4rem] text-gray-900 whitespace-pre-wrap break-words">
-
-        指示を待っています。
-
-      </p>
-
-      <p id="translation-note" class="text-[11px] text-amber-800 mt-4 leading-relaxed bg-amber-50 rounded-lg px-3 py-2 border border-amber-100">
-
-        既定は日本語（管理員の原文）です。英語・ベトナム語・インドネシア語などのタブを押すと、そのときだけ翻訳が表示されます。
-
-      </p>
-
-    </section>
-
-
-
-    <!-- 応答ボタン（언어별 라벨） -->
-
-    <div class="grid grid-cols-2 gap-3">
+        <!-- 応答ボタン（언어별 라벨） -->
+        <div class="grid grid-cols-2 gap-3">
 
       <button type="button" data-btn="OK" class="btn-r py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white font-semibold text-sm shadow-md transition shadow-emerald-900/10"></button>
 
@@ -215,39 +275,96 @@
 
       <button type="button" data-btn="CUSTOM" class="btn-r py-4 rounded-2xl bg-white hover:bg-gray-50 active:scale-[0.98] border-2 border-indigo-900 text-indigo-950 font-semibold text-sm shadow-sm transition flex flex-col items-center justify-center gap-1">
 
-        <span class="text-xs opacity-70">話す · Speak</span>
-
       </button>
 
-    </div>
-
-
-
-    <!-- 「自分で答える」デモ：音声UI風 -->
-
-    <div id="voice-panel" class="hidden rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/80 px-4 py-6 text-center">
-
-      <div class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-white border border-indigo-200 mb-3 shadow-inner" aria-hidden="true">
-
-        <svg class="h-6 w-6 text-indigo-700 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+        </div>
 
       </div>
 
-      <p id="voice-msg" class="text-sm font-medium text-indigo-950 mb-4">音声入力は今後つなぎ込みます（現在は送信のみ）</p>
+      <!-- Right column: staff input / history / glossary -->
+      <div id="worker-col-right" class="lg:col-span-5 flex flex-col gap-4 lg:sticky lg:top-4 self-start">
 
-      <button type="button" id="voice-done" class="text-sm font-semibold text-indigo-700 underline underline-offset-2">閉じる</button>
+        <section class="rounded-2xl bg-white border border-indigo-100 shadow-sm overflow-hidden">
+          <button type="button" id="worker-chat-toggle" class="w-full px-4 py-3 text-left text-sm font-semibold text-indigo-950 hover:bg-indigo-50/80 flex justify-between items-center">
+            <span data-worker-i18n="worker_chat">管理者とのチャット</span>
+            <span id="worker-chat-chevron" class="text-gray-400 text-xs">▼</span>
+          </button>
+          <div id="worker-chat-panel" class="border-t border-indigo-50 px-4 pb-3 pt-2">
+            <ul id="worker-chat-thread" class="space-y-2 max-h-36 overflow-y-auto text-xs bg-gray-50 rounded-lg border border-gray-100 p-2 min-h-[2.5rem]"></ul>
+          </div>
+        </section>
 
-    </div>
+        <section class="rounded-2xl border border-sky-200 bg-sky-50/80 shadow-sm overflow-hidden">
+          <button type="button" id="staffmsg-toggle" class="w-full px-4 py-3 text-left text-sm font-semibold text-sky-900 hover:bg-sky-50 flex justify-between items-center">
+            <span data-worker-i18n="staff_msg_title">管理者へメッセージ</span>
+            <span id="staffmsg-chevron" class="text-sky-700/50 text-xs">▼</span>
+          </button>
+          <div id="staffmsg-panel" class="border-t border-sky-100 px-4 pb-4 pt-3">
+            <label for="staff-to-admin-text" class="sr-only" data-worker-i18n="staff_msg_title">管理者へメッセージ</label>
+            <textarea
+              id="staff-to-admin-text"
+              rows="2"
+              class="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-400 outline-none resize-y"
+              placeholder="必要な連絡を入力してください"
+            ></textarea>
+            <button
+              type="button"
+              id="staff-to-admin-send"
+              class="mt-2 w-full py-2 rounded-xl bg-sky-800 text-white text-sm font-semibold shadow-sm hover:bg-sky-900 active:scale-[0.99] transition disabled:opacity-40 disabled:pointer-events-none"
+            >
+              送信
+            </button>
+          </div>
+        </section>
 
+        <section id="worker-main-teach-section" class="rounded-2xl border border-violet-200 bg-violet-50/60 shadow-sm overflow-hidden">
+          <p class="px-4 py-2 text-xs font-semibold text-violet-900 border-b border-violet-100" data-worker-i18n="profile_learn_title">学習（外食・用語の抜粋）</p>
+          <ul id="worker-main-teach-list" class="p-2 space-y-2 max-h-64 overflow-y-auto text-xs"></ul>
+        </section>
 
+        <div id="voice-panel" class="hidden rounded-2xl border-2 border-dashed border-indigo-300 bg-indigo-50/80 px-4 py-4 space-y-3">
 
-    <p id="footer-hint" class="text-center text-[11px] text-gray-400 pb-2">入力を待っています。</p>
+      <p class="text-sm font-medium text-indigo-950 text-center">自分で答える</p>
 
+      <textarea id="custom-answer-text" rows="4" class="w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm ja-text" placeholder="内容を入力するか、下のマイクで音声入力してから「送信」"></textarea>
 
+      <div class="flex justify-center pt-1">
 
-    <!-- 用語リスト -->
+        <button type="button" id="custom-mic-btn" class="flex h-16 w-16 items-center justify-center rounded-full bg-gray-900 text-white shadow-lg ring-4 ring-white active:scale-95 transition">
 
-    <div class="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
+          <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+
+        </button>
+
+      </div>
+
+      <p id="custom-mic-hint" class="text-center text-[11px] text-gray-600">マイクをタップで音声入力（対応ブラウザのみ）</p>
+
+      <div class="flex flex-col sm:flex-row gap-2 justify-stretch items-stretch sm:items-center">
+
+        <button type="button" id="custom-send-btn" class="flex-1 py-3 rounded-xl bg-indigo-900 text-white font-semibold text-sm shadow-md hover:bg-indigo-800">送信</button>
+
+        <button type="button" id="voice-done" class="text-sm font-semibold text-indigo-700 underline underline-offset-2 py-2 text-center sm:px-4">閉じる</button>
+
+      </div>
+
+        </div>
+
+        <section id="instruction-history-section" class="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden">
+          <button type="button" id="hist-toggle" class="w-full px-4 py-3 text-left text-sm font-semibold text-gray-800 hover:bg-gray-50 flex justify-between items-center">
+            <span data-worker-i18n="hist_title">これまでの指示（あなたの返答）</span>
+            <span id="hist-chevron" class="text-gray-400 text-xs">▼</span>
+          </button>
+          <div id="hist-panel" class="border-t border-gray-100 px-4 pb-4 pt-2">
+            <ul id="instruction-history-list" class="space-y-2 max-h-48 overflow-y-auto text-sm"></ul>
+            <p id="instruction-history-empty" class="text-xs text-gray-500 py-2 hidden" data-worker-i18n="hist_empty">まだ返信した指示はありません。</p>
+          </div>
+        </section>
+
+        <p id="footer-hint" class="text-center text-[11px] text-gray-400 pb-2">入力を待っています。</p>
+
+        <!-- 用語リスト -->
+        <div class="rounded-2xl bg-white border border-gray-100 shadow-sm overflow-hidden">
 
       <button type="button" id="glossary-toggle" class="w-full px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 flex justify-between items-center">
 
@@ -259,6 +376,8 @@
 
       <div id="glossary-panel" class="hidden border-t border-gray-100 px-4 pb-4 pt-2 flex flex-col gap-2 bg-gray-50/80">
 
+        <div id="glossary-tabs" class="flex flex-wrap gap-1.5"></div>
+
         <input type="search" id="glossary-search" class="w-full rounded-xl bg-white border border-gray-200 px-3 py-2 text-sm placeholder:text-gray-400" placeholder="検索…" autocomplete="off" />
 
         <p id="glossary-status" class="text-[11px] text-gray-500"></p>
@@ -267,6 +386,27 @@
 
       </div>
 
+        </div>
+
+      </div>
+    </div>
+
+    </div>
+
+    <div id="worker-panel-word" class="hidden flex flex-col gap-4">
+      <section class="rounded-2xl border border-indigo-100 bg-white shadow-sm overflow-hidden p-4">
+        <h2 class="text-sm font-semibold text-indigo-900 mb-3" data-worker-i18n="profile_wordbook">マイ単語帳</h2>
+        <ul id="worker-main-wordbook-list" class="space-y-1.5 max-h-[min(60vh,28rem)] overflow-y-auto text-[11px]"></ul>
+        <p id="worker-main-wordbook-empty" class="text-[10px] text-gray-400 py-2 hidden" data-worker-i18n="profile_saved_empty">まだありません。</p>
+      </section>
+    </div>
+
+    <div id="worker-panel-expr" class="hidden flex flex-col gap-4">
+      <section class="rounded-2xl border border-indigo-100 bg-white shadow-sm overflow-hidden p-4">
+        <h2 class="text-sm font-semibold text-indigo-900 mb-3" data-worker-i18n="profile_exprbook">マイ表現集</h2>
+        <ul id="worker-main-exprbook-list" class="space-y-1.5 max-h-[min(60vh,28rem)] overflow-y-auto text-[11px]"></ul>
+        <p id="worker-main-exprbook-empty" class="text-[10px] text-gray-400 py-2 hidden" data-worker-i18n="profile_saved_empty">まだありません。</p>
+      </section>
     </div>
 
   </div>
@@ -279,13 +419,111 @@
 
       var STORAGE_LOCALE = "workbridge_worker_locale";
 
+      function workerT(key) {
+
+        var packs = window.__WB_WORKER_I18N__ || {};
+
+        var loc = typeof activeLocale !== "undefined" && activeLocale ? activeLocale : "ja";
+
+        try {
+
+          var sv = localStorage.getItem(STORAGE_LOCALE);
+
+          if (sv && packs[sv]) loc = sv;
+
+        } catch (e) {}
+
+        if (!packs[loc]) loc = packs.en ? "en" : "ja";
+
+        var p = packs[loc] || packs.ja || {};
+
+        var v = p[key];
+
+        if (v !== undefined && v !== null) return v;
+
+        var ja = packs.ja || {};
+
+        return ja[key] !== undefined ? ja[key] : key;
+
+      }
+
+      function syncFooterHintI18n() {
+
+        var fh = document.getElementById("footer-hint");
+
+        var orig = document.getElementById("text-original");
+
+        if (!fh) return;
+
+        var idle =
+
+          !orig ||
+
+          orig.textContent === "—" ||
+
+          !String(orig.textContent || "").trim();
+
+        fh.textContent = workerT(idle ? "footer_idle" : "footer_latest");
+
+      }
+
+      function applyWorkerUiLocale() {
+
+        var packs = window.__WB_WORKER_I18N__ || {};
+
+        var loc = typeof activeLocale !== "undefined" && activeLocale ? activeLocale : "ja";
+
+        if (!packs[loc]) loc = packs.en ? "en" : "ja";
+
+        document.querySelectorAll("[data-worker-i18n]").forEach(function (el) {
+
+          var key = el.getAttribute("data-worker-i18n");
+
+          if (!key) return;
+
+          var p = packs[loc] || packs.ja || {};
+
+          var val = p[key];
+
+          if (val === undefined && packs.ja) val = packs.ja[key];
+
+          if (val !== undefined) el.textContent = val;
+
+        });
+
+        syncFooterHintI18n();
+
+        var wpp = document.getElementById("worker-profile-avatar-picker");
+
+        if (wpp) {
+
+          var al = workerT("profile_edit_photo");
+
+          wpp.setAttribute("aria-label", al);
+
+          wpp.setAttribute("title", al);
+
+        }
+
+        var wph = document.getElementById("worker-header-profile-btn");
+
+        if (wph) {
+
+          var idn = document.getElementById("worker-identity");
+
+          wph.setAttribute("title", workerT("profile_title") + (idn && idn.textContent ? " · " + idn.textContent : ""));
+
+        }
+
+      }
+
 
 
       var FLAGS = { ja: "🇯🇵", en: "🇺🇸", vi: "🇻🇳", id: "🇮🇩", my: "🇲🇲", ne: "🇳🇵" };
 
 
 
-      /* UI: JP, US, VN, ID, MM, NP (서버 locale-config 순서와 맞출 것) */
+      /* UI: JP, US, VN, ID, MM, NP — region code shown only once (with label below) */
 
       var SHORT_CODES = { ja: "JP", en: "US", vi: "VN", id: "ID", my: "MM", ne: "NP" };
 
@@ -427,6 +665,12 @@
 
       var localeBadge = document.getElementById("locale-badge");
 
+      var translateModeAutoBtn = document.getElementById("translate-mode-auto");
+
+      var translateModeManualBtn = document.getElementById("translate-mode-manual");
+
+      var translationRunBtn = document.getElementById("translation-run-btn");
+
       var footerHint = document.getElementById("footer-hint");
 
       var langRow = document.getElementById("lang-row");
@@ -435,15 +679,35 @@
 
       var voiceDone = document.getElementById("voice-done");
 
+      var customAnswerText = document.getElementById("custom-answer-text");
+
+      var customMicBtn = document.getElementById("custom-mic-btn");
+
+      var customSendBtn = document.getElementById("custom-send-btn");
+
+      var customMicHint = document.getElementById("custom-mic-hint");
+
 
 
       var activeLocale = "ja";
 
       var lastInstruction = "";
 
+      var lastInstructionImageUrl = "";
+
       var localeTargets = [];
 
       var translationCache = {};
+
+      var TRANSLATE_MODE_KEY = "wb_worker_translate_auto";
+
+      var translationAuto = true;
+
+      try {
+
+        translationAuto = localStorage.getItem(TRANSLATE_MODE_KEY) !== "0";
+
+      } catch (e) {}
 
 
 
@@ -461,7 +725,25 @@
 
       function setStatus(text, ok) {
 
-        connStatusEl.textContent = "接続: " + text;
+        if (!connStatusEl) return;
+
+        if (ok) {
+
+          connStatusEl.textContent = workerT("conn_ok");
+
+        } else {
+
+          var tail = text || "";
+
+          if (tail === "確認中…") tail = workerT("status_checking");
+
+          else if (tail === "切断") tail = workerT("status_off");
+
+          else if (tail === "エラー") tail = workerT("status_err");
+
+          connStatusEl.textContent = workerT("conn_bad") + tail;
+
+        }
 
         connStatusEl.className =
 
@@ -510,6 +792,388 @@
           location.href = "/login?role=worker";
 
         });
+
+        document.getElementById("m-alarm-settings").addEventListener("click", function (e) {
+
+          e.stopPropagation();
+
+          menuDropdown.classList.add("hidden");
+
+          loadWorkerAlarmForm();
+
+          document.getElementById("modal-worker-alarm").classList.remove("hidden");
+
+          wbEnsureAudioCtxWorker();
+
+        });
+
+        document.getElementById("modal-worker-alarm-close").addEventListener("click", function () {
+
+          saveWorkerAlarmForm();
+
+          document.getElementById("modal-worker-alarm").classList.add("hidden");
+
+        });
+
+        ["worker-alarm-master", "worker-alarm-bell", "worker-alarm-vibrate", "worker-alarm-notify"].forEach(function (id) {
+
+          var el = document.getElementById(id);
+
+          if (el) el.addEventListener("change", saveWorkerAlarmForm);
+
+        });
+
+        var wAp = document.getElementById("worker-alarm-preset");
+
+        if (wAp) wAp.addEventListener("change", saveWorkerAlarmForm);
+
+        var wAi = document.getElementById("worker-alarm-interval");
+
+        if (wAi)
+
+          wAi.addEventListener("change", function () {
+
+            saveWorkerAlarmForm();
+
+          });
+
+        document.getElementById("worker-alarm-test").addEventListener("click", function () {
+
+          saveWorkerAlarmForm();
+
+          var pr = workerGetAlarmPrefs();
+
+          if (pr.master && pr.bell) wbPlaySoundPresetWorker(pr.preset, 0.95);
+
+          if (pr.master && pr.vibrate && navigator.vibrate) navigator.vibrate([150, 80, 150]);
+
+        });
+
+        document.getElementById("worker-alarm-perm").addEventListener("click", function () {
+
+          if (typeof Notification === "undefined") return;
+
+          Notification.requestPermission().catch(function () {});
+
+        });
+
+      }
+
+
+
+      var workerAlarmPendingIds = {};
+
+      var workerAlarmLoopTimer = null;
+
+
+
+      function workerGetAlarmPrefs() {
+
+        return {
+
+          master: localStorage.getItem("wb_worker_alarm_master") !== "0",
+
+          bell: localStorage.getItem("wb_worker_ch_bell") !== "0",
+
+          vibrate: localStorage.getItem("wb_worker_ch_vibrate") === "1",
+
+          notify: localStorage.getItem("wb_worker_ch_notify") !== "0",
+
+          preset: localStorage.getItem("wb_worker_alarm_preset") || "bell1",
+
+          intervalSec: localStorage.getItem("wb_worker_alarm_interval") || "3",
+
+        };
+
+      }
+
+
+
+      function saveWorkerAlarmForm() {
+
+        var m = document.getElementById("worker-alarm-master");
+
+        var b = document.getElementById("worker-alarm-bell");
+
+        var v = document.getElementById("worker-alarm-vibrate");
+
+        var n = document.getElementById("worker-alarm-notify");
+
+        var s = document.getElementById("worker-alarm-preset");
+
+        var iv = document.getElementById("worker-alarm-interval");
+
+        if (m) localStorage.setItem("wb_worker_alarm_master", m.checked ? "1" : "0");
+
+        if (b) localStorage.setItem("wb_worker_ch_bell", b.checked ? "1" : "0");
+
+        if (v) localStorage.setItem("wb_worker_ch_vibrate", v.checked ? "1" : "0");
+
+        if (n) localStorage.setItem("wb_worker_ch_notify", n.checked ? "1" : "0");
+
+        if (s && s.value) localStorage.setItem("wb_worker_alarm_preset", s.value);
+
+        if (iv) {
+
+          var sec = parseInt(iv.value, 10);
+
+          if (isNaN(sec)) sec = 3;
+
+          sec = Math.max(2, Math.min(15, sec));
+
+          iv.value = String(sec);
+
+          localStorage.setItem("wb_worker_alarm_interval", String(sec));
+
+        }
+
+        workerRestartAlarmLoopInner();
+
+      }
+
+
+
+      function loadWorkerAlarmForm() {
+
+        var p = workerGetAlarmPrefs();
+
+        var m = document.getElementById("worker-alarm-master");
+
+        var b = document.getElementById("worker-alarm-bell");
+
+        var v = document.getElementById("worker-alarm-vibrate");
+
+        var n = document.getElementById("worker-alarm-notify");
+
+        var s = document.getElementById("worker-alarm-preset");
+
+        var iv = document.getElementById("worker-alarm-interval");
+
+        if (m) m.checked = p.master;
+
+        if (b) b.checked = p.bell;
+
+        if (v) v.checked = p.vibrate;
+
+        if (n) n.checked = p.notify;
+
+        if (s) {
+
+          var pv = (p.preset || "bell1").trim();
+
+          if (!s.querySelector('option[value="' + pv + '"]')) pv = "bell1";
+
+          s.value = pv;
+
+        }
+
+        if (iv) {
+
+          var sec = parseInt(String(p.intervalSec || "3"), 10);
+
+          if (isNaN(sec)) sec = 3;
+
+          iv.value = String(Math.max(2, Math.min(15, sec)));
+
+        }
+
+      }
+
+
+
+      function wbEnsureAudioCtxWorker() {
+
+        var AC = window.AudioContext || window.webkitAudioContext;
+
+        if (!AC) return null;
+
+        var ctx = window.__wb_worker_audio_ctx;
+
+        if (!ctx) ctx = window.__wb_worker_audio_ctx = new AC();
+
+        if (ctx.state === "suspended") ctx.resume().catch(function () {});
+
+        return ctx;
+
+      }
+
+
+
+      function wbPlaySoundPresetWorker(preset, intensity) {
+
+        intensity = intensity == null ? 1 : intensity;
+
+        var ctx = wbEnsureAudioCtxWorker();
+
+        if (!ctx) return;
+
+        var now = ctx.currentTime;
+
+        function tone(freq, t0, dur, vol) {
+
+          var o = ctx.createOscillator();
+
+          var g = ctx.createGain();
+
+          o.type = "sine";
+
+          o.frequency.value = freq;
+
+          g.gain.value = Math.min(0.42, vol * intensity);
+
+          o.connect(g);
+
+          g.connect(ctx.destination);
+
+          o.start(t0);
+
+          try {
+
+            g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+
+          } catch (e) {
+
+            g.gain.linearRampToValueAtTime(0.001, t0 + dur);
+
+          }
+
+          o.stop(t0 + dur + 0.06);
+
+        }
+
+        if (preset === "bell2") {
+
+          for (var i = 0; i < 3; i++) tone(660, now + i * 0.13, 0.07, 0.24);
+
+        } else if (preset === "chime") {
+
+          tone(523.25, now, 0.14, 0.22);
+
+          tone(659.25, now + 0.11, 0.14, 0.18);
+
+          tone(783.99, now + 0.22, 0.16, 0.16);
+
+        } else if (preset === "beep") {
+
+          tone(440, now, 0.09, 0.26);
+
+        } else {
+
+          tone(740, now, 0.12, 0.26);
+
+          tone(988, now + 0.13, 0.12, 0.22);
+
+        }
+
+      }
+
+
+
+      function workerAlarmTick() {
+
+        if (!Object.keys(workerAlarmPendingIds).length) {
+
+          workerStopAlarmLoop();
+
+          return;
+
+        }
+
+        var p = workerGetAlarmPrefs();
+
+        if (!p.master) return;
+
+        if (p.bell) wbPlaySoundPresetWorker(p.preset, 1);
+
+        if (p.vibrate && navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+        if (
+
+          p.notify &&
+
+          typeof Notification !== "undefined" &&
+
+          Notification.permission === "granted" &&
+
+          document.hidden
+
+        ) {
+
+          try {
+
+            new Notification("未対応の指示があります", {
+
+              body: "管理者の指示に応答してください。",
+
+              silent: true,
+
+            });
+
+          } catch (e) {}
+
+        }
+
+      }
+
+
+
+      function workerStopAlarmLoop() {
+
+        if (workerAlarmLoopTimer) {
+
+          clearInterval(workerAlarmLoopTimer);
+
+          workerAlarmLoopTimer = null;
+
+        }
+
+      }
+
+
+
+      function workerRestartAlarmLoopInner() {
+
+        workerStopAlarmLoop();
+
+        var ids = Object.keys(workerAlarmPendingIds);
+
+        if (!ids.length) return;
+
+        var p = workerGetAlarmPrefs();
+
+        if (!p.master) return;
+
+        var sec = Math.max(2, Math.min(15, parseInt(String(p.intervalSec || "3"), 10) || 3));
+
+        workerAlarmLoopTimer = setInterval(workerAlarmTick, sec * 1000);
+
+        workerAlarmTick();
+
+      }
+
+
+
+      function registerWorkerAlarmNeed(id) {
+
+        if (!id) return;
+
+        workerAlarmPendingIds[id] = true;
+
+        workerRestartAlarmLoopInner();
+
+      }
+
+
+
+      function unregisterWorkerAlarmNeed(id) {
+
+        if (!id) return;
+
+        delete workerAlarmPendingIds[id];
+
+        if (!Object.keys(workerAlarmPendingIds).length) workerStopAlarmLoop();
+
+        else workerRestartAlarmLoopInner();
 
       }
 
@@ -565,8 +1229,6 @@
 
 
 
-        translationNote.textContent = NOTES[loc] || NOTES.ja;
-
         langRow.querySelectorAll("[data-locale]").forEach(function (el) {
 
           var on = el.getAttribute("data-locale") === loc;
@@ -585,15 +1247,121 @@
 
         localeBadge.textContent = tInfo ? tInfo.label : loc.toUpperCase();
 
+        syncTranslateModeButtons();
+
+        applyWorkerUiLocale();
+
         refreshTranslatedPane();
 
       }
 
 
 
+      function syncTranslateModeButtons() {
+
+        if (translateModeAutoBtn && translateModeManualBtn) {
+
+          translateModeAutoBtn.className =
+
+            "px-2.5 py-1 rounded-md text-[11px] font-semibold " +
+
+            (translationAuto ? "bg-white text-indigo-900 shadow-sm" : "text-gray-600 hover:bg-white/80");
+
+          translateModeManualBtn.className =
+
+            "px-2.5 py-1 rounded-md text-[11px] font-semibold " +
+
+            (!translationAuto ? "bg-white text-indigo-900 shadow-sm" : "text-gray-600 hover:bg-white/80");
+
+        }
+
+        if (translationRunBtn) {
+
+          var showManual = !translationAuto && activeLocale !== "ja" && !!lastInstruction && !lastInstructionImageUrl;
+
+          translationRunBtn.classList.toggle("hidden", !showManual);
+
+        }
+
+      }
+
+      function fetchTranslationForLocale(loc, updatePane) {
+
+        var key = lastInstruction + "\0" + loc;
+
+        if (translationCache[key]) {
+
+          if (updatePane && activeLocale === loc) textTranslated.textContent = translationCache[key];
+
+          return Promise.resolve(translationCache[key]);
+
+        }
+
+        var tok = sessionStorage.getItem("wb_worker_token");
+
+        if (!tok) {
+
+          if (updatePane && activeLocale === loc) textTranslated.textContent = lastInstruction;
+
+          return Promise.resolve(lastInstruction);
+
+        }
+
+        if (updatePane && activeLocale === loc) textTranslated.textContent = "翻訳を読み込み中…";
+
+        return fetch("/api/v1/i18n/translate?token=" + encodeURIComponent(tok), {
+
+          method: "POST",
+
+          headers: { "Content-Type": "application/json" },
+
+          body: JSON.stringify({ text: lastInstruction, target_locale: loc }),
+
+        })
+
+          .then(function (r) {
+
+            if (!r.ok) throw new Error(String(r.status));
+
+            return r.json();
+
+          })
+
+          .then(function (j) {
+
+            var out = j && j.translated_text ? j.translated_text : lastInstruction;
+
+            translationCache[lastInstruction + "\0" + loc] = out;
+
+            if (updatePane && activeLocale === loc) textTranslated.textContent = out;
+
+            return out;
+
+          })
+
+          .catch(function () {
+
+            if (updatePane && activeLocale === loc) textTranslated.textContent = lastInstruction;
+
+            return lastInstruction;
+
+          });
+
+      }
+
       function refreshTranslatedPane() {
 
+        syncTranslateModeButtons();
+
         if (!lastInstruction) {
+
+          if (lastInstructionImageUrl) {
+
+            textTranslated.textContent = workerT("instr_image_translate_hint");
+
+            return;
+
+          }
 
           textTranslated.textContent = WAITING[activeLocale] || WAITING.ja;
 
@@ -619,11 +1387,7 @@
 
         }
 
-        textTranslated.textContent = "翻訳を読み込み中…";
-
-        var tok = sessionStorage.getItem("wb_worker_token");
-
-        if (!tok) {
+        if (!translationAuto) {
 
           textTranslated.textContent = lastInstruction;
 
@@ -631,51 +1395,67 @@
 
         }
 
-        var loc = activeLocale;
+        fetchTranslationForLocale(activeLocale, true);
 
-        fetch("/api/v1/i18n/translate?token=" + encodeURIComponent(tok), {
+      }
 
-          method: "POST",
+      (function setupTranslateModeUi() {
 
-          headers: { "Content-Type": "application/json" },
+        if (translateModeAutoBtn) {
 
-          body: JSON.stringify({ text: lastInstruction, target_locale: loc })
+          translateModeAutoBtn.addEventListener("click", function () {
 
-        })
+            translationAuto = true;
 
-          .then(function (r) {
+            try {
 
-            if (!r.ok) throw new Error(String(r.status));
+              localStorage.setItem(TRANSLATE_MODE_KEY, "1");
 
-            return r.json();
+            } catch (e) {}
 
-          })
+            syncTranslateModeButtons();
 
-          .then(function (j) {
-
-            var out = j && j.translated_text ? j.translated_text : lastInstruction;
-
-            translationCache[lastInstruction + "\0" + loc] = out;
-
-            if (activeLocale === loc) {
-
-              textTranslated.textContent = out;
-
-            }
-
-          })
-
-          .catch(function () {
-
-            if (activeLocale === loc) {
-
-              textTranslated.textContent = lastInstruction;
-
-            }
+            refreshTranslatedPane();
 
           });
 
-      }
+        }
+
+        if (translateModeManualBtn) {
+
+          translateModeManualBtn.addEventListener("click", function () {
+
+            translationAuto = false;
+
+            try {
+
+              localStorage.setItem(TRANSLATE_MODE_KEY, "0");
+
+            } catch (e) {}
+
+            syncTranslateModeButtons();
+
+            refreshTranslatedPane();
+
+          });
+
+        }
+
+        if (translationRunBtn) {
+
+          translationRunBtn.addEventListener("click", function () {
+
+            if (!lastInstruction || activeLocale === "ja") return;
+
+            fetchTranslationForLocale(activeLocale, true);
+
+          });
+
+        }
+
+        syncTranslateModeButtons();
+
+      })();
 
 
 
@@ -725,17 +1505,41 @@
 
 
 
-      function setInstruction(text) {
+      function setInstruction(text, imageUrl) {
 
-        lastInstruction = text;
+        lastInstruction = (text || "").trim();
 
-        textOriginal.textContent = text;
+        lastInstructionImageUrl = (typeof imageUrl === "string" && imageUrl.trim()) ? imageUrl.trim() : "";
 
-        textEasy.textContent = "読み込み中…";
+        var imgBox = document.getElementById("inst-image-box");
+
+        var imgEl = document.getElementById("inst-image");
+
+        if (lastInstructionImageUrl && imgEl && imgBox) {
+
+          imgEl.src = lastInstructionImageUrl;
+
+          imgEl.alt = workerT("admin_instr_title");
+
+          imgBox.classList.remove("hidden");
+
+        } else if (imgBox) {
+
+          imgBox.classList.add("hidden");
+
+          if (imgEl) imgEl.removeAttribute("src");
+
+        }
+
+        var cap = lastInstruction || (lastInstructionImageUrl ? (workerT("instr_image_only") || "（画像）") : "—");
+
+        textOriginal.textContent = cap;
+
+        textEasy.textContent = lastInstruction ? "読み込み中…" : "—";
 
         translationCache = {};
 
-        footerHint.textContent = "最新の指示を表示しています。";
+        syncFooterHintI18n();
 
         try {
 
@@ -755,7 +1559,9 @@
 
         }
 
-        fetchEasyJa(text);
+        if (lastInstruction) fetchEasyJa(lastInstruction);
+
+        else textEasy.textContent = "—";
 
       }
 
@@ -771,7 +1577,7 @@
 
         try { saved = localStorage.getItem(STORAGE_LOCALE) || ""; } catch (e) {}
 
-        if (lastInstruction) {
+        if (lastInstruction || lastInstructionImageUrl) {
 
           saved = "ja";
 
@@ -805,15 +1611,15 @@
 
           var code = SHORT_CODES[t.locale] || String(t.locale).toUpperCase();
 
-          btn.setAttribute("title", t.label + " (" + code + ")");
+          btn.setAttribute("title", (t.label || "").trim());
 
           btn.innerHTML =
 
             "<span class=\"text-2xl leading-none select-none\" aria-hidden=\"true\">" + flag + "</span>"
 
-            + "<span class=\"text-[10px] font-semibold text-gray-800 tracking-tight\">" + escapeHtml(code) + "</span>"
+            + "<span class=\"text-[11px] font-semibold text-gray-800 tracking-tight max-w-[6.5rem] truncate text-center leading-snug\">" +
 
-            + "<span class=\"text-[9px] text-gray-500 max-w-[4.5rem] truncate text-center leading-tight\">" + escapeHtml(t.label) + "</span>";
+            escapeHtml((t.label || "").trim()) + "</span>";
 
           btn.addEventListener("click", function () {
 
@@ -863,6 +1669,194 @@
 
 
 
+      var LAYOUT_STORAGE = "wb_worker_layout";
+
+      var workerLayoutInited = false;
+
+      function initWorkerLayout() {
+
+        if (workerLayoutInited) return;
+
+        workerLayoutInited = true;
+
+        var bn = document.getElementById("layout-btn-narrow");
+
+        var bw = document.getElementById("layout-btn-wide");
+
+        var appEl = document.getElementById("app");
+
+        var grid = document.getElementById("worker-layout-grid");
+
+        var left = document.getElementById("worker-col-left");
+
+        var right = document.getElementById("worker-col-right");
+
+        function styleLayoutButtons(wide) {
+
+          if (bn) {
+
+            bn.classList.toggle("bg-indigo-900", !wide);
+
+            bn.classList.toggle("text-white", !wide);
+
+            bn.classList.toggle("text-gray-700", wide);
+
+            bn.classList.toggle("hover:bg-gray-50", wide);
+
+          }
+
+          if (bw) {
+
+            bw.classList.toggle("bg-indigo-900", wide);
+
+            bw.classList.toggle("text-white", wide);
+
+            bw.classList.toggle("text-gray-700", !wide);
+
+            bw.classList.toggle("hover:bg-gray-50", !wide);
+
+          }
+
+        }
+
+        function apply(wide) {
+
+          if (!appEl || !grid || !left || !right) return;
+
+          if (wide) {
+
+            appEl.setAttribute("data-worker-layout", "wide");
+
+            appEl.classList.remove("max-w-md");
+
+            appEl.classList.add("max-w-6xl");
+
+            grid.classList.add("lg:grid-cols-12");
+
+            left.classList.add("lg:col-span-7");
+
+            right.classList.add("lg:col-span-5", "lg:sticky", "lg:top-4", "self-start");
+
+          } else {
+
+            appEl.setAttribute("data-worker-layout", "narrow");
+
+            appEl.classList.add("max-w-md");
+
+            appEl.classList.remove("max-w-6xl");
+
+            grid.classList.remove("lg:grid-cols-12");
+
+            left.classList.remove("lg:col-span-7");
+
+            right.classList.remove("lg:col-span-5", "lg:sticky", "lg:top-4", "self-start");
+
+          }
+
+          styleLayoutButtons(wide);
+
+          try {
+
+            localStorage.setItem(LAYOUT_STORAGE, wide ? "wide" : "narrow");
+
+          } catch (e) {}
+
+        }
+
+        if (bn) bn.addEventListener("click", function () { apply(false); });
+
+        if (bw) bw.addEventListener("click", function () { apply(true); });
+
+        try {
+
+          if (localStorage.getItem(LAYOUT_STORAGE) === "wide") apply(true);
+
+          else apply(false);
+
+        } catch (e) {
+
+          apply(false);
+
+        }
+
+      }
+
+
+
+      function appendWorkerChatRow(fromRole, label, text, tsOrCreated) {
+
+        var ul = document.getElementById("worker-chat-thread");
+
+        if (!ul) return;
+
+        var li = document.createElement("li");
+
+        li.className =
+
+          "rounded-md px-2 py-1 " +
+
+          (fromRole === "admin" ? "bg-indigo-50 border border-indigo-100" : "bg-sky-50 border border-sky-100");
+
+        var meta = document.createElement("div");
+
+        meta.className = "text-[10px] text-gray-500";
+
+        var sec = typeof tsOrCreated === "number" ? tsOrCreated : (tsOrCreated || Date.now() / 1000);
+
+        var d = new Date(sec * 1000);
+
+        meta.textContent = "[" + d.toLocaleTimeString() + "] " + (label || "");
+
+        var body = document.createElement("div");
+
+        body.className = "text-[12px] text-gray-900 whitespace-pre-wrap break-words mt-0.5";
+
+        body.textContent = text || "";
+
+        li.appendChild(meta);
+
+        li.appendChild(body);
+
+        ul.appendChild(li);
+
+        ul.scrollTop = ul.scrollHeight;
+
+      }
+
+
+
+      function loadWorkerChatHistory(tok) {
+
+        var ul = document.getElementById("worker-chat-thread");
+
+        if (!ul || !tok) return;
+
+        fetch("/api/v1/auth/chat-messages?token=" + encodeURIComponent(tok) + "&limit=80")
+
+          .then(function (r) {
+
+            return r.ok ? r.json() : Promise.reject();
+
+          })
+
+          .then(function (rows) {
+
+            ul.innerHTML = "";
+
+            (rows || []).forEach(function (row) {
+
+              appendWorkerChatRow(row.from_role, row.from_label, row.text, row.created_at);
+
+            });
+
+          })
+
+          .catch(function () {});
+
+      }
+
+
+
       function finishAuth(data) {
 
         loading.classList.add("hidden");
@@ -879,9 +1873,221 @@
 
         }
 
+        var whead = document.getElementById("worker-header-profile-btn");
+
+        if (whead && data.worker_display_label) {
+
+          whead.setAttribute("title", workerT("profile_title") + " · " + data.worker_display_label);
+
+        }
+
+        refreshWorkerHeaderAvatar(function () {
+
+          workerRenderHomeTeach();
+
+        });
+
+        if (!workerMainTabsWired) {
+
+          workerMainTabsWired = true;
+
+          var ttH = document.getElementById("worker-tab-home");
+
+          var ttW = document.getElementById("worker-tab-word");
+
+          var ttE = document.getElementById("worker-tab-expr");
+
+          if (ttH) ttH.addEventListener("click", function () { setWorkerMainTab("home"); });
+
+          if (ttW) ttW.addEventListener("click", function () { setWorkerMainTab("word"); });
+
+          if (ttE) ttE.addEventListener("click", function () { setWorkerMainTab("expr"); });
+
+        }
+
+        if (!workerProfileUiWired) {
+
+          workerProfileUiWired = true;
+
+          if (whead) whead.addEventListener("click", openWorkerProfileModal);
+
+          var wcl = document.getElementById("worker-profile-close");
+
+          if (wcl) wcl.addEventListener("click", closeWorkerProfileModal);
+
+          var wov = document.getElementById("modal-worker-profile");
+
+          if (wov) {
+
+            wov.addEventListener("click", function (ev) {
+
+              if (ev.target.id === "modal-worker-profile") closeWorkerProfileModal();
+
+            });
+
+          }
+
+          var wavp = document.getElementById("worker-profile-avatar-picker");
+
+          if (wavp) wavp.addEventListener("click", function () {
+
+            document.getElementById("worker-profile-avatar-file").click();
+
+          });
+
+          var wavf = document.getElementById("worker-profile-avatar-file");
+
+          if (wavf) {
+
+            wavf.addEventListener("change", function () {
+
+              var ftok = sessionStorage.getItem("wb_worker_token");
+
+              var f = wavf.files && wavf.files[0];
+
+              if (!ftok || !f || !workerProfileHasStaff) return;
+
+              var fd = new FormData();
+
+              fd.append("file", f);
+
+              fetch("/api/v1/auth/worker-avatar?token=" + encodeURIComponent(ftok), { method: "POST", body: fd })
+
+                .then(function (r) {
+
+                  return r.ok ? r.json() : Promise.reject();
+
+                })
+
+                .then(function (j) {
+
+                  document.getElementById("worker-profile-status").textContent = workerT("profile_avatar_ok");
+
+                  workerProfileFillAvatarPreview({ avatar_url: j.avatar_url });
+
+                  refreshWorkerHeaderAvatar();
+
+                  wavf.value = "";
+
+                })
+
+                .catch(function () {
+
+                  document.getElementById("worker-profile-status").textContent = workerT("profile_pw_fail");
+
+                });
+
+            });
+
+          }
+
+          var wrp = document.getElementById("worker-profile-remove-photo");
+
+          if (wrp) wrp.addEventListener("click", function () {
+
+            var ftok = sessionStorage.getItem("wb_worker_token");
+
+            if (!ftok || !workerProfileHasStaff) return;
+
+            fetch("/api/v1/auth/worker-avatar?token=" + encodeURIComponent(ftok), { method: "DELETE" })
+
+              .then(function (r) {
+
+                return r.ok ? r.json() : Promise.reject();
+
+              })
+
+              .then(function () {
+
+                refreshWorkerHeaderAvatar();
+
+                return fetch("/api/v1/auth/worker-profile?token=" + encodeURIComponent(ftok)).then(function (ru) {
+
+                  return ru.ok ? ru.json() : {};
+
+                });
+
+              })
+
+              .then(workerProfileFillAvatarPreview)
+
+              .catch(function () {});
+
+          });
+
+          var wpsa = document.getElementById("worker-profile-pw-save");
+
+          if (wpsa) {
+
+            wpsa.addEventListener("click", function () {
+
+              var ftok = sessionStorage.getItem("wb_worker_token");
+
+              var curpw = document.getElementById("worker-profile-current-pw").value;
+
+              var npw = document.getElementById("worker-profile-new-pw").value;
+
+              var st = document.getElementById("worker-profile-status");
+
+              if (!ftok || npw.length < 4) {
+
+                if (st) st.textContent = workerT("profile_pw_fail");
+
+                return;
+
+              }
+
+              fetch("/api/v1/auth/worker-password?token=" + encodeURIComponent(ftok), {
+
+                method: "POST",
+
+                headers: { "Content-Type": "application/json" },
+
+                body: JSON.stringify({ current_password: curpw, new_password: npw }),
+
+              })
+
+                .then(function (r) {
+
+                  if (!r.ok) throw new Error();
+
+                  return r.json();
+
+                })
+
+                .then(function () {
+
+                  if (st) st.textContent = workerT("profile_pw_ok");
+
+                  document.getElementById("worker-profile-current-pw").value = "";
+
+                  document.getElementById("worker-profile-new-pw").value = "";
+
+                })
+
+                .catch(function () {
+
+                  if (st) st.textContent = workerT("profile_pw_fail");
+
+                });
+
+            });
+
+          }
+
+        }
+
         setupWorkerMenu();
 
+        initWorkerLayout();
+
+        loadWorkerHistory();
+
+        loadPendingInstructions();
+
         connectWs(data.access_token);
+
+        loadWorkerChatHistory(data.access_token);
 
       }
 
@@ -889,7 +2095,43 @@
 
       if (savedTok && !joinToken) {
 
-        finishAuth({ access_token: savedTok, worker_display_label: savedLabel || "" });
+        fetch("/api/v1/auth/session?token=" + encodeURIComponent(savedTok))
+
+          .then(function (r) {
+
+            return r.ok ? r.json() : Promise.reject();
+
+          })
+
+          .then(function (info) {
+
+            var lab =
+
+              (info && typeof info.worker_display_label === "string"
+
+                ? info.worker_display_label
+
+                : null) ||
+
+              savedLabel ||
+
+              "";
+
+            if (info && typeof info.worker_display_label === "string") {
+
+              sessionStorage.setItem("wb_worker_label", lab);
+
+            }
+
+            finishAuth({ access_token: savedTok, worker_display_label: lab });
+
+          })
+
+          .catch(function () {
+
+            finishAuth({ access_token: savedTok, worker_display_label: savedLabel || "" });
+
+          });
 
       } else {
 
@@ -933,9 +2175,1008 @@
 
 
 
+      var workerProfileUiWired = false;
+
+      var workerMainTabsWired = false;
+
+      var workerMainTabActive = "home";
+
+      var workerWsInstance = null;
+
+      var workerWsPingTimer = null;
+
+      var currentInstructionId = null;
+
+      var pendingCustomInstructionId = null;
+
+
+
+
+
+      function colorForButton(btn) {
+
+        if (btn === "OK") return "bg-emerald-500";
+
+        if (btn === "REPEAT") return "bg-amber-400";
+
+        if (btn === "NG") return "bg-rose-500";
+
+        return "bg-indigo-600";
+
+      }
+
+
+
+      function renderInstructionHistory(rows) {
+
+        var ul = document.getElementById("instruction-history-list");
+
+        var empty = document.getElementById("instruction-history-empty");
+
+        if (!ul || !empty) return;
+
+        ul.innerHTML = "";
+
+        if (!rows || !rows.length) {
+
+          empty.classList.remove("hidden");
+
+          return;
+
+        }
+
+        empty.classList.add("hidden");
+
+        rows.forEach(function (row) {
+
+          var btn = row.button || "";
+
+          var li = document.createElement("li");
+
+          li.className = "border border-gray-100 rounded-lg overflow-hidden bg-gray-50/80";
+
+          var outer = document.createElement("div");
+
+          outer.className = "flex gap-2 p-2 pr-1";
+
+          var left = document.createElement("div");
+
+          left.className = "flex-1 min-w-0 relative pb-5";
+
+          if (row.created_at) {
+
+            var dtp = document.createElement("p");
+
+            dtp.className = "text-[10px] text-gray-500";
+
+            dtp.textContent = new Date(row.created_at * 1000).toLocaleString();
+
+            left.appendChild(dtp);
+
+          }
+
+          if (row.image_url) {
+
+            var igh = document.createElement("img");
+
+            igh.src = row.image_url;
+
+            igh.className = "mt-1 max-w-full max-h-24 rounded border border-gray-200 object-contain bg-white";
+
+            igh.alt = "";
+
+            left.appendChild(igh);
+
+          }
+
+          var tp = document.createElement("p");
+
+          tp.className = "text-sm text-gray-900 line-clamp-4 whitespace-pre-wrap break-words";
+
+          tp.textContent = row.text || "";
+
+          left.appendChild(tp);
+
+          var hasCustom = btn === "CUSTOM" && row.custom_text && String(row.custom_text).trim();
+
+          var detail = null;
+
+          var expandBtn = null;
+
+          if (hasCustom) {
+
+            expandBtn = document.createElement("button");
+
+            expandBtn.type = "button";
+
+            expandBtn.className =
+
+              "history-expand absolute bottom-0 right-0 p-1 text-indigo-600 hover:bg-indigo-50 rounded text-xs leading-none";
+
+            expandBtn.textContent = "▼";
+
+            expandBtn.setAttribute("aria-expanded", "false");
+
+            left.appendChild(expandBtn);
+
+            detail = document.createElement("div");
+
+            detail.className =
+
+              "hidden px-3 pb-3 pt-2 text-xs text-gray-800 bg-white border-t border-gray-100 whitespace-pre-wrap break-words";
+
+            detail.textContent = String(row.custom_text);
+
+            expandBtn.addEventListener("click", function () {
+
+              var willOpen = detail.classList.contains("hidden");
+
+              detail.classList.toggle("hidden");
+
+              expandBtn.textContent = willOpen ? "▲" : "▼";
+
+              expandBtn.setAttribute("aria-expanded", willOpen ? "true" : "false");
+
+            });
+
+          }
+
+          var bar = document.createElement("div");
+
+          bar.className = "w-2 shrink-0 rounded-full self-stretch " + colorForButton(btn);
+
+          bar.title = btn;
+
+          outer.appendChild(left);
+
+          outer.appendChild(bar);
+
+          li.appendChild(outer);
+
+          if (detail) li.appendChild(detail);
+
+          ul.appendChild(li);
+
+        });
+
+      }
+
+
+
+      function loadWorkerHistory() {
+
+        var tok = sessionStorage.getItem("wb_worker_token");
+
+        if (!tok) return;
+
+        fetch("/api/v1/auth/worker-instruction-history?token=" + encodeURIComponent(tok) + "&limit=80")
+
+          .then(function (r) {
+
+            return r.ok ? r.json() : Promise.reject();
+
+          })
+
+          .then(function (rows) {
+
+            renderInstructionHistory(rows || []);
+
+          })
+
+          .catch(function () {});
+
+      }
+
+
+
+      function loadRecentEligibleSnapshot() {
+
+        var tok = sessionStorage.getItem("wb_worker_token");
+
+        if (!tok) return;
+
+        fetch("/api/v1/auth/worker-recent-instructions?token=" + encodeURIComponent(tok) + "&limit=8")
+
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+
+          .then(function (rows) {
+
+            var list = rows || [];
+
+            if (!list.length) return;
+
+            var origEl = document.getElementById("text-original");
+
+            var idleMain =
+
+              !currentInstructionId ||
+
+              (origEl && (origEl.textContent === "—" || String(origEl.textContent || "").trim() === ""));
+
+            if (!idleMain) return;
+
+            var newest = list[0];
+
+            if (!newest || !newest.instruction_id) return;
+
+            currentInstructionId = newest.instruction_id;
+
+            setInstruction(newest.text || "", newest.image_url || "");
+
+          })
+
+          .catch(function () {});
+
+      }
+
+
+
+      function loadPendingInstructions() {
+
+        var tok = sessionStorage.getItem("wb_worker_token");
+
+        if (!tok) return;
+
+        fetch("/api/v1/auth/worker-pending-instructions?token=" + encodeURIComponent(tok) + "&limit=40")
+
+          .then(function (r) {
+
+            return r.ok ? r.json() : Promise.reject();
+
+          })
+
+          .then(function (rows) {
+
+            var list = rows || [];
+
+            list.forEach(function (row) {
+
+              if (row && row.instruction_id) registerWorkerAlarmNeed(row.instruction_id);
+
+            });
+
+            renderPendingInstructions(list);
+
+            var origEl = document.getElementById("text-original");
+
+            var idleMain = !currentInstructionId || (origEl && (origEl.textContent === "—" || origEl.textContent === ""));
+
+            if (list.length && idleMain && typeof setInstruction === "function") {
+
+              currentInstructionId = list[0].instruction_id;
+
+              setInstruction(list[0].text || "", list[0].image_url || "");
+
+            } else if (!list.length && idleMain) {
+
+              loadRecentEligibleSnapshot();
+
+            }
+
+          })
+
+          .catch(function () {});
+
+      }
+
+
+
+      function renderPendingInstructions(rows) {
+
+        var ul = document.getElementById("pending-instructions-list");
+
+        var empty = document.getElementById("pending-instructions-empty");
+
+        if (!ul || !empty) return;
+
+        ul.innerHTML = "";
+
+        if (!rows || !rows.length) {
+
+          empty.classList.remove("hidden");
+
+          return;
+
+        }
+
+        empty.classList.add("hidden");
+
+        rows.forEach(function (row) {
+
+          var iid = row.instruction_id;
+
+          var wrap = document.createElement("li");
+
+          wrap.className = "rounded-lg border border-amber-200 bg-white p-2.5 space-y-2";
+
+          var meta = document.createElement("p");
+
+          meta.className = "text-[10px] text-amber-900/70";
+
+          meta.textContent = row.created_at ? new Date(row.created_at * 1000).toLocaleString() : "";
+
+          if (row.image_url) {
+
+            var ig = document.createElement("img");
+
+            ig.src = row.image_url;
+
+            ig.className = "max-w-full rounded-lg border border-amber-100 bg-white max-h-48 object-contain";
+
+            ig.alt = "";
+
+            wrap.appendChild(ig);
+
+          }
+
+          var tp = document.createElement("p");
+
+          tp.className = "text-sm text-gray-900 whitespace-pre-wrap break-words";
+
+          tp.textContent = row.text || "";
+
+          var btns = document.createElement("div");
+
+          btns.className = "flex flex-wrap gap-2";
+
+          [["OK"], ["REPEAT"], ["NG"], ["CUSTOM"]].forEach(function (arr) {
+
+            var code = arr[0];
+
+            var b = document.createElement("button");
+
+            b.type = "button";
+
+            b.className =
+
+              "px-3 py-1.5 rounded-lg text-white text-xs font-semibold " +
+
+              (code === "OK"
+
+                ? "bg-emerald-600"
+
+                : code === "REPEAT"
+
+                  ? "bg-amber-400 text-amber-950"
+
+                  : code === "NG"
+
+                    ? "bg-rose-400"
+
+                    : "bg-indigo-900");
+
+            b.textContent =
+
+              code === "OK"
+
+                ? "了解"
+
+                : code === "REPEAT"
+
+                  ? "もう一度"
+
+                  : code === "NG"
+
+                    ? "分からない"
+
+                    : "自由回答";
+
+            b.addEventListener("click", function () {
+
+              if (code === "CUSTOM") {
+
+                pendingCustomInstructionId = iid;
+
+                if (typeof customAnswerText !== "undefined" && customAnswerText) customAnswerText.value = "";
+
+                if (typeof customMicHint !== "undefined" && customMicHint)
+
+                  customMicHint.textContent = "マイクをタップで音声入力（対応ブラウザのみ）";
+
+                if (typeof voicePanel !== "undefined" && voicePanel) voicePanel.classList.remove("hidden");
+
+                return;
+
+              }
+
+              sendWorkerResponse(code, null, iid);
+
+            });
+
+            btns.appendChild(b);
+
+          });
+
+          wrap.appendChild(meta);
+
+          wrap.appendChild(tp);
+
+          wrap.appendChild(btns);
+
+          ul.appendChild(wrap);
+
+        });
+
+      }
+
+
+
+      function sendWorkerResponse(code, customText, explicitInstructionId) {
+
+        var iid = null;
+
+        if (explicitInstructionId !== undefined && explicitInstructionId !== null && String(explicitInstructionId).trim()) {
+
+          iid = String(explicitInstructionId).trim();
+
+        } else {
+
+          iid = currentInstructionId;
+
+        }
+
+        if (!iid) return;
+
+        var payload = { type: "worker_response", button: code, instruction_id: iid };
+
+        if (code === "CUSTOM") {
+
+          var t = (customText || "").trim();
+
+          if (t) payload.custom_text = t;
+
+        }
+
+        var tok = sessionStorage.getItem("wb_worker_token");
+
+        function afterSend() {
+
+          unregisterWorkerAlarmNeed(iid);
+
+          window.setTimeout(function () {
+
+            loadWorkerHistory();
+
+            loadPendingInstructions();
+
+          }, 350);
+
+        }
+
+        if (workerWsInstance && workerWsInstance.readyState === WebSocket.OPEN) {
+
+          try {
+
+            workerWsInstance.send(JSON.stringify(payload));
+
+          } catch (e) {}
+
+          afterSend();
+
+          return;
+
+        }
+
+        if (!tok) return;
+
+        fetch("/api/v1/auth/worker-instruction-reply?token=" + encodeURIComponent(tok), {
+
+          method: "POST",
+
+          headers: { "Content-Type": "application/json" },
+
+          body: JSON.stringify({
+
+            instruction_id: iid,
+
+            button: code,
+
+            custom_text: code === "CUSTOM" ? ((customText || "").trim().slice(0, 4000) || null) : null,
+
+          }),
+
+        })
+
+          .then(function (r) {
+
+            if (!r.ok) throw new Error(String(r.status));
+
+            return r.json();
+
+          })
+
+          .then(function () {
+
+            afterSend();
+
+          })
+
+          .catch(function () {});
+
+      }
+
+
+      function workerGlossaryPickCols(row) {
+
+        var keys = Object.keys(row);
+
+        var ja = keys.filter(function (k) { return /日本語|単語/i.test(k); });
+
+        var w = ja.length ? row[ja[0]] : (keys.length ? row[keys[0]] : "");
+
+        var meaning = keys.filter(function (k) { return /意味|説明|한국/i.test(k); });
+
+        var m = meaning.length ? row[meaning[0]] : (keys[1] ? row[keys[1]] : "");
+
+        var ex = keys.filter(function (k) { return /使用例|例|使い方/i.test(k); });
+
+        var e = ex.length ? row[ex[0]] : "";
+
+        return { w: w, m: m, e: e };
+
+      }
+
+
+
+      var WORKER_AVATAR_COLORS = [
+        "#6366f1",
+        "#8b5cf6",
+        "#ec4899",
+        "#f97316",
+        "#14b8a6",
+        "#0ea5e9",
+        "#84cc16",
+        "#f59e0b",
+      ];
+
+      var WB_LS_WORD = "wb_worker_wordbook_v1";
+
+      var WB_LS_EXPR = "wb_worker_exprbook_v1";
+
+      var workerProfileSheetGid = 0;
+
+      var workerProfileHasStaff = false;
+
+      var workerProfileCache = null;
+
+      function workerHashString(str) {
+        var h = 0;
+        var x = String(str || "");
+        for (var i = 0; i < x.length; i++) {
+          h = ((h << 5) - h + x.charCodeAt(i)) | 0;
+        }
+        return Math.abs(h);
+      }
+
+      function workerSpeechLang(loc) {
+        var m = { ja: "ja-JP", en: "en-US", ko: "ko-KR", zh: "zh-CN", vi: "vi-VN", id: "id-ID", my: "my-MM", ne: "ne-NP" };
+        return m[loc] || "en-US";
+      }
+
+      function workerForeignLine(row, loc) {
+        var keys = Object.keys(row);
+        var lc = loc || activeLocale || "ja";
+        var checks = [
+          [/ベトナム|Vietnamese|Tiếng|越南/i, "vi"],
+          [/英語|English/i, "en"],
+          [/韓国|한국|Korean|ハングル/i, "ko"],
+          [/中国|中文|简体/i, "zh"],
+          [/インドネシア|Indonesia|Bahasa/i, "id"],
+          [/ミャンマー|Myanmar|မြန်မာ/i, "my"],
+          [/ネパール|Nepal|नेपाल/i, "ne"],
+        ];
+        for (var c = 0; c < checks.length; c++) {
+          if (checks[c][1] !== lc) continue;
+          var re = checks[c][0];
+          for (var i = 0; i < keys.length; i++) {
+            if (re.test(keys[i])) {
+              var vv = row[keys[i]];
+              if (vv && String(vv).trim()) return String(vv).trim();
+            }
+          }
+        }
+        var pc = workerGlossaryPickCols(row);
+        return String(pc.m || pc.e || pc.w || "").trim();
+      }
+
+      function workerSpeakRow(row) {
+        if (!window.speechSynthesis) return;
+        var loc = activeLocale || "ja";
+        var text = workerForeignLine(row, loc);
+        if (!text) return;
+        window.speechSynthesis.cancel();
+        var ut = new SpeechSynthesisUtterance(text);
+        ut.lang = workerSpeechLang(loc);
+        window.speechSynthesis.speak(ut);
+      }
+
+      function refreshWorkerHeaderAvatar(onDone) {
+        var holder = document.getElementById("worker-header-avatar");
+        var tok = sessionStorage.getItem("wb_worker_token");
+        var idEl = document.getElementById("worker-identity");
+        var lab = (idEl && idEl.textContent ? idEl.textContent.trim() : "") || "?";
+        function finish(cb) {
+          if (typeof cb === "function") cb();
+        }
+        if (!holder || !tok) {
+          finish(onDone);
+          return;
+        }
+        holder.innerHTML = "";
+        holder.className =
+          "w-10 h-10 shrink-0 rounded-full overflow-hidden border-2 border-white shadow-sm flex items-center justify-center text-white text-sm font-bold";
+        fetch("/api/v1/auth/worker-profile?token=" + encodeURIComponent(tok))
+          .then(function (r) {
+            return r.ok ? r.json() : Promise.reject();
+          })
+          .then(function (p) {
+            workerProfileCache = p;
+            workerProfileHasStaff = !!p.has_staff_account;
+            if (p.avatar_url) {
+              var im = document.createElement("img");
+              im.src = p.avatar_url;
+              im.className = "w-full h-full object-cover";
+              im.alt = "";
+              holder.appendChild(im);
+              finish(onDone);
+              return;
+            }
+            var ci =
+              typeof p.avatar_color_index === "number"
+                ? p.avatar_color_index
+                : workerHashString(lab) % 8;
+            var dv = document.createElement("div");
+            dv.className = "w-full h-full flex items-center justify-center";
+            dv.style.backgroundColor = WORKER_AVATAR_COLORS[ci % 8];
+            dv.textContent = lab.charAt(0).toUpperCase() || "?";
+            holder.appendChild(dv);
+            finish(onDone);
+          })
+          .catch(function () {
+            workerProfileHasStaff = false;
+            var dv = document.createElement("div");
+            dv.className = "w-full h-full flex items-center justify-center text-white";
+            dv.style.backgroundColor = WORKER_AVATAR_COLORS[workerHashString(lab) % 8];
+            dv.textContent = lab.charAt(0).toUpperCase() || "?";
+            holder.appendChild(dv);
+            finish(onDone);
+          });
+      }
+
+      function wbLsGet(key) {
+        try {
+          return JSON.parse(localStorage.getItem(key) || "null");
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function wbLsSet(key, val) {
+        try {
+          localStorage.setItem(key, JSON.stringify(val));
+        } catch (e) {}
+      }
+
+      function workerSaveGlossaryItem(kind, row) {
+        var tok = sessionStorage.getItem("wb_worker_token");
+        if (!tok || !row) return;
+        if (workerProfileHasStaff) {
+          fetch("/api/v1/auth/worker-glossary-saves?token=" + encodeURIComponent(tok), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ kind: kind, sheet_gid: workerProfileSheetGid, item: row }),
+          }).then(function (r) {
+            if (r.ok) workerRefreshSavedLists();
+          });
+          return;
+        }
+        var key = kind === "word" ? WB_LS_WORD : WB_LS_EXPR;
+        var arr = wbLsGet(key) || [];
+        var sig = JSON.stringify(row);
+        if (arr.some(function (x) { return JSON.stringify(x.item) === sig; })) return;
+        arr.unshift({ sheet_gid: workerProfileSheetGid, item: row });
+        wbLsSet(key, arr.slice(0, 200));
+        workerRefreshSavedLists();
+      }
+
+      function workerRefreshSavedLists() {
+        var tok = sessionStorage.getItem("wb_worker_token");
+        var uw = document.getElementById("worker-main-wordbook-list");
+        var ue = document.getElementById("worker-main-exprbook-list");
+        var ew = document.getElementById("worker-main-wordbook-empty");
+        var ee = document.getElementById("worker-main-exprbook-empty");
+        if (!uw || !ue) return;
+
+        function renderUl(ul, rows, emptyEl, kind) {
+          ul.innerHTML = "";
+          if (!rows || !rows.length) {
+            emptyEl.classList.remove("hidden");
+            return;
+          }
+          emptyEl.classList.add("hidden");
+          rows.forEach(function (entry) {
+            var item = entry.item || {};
+            var sid = entry.id;
+            var pc = workerGlossaryPickCols(item);
+            var li = document.createElement("li");
+            li.className = "flex justify-between gap-1 items-start border border-gray-100 rounded px-2 py-1 bg-gray-50";
+            var tx = document.createElement("span");
+            tx.className = "text-gray-800 break-words";
+            tx.textContent = String(pc.w || "").slice(0, 80);
+            var rb = document.createElement("button");
+            rb.type = "button";
+            rb.className = "shrink-0 text-[10px] text-rose-600";
+            rb.textContent = workerT("profile_remove_saved");
+            rb.addEventListener("click", function () {
+              workerDeleteSaved(kind, sid, entry);
+            });
+            li.appendChild(tx);
+            li.appendChild(rb);
+            ul.appendChild(li);
+          });
+        }
+
+        if (workerProfileHasStaff && tok) {
+          fetch("/api/v1/auth/worker-glossary-saves?token=" + encodeURIComponent(tok) + "&kind=word")
+            .then(function (r) {
+              return r.ok ? r.json() : [];
+            })
+            .then(function (rows) {
+              renderUl(uw, rows, ew, "word");
+            })
+            .catch(function () {
+              renderUl(uw, [], ew, "word");
+            });
+          fetch("/api/v1/auth/worker-glossary-saves?token=" + encodeURIComponent(tok) + "&kind=expression")
+            .then(function (r) {
+              return r.ok ? r.json() : [];
+            })
+            .then(function (rows) {
+              renderUl(ue, rows, ee, "expression");
+            })
+            .catch(function () {
+              renderUl(ue, [], ee, "expression");
+            });
+          return;
+        }
+        renderUl(uw, wbLsGet(WB_LS_WORD) || [], ew, "word");
+        renderUl(ue, wbLsGet(WB_LS_EXPR) || [], ee, "expression");
+      }
+
+      function workerDeleteSaved(kind, saveId, entry) {
+        var tok = sessionStorage.getItem("wb_worker_token");
+        if (workerProfileHasStaff && saveId && tok) {
+          fetch(
+            "/api/v1/auth/worker-glossary-saves/" + encodeURIComponent(saveId) + "?token=" + encodeURIComponent(tok),
+            { method: "DELETE" }
+          ).then(function () {
+            workerRefreshSavedLists();
+          });
+          return;
+        }
+        var key = kind === "word" ? WB_LS_WORD : WB_LS_EXPR;
+        var arr = wbLsGet(key) || [];
+        var sig = JSON.stringify((entry && entry.item) || {});
+        wbLsSet(
+          key,
+          arr.filter(function (x) {
+            return JSON.stringify(x.item) !== sig;
+          })
+        );
+        workerRefreshSavedLists();
+      }
+
+      function workerProfileFillAvatarPreview(p) {
+        var prev = document.getElementById("worker-profile-avatar-preview");
+        if (!prev) return;
+        prev.innerHTML = "";
+        var lab = (document.getElementById("worker-identity") || {}).textContent || "?";
+        if (p.avatar_url) {
+          var im = document.createElement("img");
+          im.src = p.avatar_url;
+          im.className = "w-full h-full object-cover";
+          prev.appendChild(im);
+          return;
+        }
+        var ci = typeof p.avatar_color_index === "number" ? p.avatar_color_index : workerHashString(lab) % 8;
+        var dv = document.createElement("div");
+        dv.className = "w-full h-full flex items-center justify-center text-2xl font-bold text-white";
+        dv.style.backgroundColor = WORKER_AVATAR_COLORS[ci % 8];
+        dv.textContent = String(lab).trim().charAt(0).toUpperCase() || "?";
+        prev.appendChild(dv);
+      }
+
+      function svgIconSpeaker() {
+        return '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M6.344 17.658l-3.868-2.598V9.94l3.867-2.597a2 2 0 011.658-.293h4.764a2 2 0 012 2v8.5a2 2 0 01-2 2H8.002a2 2 0 01-1.658-.893z"/></svg>';
+      }
+
+      function svgIconStar() {
+        return '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>';
+      }
+
+      function svgIconNote() {
+        return '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>';
+      }
+
+      function setWorkerMainTab(name) {
+        var ph = document.getElementById("worker-panel-home");
+        var pw = document.getElementById("worker-panel-word");
+        var pe = document.getElementById("worker-panel-expr");
+        var bh = document.getElementById("worker-tab-home");
+        var bw = document.getElementById("worker-tab-word");
+        var be = document.getElementById("worker-tab-expr");
+        var selOn = "flex-1 min-w-[5rem] px-3 py-2 rounded-lg text-xs font-semibold bg-indigo-900 text-white";
+        var selOff = "flex-1 min-w-[5rem] px-3 py-2 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-50";
+        if (!ph || !pw || !pe || !bh || !bw || !be) return;
+        workerMainTabActive = name === "word" || name === "expr" ? name : "home";
+        ph.classList.toggle("hidden", workerMainTabActive !== "home");
+        pw.classList.toggle("hidden", workerMainTabActive !== "word");
+        pe.classList.toggle("hidden", workerMainTabActive !== "expr");
+        bh.className = workerMainTabActive === "home" ? selOn : selOff;
+        bw.className = workerMainTabActive === "word" ? selOn : selOff;
+        be.className = workerMainTabActive === "expr" ? selOn : selOff;
+        bh.setAttribute("aria-selected", workerMainTabActive === "home" ? "true" : "false");
+        bw.setAttribute("aria-selected", workerMainTabActive === "word" ? "true" : "false");
+        be.setAttribute("aria-selected", workerMainTabActive === "expr" ? "true" : "false");
+        if (workerMainTabActive === "word" || workerMainTabActive === "expr") workerRefreshSavedLists();
+        applyWorkerUiLocale();
+      }
+
+      function foodGlossaryUrl(sheetGid) {
+        var tok = sessionStorage.getItem("wb_worker_token");
+        var u;
+        if (tok) {
+          u = "/api/v1/auth/worker-food-glossary?token=" + encodeURIComponent(tok);
+          if (sheetGid !== null && sheetGid !== undefined && sheetGid !== "")
+            u += "&sheet_gid=" + encodeURIComponent(String(sheetGid));
+          return u;
+        }
+        u = "/api/v1/curriculum/food-glossary";
+        if (sheetGid !== null && sheetGid !== undefined && sheetGid !== "")
+          u += "?sheet_gid=" + encodeURIComponent(String(sheetGid));
+        return u;
+      }
+
+      function workerRenderHomeTeach() {
+        var ul = document.getElementById("worker-main-teach-list");
+        if (!ul) return;
+        fetch(foodGlossaryUrl(null))
+          .then(function (r) {
+            return r.ok ? r.json() : Promise.reject();
+          })
+          .then(function (data) {
+            workerProfileSheetGid = data.sheet_gid != null ? data.sheet_gid : 0;
+            var rows = (data.rows || []).slice(0, 20);
+            ul.innerHTML = "";
+            rows.forEach(function (row) {
+              var pc = workerGlossaryPickCols(row);
+              var li = document.createElement("li");
+              li.className = "flex gap-2 items-start border border-gray-100 rounded-lg p-2 bg-white";
+              var left = document.createElement("div");
+              left.className = "flex-1 min-w-0 text-[11px]";
+              left.innerHTML =
+                '<div class="font-medium text-gray-900">' +
+                escapeHtml(String(pc.w || "")) +
+                "</div>" +
+                (pc.m ? '<div class="text-gray-500 mt-0.5">' + escapeHtml(String(pc.m)) + "</div>" : "");
+              var actions = document.createElement("div");
+              actions.className = "flex shrink-0 gap-0.5";
+              var sp = document.createElement("button");
+              sp.type = "button";
+              sp.className = "p-1.5 rounded-lg hover:bg-indigo-50 text-indigo-700";
+              sp.setAttribute("aria-label", workerT("profile_tts"));
+              sp.innerHTML = svgIconSpeaker();
+              sp.addEventListener("click", function () {
+                workerSpeakRow(row);
+              });
+              var st = document.createElement("button");
+              st.type = "button";
+              st.className = "p-1.5 rounded-lg hover:bg-amber-50 text-amber-600";
+              st.setAttribute("aria-label", workerT("profile_add_expr"));
+              st.innerHTML = svgIconStar();
+              st.addEventListener("click", function () {
+                workerSaveGlossaryItem("expression", row);
+              });
+              var nt = document.createElement("button");
+              nt.type = "button";
+              nt.className = "p-1.5 rounded-lg hover:bg-sky-50 text-sky-700";
+              nt.setAttribute("aria-label", workerT("profile_add_word"));
+              nt.innerHTML = svgIconNote();
+              nt.addEventListener("click", function () {
+                workerSaveGlossaryItem("word", row);
+              });
+              actions.appendChild(sp);
+              actions.appendChild(st);
+              actions.appendChild(nt);
+              li.appendChild(left);
+              li.appendChild(actions);
+              ul.appendChild(li);
+            });
+          })
+          .catch(function () {
+            ul.innerHTML = "";
+          });
+      }
+
+      function openWorkerProfileModal() {
+        applyWorkerUiLocale();
+        var tok = sessionStorage.getItem("wb_worker_token");
+        if (!tok) return;
+        document.getElementById("modal-worker-profile").classList.remove("hidden");
+        document.getElementById("worker-profile-status").textContent = "";
+        document.getElementById("worker-profile-current-pw").value = "";
+        document.getElementById("worker-profile-new-pw").value = "";
+
+        fetch("/api/v1/auth/worker-profile?token=" + encodeURIComponent(tok))
+          .then(function (r) {
+            return r.ok ? r.json() : {};
+          })
+          .then(function (p) {
+            workerProfileCache = p;
+            workerProfileHasStaff = !!p.has_staff_account;
+            var pick = document.getElementById("worker-profile-avatar-picker");
+            var rm = document.getElementById("worker-profile-remove-photo");
+            var pw = document.getElementById("worker-profile-password-block");
+            var gh = document.getElementById("worker-profile-guest-hint");
+            if (p.has_staff_account) {
+              pick.classList.remove("hidden");
+              rm.classList.remove("hidden");
+              pw.classList.remove("hidden");
+              gh.classList.add("hidden");
+            } else {
+              pick.classList.add("hidden");
+              rm.classList.add("hidden");
+              pw.classList.add("hidden");
+              gh.classList.remove("hidden");
+            }
+            workerProfileFillAvatarPreview(p);
+          });
+
+        fetch("/api/v1/auth/worker-ng-replies?token=" + encodeURIComponent(tok) + "&limit=80")
+          .then(function (r) {
+            return r.ok ? r.json() : [];
+          })
+          .then(function (rows) {
+            var ul = document.getElementById("worker-profile-ng-list");
+            var em = document.getElementById("worker-profile-ng-empty");
+            ul.innerHTML = "";
+            if (!rows || !rows.length) {
+              em.classList.remove("hidden");
+              return;
+            }
+            em.classList.add("hidden");
+            rows.forEach(function (row) {
+              var li = document.createElement("li");
+              li.className = "border border-amber-100 rounded-lg p-2 bg-amber-50/80";
+              var dt = document.createElement("p");
+              dt.className = "text-[10px] text-amber-900/70";
+              dt.textContent = new Date(row.created_at * 1000).toLocaleString();
+              var tp = document.createElement("p");
+              tp.className = "text-[11px] text-gray-900 mt-1 whitespace-pre-wrap";
+              tp.textContent = row.text || "";
+              li.appendChild(dt);
+              li.appendChild(tp);
+              ul.appendChild(li);
+            });
+          })
+          .catch(function () {});
+      }
+
+      function closeWorkerProfileModal() {
+        document.getElementById("modal-worker-profile").classList.add("hidden");
+      }
+
       function connectWs(accessToken) {
 
         setStatus("確認中…", false);
+
+        if (workerWsPingTimer) {
+
+          clearInterval(workerWsPingTimer);
+
+          workerWsPingTimer = null;
+
+        }
 
         var wsProto = location.protocol === "https:" ? "wss:" : "ws:";
 
@@ -943,17 +3184,155 @@
 
         var ws = new WebSocket(wsUrl);
 
-
-
-        ws.onopen = function () { setStatus("済み", true); };
-
-        ws.onclose = function () { setStatus("切断", false); };
-
-        ws.onerror = function () { setStatus("エラー", false); };
+        workerWsInstance = ws;
 
 
 
-        var currentInstructionId = null;
+        var staffTextEl = document.getElementById("staff-to-admin-text");
+
+        var staffSendEl = document.getElementById("staff-to-admin-send");
+
+        function syncStaffToAdminBtn() {
+
+          if (!staffSendEl || !staffTextEl) return;
+
+          var has = (staffTextEl.value || "").trim().length > 0;
+
+          staffSendEl.disabled = !has;
+
+        }
+
+        if (staffTextEl && staffSendEl) {
+
+          staffTextEl.addEventListener("input", syncStaffToAdminBtn);
+
+          staffSendEl.addEventListener("click", function () {
+
+            var txt = (staffTextEl.value || "").trim();
+
+            if (!txt) return;
+
+            function clearLocal() {
+
+              staffTextEl.value = "";
+
+              syncStaffToAdminBtn();
+
+            }
+
+            function sendRest() {
+
+              fetch("/api/v1/auth/chat-message?token=" + encodeURIComponent(accessToken), {
+
+                method: "POST",
+
+                headers: { "Content-Type": "application/json" },
+
+                body: JSON.stringify({ text: txt }),
+
+              })
+
+                .then(function (r) {
+
+                  if (!r.ok) throw new Error(String(r.status));
+
+                  return r.json();
+
+                })
+
+                .then(function () {
+
+                  appendWorkerChatRow("worker", (document.getElementById("worker-identity") || {}).textContent || "?", txt, Date.now() / 1000);
+
+                  clearLocal();
+
+                })
+
+                .catch(function () {});
+
+            }
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+
+              ws.send(JSON.stringify({ type: "staff_message", text: txt }));
+
+              appendWorkerChatRow("worker", (document.getElementById("worker-identity") || {}).textContent || "?", txt, Date.now() / 1000);
+
+              clearLocal();
+
+              return;
+
+            }
+
+            sendRest();
+
+          });
+
+        }
+
+
+
+        ws.onopen = function () {
+
+          setStatus("済み", true);
+
+          loadWorkerHistory();
+
+          loadPendingInstructions();
+
+          syncStaffToAdminBtn();
+
+          if (workerWsPingTimer) {
+
+            clearInterval(workerWsPingTimer);
+
+            workerWsPingTimer = null;
+
+          }
+
+          workerWsPingTimer = setInterval(function () {
+
+            var w = workerWsInstance;
+
+            if (w && w.readyState === WebSocket.OPEN) {
+
+              try {
+
+                w.send(JSON.stringify({ type: "ping" }));
+
+              } catch (e) {}
+
+            }
+
+          }, 25000);
+
+        };
+
+        ws.onclose = function () {
+
+          if (workerWsPingTimer) {
+
+            clearInterval(workerWsPingTimer);
+
+            workerWsPingTimer = null;
+
+          }
+
+          setStatus("切断", false);
+
+          syncStaffToAdminBtn();
+
+        };
+
+        ws.onerror = function () {
+
+          setStatus("エラー", false);
+
+          syncStaffToAdminBtn();
+
+        };
+
+
 
         ws.onmessage = function (ev) {
 
@@ -961,30 +3340,60 @@
 
           try { data = JSON.parse(ev.data); } catch (e) { return; }
 
-          if (data.type === "instruction" && typeof data.text === "string") {
+          if (data.type === "admin_message" && typeof data.text === "string") {
+
+            appendWorkerChatRow("admin", data.from_label || "管理者", data.text, data.ts);
+
+            return;
+
+          }
+
+          if (data.type === "instruction") {
+
+            var insText = typeof data.text === "string" ? data.text : "";
+
+            var insImg = typeof data.image_url === "string" ? data.image_url : "";
+
+            if (!String(insText).trim() && !String(insImg).trim()) return;
 
             currentInstructionId =
               typeof data.instruction_id === "string" && data.instruction_id ? data.instruction_id : null;
 
-            setInstruction(data.text);
+            setInstruction(insText, insImg);
+
+            pendingCustomInstructionId = null;
+
+            registerWorkerAlarmNeed(currentInstructionId);
+
+            loadPendingInstructions();
 
           }
 
         };
 
-
-
-        function sendBtn(code) {
-
-          if (ws.readyState !== WebSocket.OPEN) return;
-
-          var payload = { type: "worker_response", button: code };
-
-          if (currentInstructionId) payload.instruction_id = currentInstructionId;
-
-          ws.send(JSON.stringify(payload));
-
+        /* ----- panels (collapsible) ----- */
+        function bindPanelToggle(btnId, panelId, chevronId, defaultOpen) {
+          var btn = document.getElementById(btnId);
+          var panel = document.getElementById(panelId);
+          var chev = document.getElementById(chevronId);
+          if (!btn || !panel || !chev) return;
+          function setOpen(open) {
+            panel.classList.toggle("hidden", !open);
+            chev.textContent = open ? "▲" : "▼";
+          }
+          setOpen(!!defaultOpen);
+          btn.addEventListener("click", function () {
+            var open = !panel.classList.contains("hidden");
+            setOpen(!open);
+          });
         }
+        bindPanelToggle("inst-toggle", "inst-panel", "inst-chevron", true);
+        bindPanelToggle("pending-toggle", "pending-panel", "pending-chevron", true);
+        bindPanelToggle("staffmsg-toggle", "staffmsg-panel", "staffmsg-chevron", true);
+        bindPanelToggle("hist-toggle", "hist-panel", "hist-chevron", true);
+        bindPanelToggle("worker-chat-toggle", "worker-chat-panel", "worker-chat-chevron", true);
+
+
 
 
 
@@ -996,7 +3405,11 @@
 
             if (b === "CUSTOM") {
 
-              sendBtn("CUSTOM");
+              pendingCustomInstructionId = null;
+
+              if (customAnswerText) customAnswerText.value = "";
+
+              if (customMicHint) customMicHint.textContent = "マイクをタップで音声入力（対応ブラウザのみ）";
 
               voicePanel.classList.remove("hidden");
 
@@ -1004,7 +3417,7 @@
 
             }
 
-            sendBtn(b);
+            sendWorkerResponse(b);
 
           });
 
@@ -1012,11 +3425,175 @@
 
 
 
+        if (customSendBtn) {
+
+          customSendBtn.addEventListener("click", function () {
+
+            var txt = (customAnswerText && customAnswerText.value) || "";
+
+            if (!txt.trim()) {
+
+              if (customMicHint) customMicHint.textContent = "内容を入力するか、マイクで音声入力してください。";
+
+              return;
+
+            }
+
+            var effId = pendingCustomInstructionId || currentInstructionId;
+
+            if (!effId) {
+
+              if (customMicHint) customMicHint.textContent = "指示を受信してから送信できます。";
+
+              return;
+
+            }
+
+            sendWorkerResponse("CUSTOM", txt, effId);
+
+            pendingCustomInstructionId = null;
+
+            voicePanel.classList.add("hidden");
+
+            if (customMicHint) customMicHint.textContent = "マイクをタップで音声入力（対応ブラウザのみ）";
+
+          });
+
+        }
+
+
+
         voiceDone.addEventListener("click", function () {
+
+          pendingCustomInstructionId = null;
 
           voicePanel.classList.add("hidden");
 
+          if (customMicHint) customMicHint.textContent = "マイクをタップで音声入力（対応ブラウザのみ）";
+
         });
+
+
+
+        (function setupCustomSpeech() {
+
+          var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+          if (!customMicBtn) return;
+
+          if (!SR) {
+
+            customMicBtn.addEventListener("click", function () {
+
+              if (customMicHint) customMicHint.textContent = "このブラウザは音声入力（SST）に対応していません。";
+
+            });
+
+            return;
+
+          }
+
+          var recognition = new SR();
+
+          var micListening = false;
+
+          function speechLang() {
+
+            var m = {
+
+              ja: "ja-JP",
+
+              en: "en-US",
+
+              ko: "ko-KR",
+
+              zh: "zh-CN",
+
+              vi: "vi-VN",
+
+              id: "id-ID",
+
+              my: "my-MM",
+
+              ne: "ne-NP"
+
+            };
+
+            return m[activeLocale] || "ja-JP";
+
+          }
+
+          recognition.onresult = function (ev) {
+
+            var final = "";
+
+            for (var i = ev.resultIndex; i < ev.results.length; i++) {
+
+              if (ev.results[i].isFinal) final += ev.results[i][0].transcript;
+
+            }
+
+            if (!final || !customAnswerText) return;
+
+            var cur = customAnswerText.value || "";
+
+            if (cur && !/\s$/.test(cur)) cur += " ";
+
+            customAnswerText.value = cur + final;
+
+          };
+
+          recognition.onend = function () {
+
+            micListening = false;
+
+            customMicBtn.classList.remove("mic-active");
+
+          };
+
+          recognition.onerror = function () {
+
+            micListening = false;
+
+            customMicBtn.classList.remove("mic-active");
+
+          };
+
+          customMicBtn.addEventListener("click", function () {
+
+            recognition.lang = speechLang();
+
+            if (micListening) {
+
+              try {
+
+                recognition.stop();
+
+              } catch (e) {}
+
+              return;
+
+            }
+
+            try {
+
+              recognition.start();
+
+              micListening = true;
+
+              customMicBtn.classList.add("mic-active");
+
+              if (customMicHint) customMicHint.textContent = "聞き取り中…（もう一度タップで停止）";
+
+            } catch (e) {
+
+              if (customMicHint) customMicHint.textContent = "音声入力を開始できませんでした。";
+
+            }
+
+          });
+
+        })();
 
 
 
@@ -1034,29 +3611,21 @@
 
         var glossList = document.getElementById("glossary-list");
 
+        var glossTabsEl = document.getElementById("glossary-tabs");
+
         var glossRows = [];
 
         var glossLoaded = false;
+
+        var glossTabMeta = [];
+
+        var glossCurrentGid = null;
 
 
 
         function pickCols(row) {
 
-          var keys = Object.keys(row);
-
-          var ja = keys.filter(function (k) { return /日本語|単語/i.test(k); });
-
-          var w = ja.length ? row[ja[0]] : (keys.length ? row[keys[0]] : "");
-
-          var meaning = keys.filter(function (k) { return /意味|説明|한국/i.test(k); });
-
-          var m = meaning.length ? row[meaning[0]] : (keys[1] ? row[keys[1]] : "");
-
-          var ex = keys.filter(function (k) { return /使用例|例|使い方/i.test(k); });
-
-          var e = ex.length ? row[ex[0]] : "";
-
-          return { w: w, m: m, e: e };
+          return workerGlossaryPickCols(row);
 
         }
 
@@ -1116,6 +3685,138 @@
 
 
 
+        function loadGlossarySheet(gid) {
+
+          glossStatus.textContent = "読み込み中…";
+
+          var url = foodGlossaryUrl(gid);
+
+          return fetch(url)
+
+            .then(function (r) {
+
+              if (!r.ok) throw new Error(r.status);
+
+              return r.json();
+
+            })
+
+            .then(function (data) {
+
+              glossRows = data.rows || [];
+
+              glossStatus.textContent = glossRows.length + " 件";
+
+              renderGlossary(glossRows);
+
+              applyGlossaryFilter();
+
+            })
+
+            .catch(function () {
+
+              glossStatus.textContent = "読み込みに失敗しました";
+
+            });
+
+        }
+
+
+
+        function setupGlossaryTabsOnce() {
+
+          if (glossLoaded) return;
+
+          glossLoaded = true;
+
+          if (!glossTabsEl) {
+
+            loadGlossarySheet(null);
+
+            return;
+
+          }
+
+          fetch("/api/v1/curriculum/food-glossary-tabs")
+
+            .then(function (r) {
+
+              return r.ok ? r.json() : Promise.reject();
+
+            })
+
+            .then(function (meta) {
+
+              var sheets = (meta && meta.sheets) || [];
+
+              glossTabMeta = sheets;
+
+              glossTabsEl.innerHTML = "";
+
+              if (!sheets.length) {
+
+                loadGlossarySheet(null);
+
+                return;
+
+              }
+
+              sheets.forEach(function (s) {
+
+                var b = document.createElement("button");
+
+                b.type = "button";
+
+                b.className =
+
+                  "px-2.5 py-1 text-xs rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-indigo-50 font-medium transition";
+
+                b.textContent = s.title || String(s.sheet_gid);
+
+                b.setAttribute("data-gid", String(s.sheet_gid));
+
+                b.addEventListener("click", function () {
+
+                  glossTabsEl.querySelectorAll("button").forEach(function (x) {
+
+                    x.classList.remove("bg-indigo-900", "text-white", "border-indigo-900");
+
+                    x.classList.add("bg-white", "text-gray-800");
+
+                  });
+
+                  b.classList.remove("bg-white", "text-gray-800");
+
+                  b.classList.add("bg-indigo-900", "text-white", "border-indigo-900");
+
+                  glossCurrentGid = s.sheet_gid;
+
+                  glossSearch.value = "";
+
+                  loadGlossarySheet(s.sheet_gid);
+
+                });
+
+                glossTabsEl.appendChild(b);
+
+              });
+
+              var firstBtn = glossTabsEl.querySelector("button");
+
+              if (firstBtn) firstBtn.click();
+
+            })
+
+            .catch(function () {
+
+              loadGlossarySheet(null);
+
+            });
+
+        }
+
+
+
         glossToggle.addEventListener("click", function () {
 
           var open = !glossPanel.classList.contains("hidden");
@@ -1134,45 +3835,7 @@
 
           glossChevron.textContent = "▲";
 
-          if (glossLoaded) {
-
-            applyGlossaryFilter();
-
-            return;
-
-          }
-
-          glossStatus.textContent = "読み込み中…";
-
-          fetch("/api/v1/curriculum/food-glossary")
-
-            .then(function (r) {
-
-              if (!r.ok) throw new Error(r.status);
-
-              return r.json();
-
-            })
-
-            .then(function (data) {
-
-              glossRows = data.rows || [];
-
-              glossLoaded = true;
-
-              glossStatus.textContent = glossRows.length + " 件";
-
-              renderGlossary(glossRows);
-
-              applyGlossaryFilter();
-
-            })
-
-            .catch(function () {
-
-              glossStatus.textContent = "読み込みに失敗しました";
-
-            });
+          setupGlossaryTabsOnce();
 
         });
 
@@ -1183,6 +3846,146 @@
     })();
 
   </script>
+
+  <div
+    id="modal-worker-profile"
+    class="hidden fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-3 sm:p-4"
+    aria-hidden="true"
+  >
+    <div
+      class="bg-white rounded-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-4 sm:p-5 shadow-xl text-sm text-gray-800"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="worker-profile-heading"
+    >
+      <div class="flex justify-between items-start gap-2 mb-3">
+        <h3 id="worker-profile-heading" class="font-semibold text-gray-900 text-base" data-worker-i18n="profile_title">プロフィール</h3>
+        <button type="button" id="worker-profile-close" class="shrink-0 rounded-lg px-2 py-1 text-gray-500 hover:bg-gray-100 text-lg leading-none">
+          <span class="sr-only" data-worker-i18n="profile_close">閉じる</span>
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="border-b border-gray-100 pb-4 mb-4">
+        <p class="text-[10px] font-medium text-gray-600 mb-2 text-center" data-worker-i18n="profile_photo_caption">顔写真（任意）</p>
+        <div class="flex justify-center mb-2">
+          <div class="relative w-24 h-24 shrink-0">
+            <div
+              id="worker-profile-avatar-preview"
+              class="w-full h-full rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100 flex items-center justify-center text-white text-2xl font-bold"
+            ></div>
+            <input
+              id="worker-profile-avatar-file"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              class="sr-only"
+              tabindex="-1"
+            />
+            <button
+              type="button"
+              id="worker-profile-avatar-picker"
+              class="hidden absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-white shadow-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <button
+          type="button"
+          id="worker-profile-remove-photo"
+          class="hidden w-full text-center text-xs text-rose-600 hover:underline mb-3"
+          data-worker-i18n="profile_remove_photo"
+        >
+          写真を削除
+        </button>
+
+        <p id="worker-profile-guest-hint" class="hidden text-[11px] text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-3" data-worker-i18n="profile_guest_hint"></p>
+
+        <div id="worker-profile-password-block" class="hidden space-y-2">
+          <label class="block text-[10px] text-gray-600" data-worker-i18n="profile_current_pw">現在のパスワード</label>
+          <input
+            id="worker-profile-current-pw"
+            type="password"
+            autocomplete="current-password"
+            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+          <label class="block text-[10px] text-gray-600" data-worker-i18n="profile_new_pw">新しいパスワード（4文字以上）</label>
+          <input
+            id="worker-profile-new-pw"
+            type="password"
+            autocomplete="new-password"
+            class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            id="worker-profile-pw-save"
+            class="w-full py-2 rounded-xl bg-indigo-900 text-white text-sm font-medium hover:bg-indigo-800"
+            data-worker-i18n="profile_pw_save"
+          >
+            パスワードを更新
+          </button>
+        </div>
+        <p id="worker-profile-status" class="text-xs min-h-[1rem] mt-2"></p>
+      </div>
+
+      <div class="mb-4">
+        <p class="text-sm font-semibold text-gray-900 mb-2" data-worker-i18n="profile_ng_title">「分からない」と答えた指示</p>
+        <ul id="worker-profile-ng-list" class="space-y-2 max-h-40 overflow-y-auto text-xs text-gray-800"></ul>
+        <p id="worker-profile-ng-empty" class="text-xs text-gray-500 py-2 hidden" data-worker-i18n="profile_ng_empty">該当がありません。</p>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="modal-worker-alarm" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl text-sm text-gray-800 max-h-[90vh] overflow-y-auto">
+      <h3 class="font-semibold text-gray-900 mb-1">通知・アラーム設定</h3>
+      <p class="text-[11px] text-gray-500 mb-3 leading-relaxed">
+        未返信の指示があるあいだ、間隔をあけてベル・振動・通知で知らせます。応答するまで続きます（ここでオフにすると無音になります）。
+      </p>
+      <label class="flex items-center gap-2 mb-3 cursor-pointer">
+        <input type="checkbox" id="worker-alarm-master" class="rounded border-gray-300" checked />
+        <span>アラームを有効にする</span>
+      </label>
+      <div class="space-y-2 mb-4 pl-1 border-l-2 border-amber-200">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="worker-alarm-bell" class="rounded border-gray-300" checked />
+          <span>ベル音</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <span class="text-xs text-gray-600 w-24 shrink-0">ベルの種類</span>
+          <select id="worker-alarm-preset" class="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+            <option value="bell1">ベル A</option>
+            <option value="bell2">ベル B</option>
+            <option value="chime">チャイム</option>
+            <option value="beep">ビープ</option>
+          </select>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="worker-alarm-vibrate" class="rounded border-gray-300" />
+          <span>振動（対応スマホ）</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="worker-alarm-notify" class="rounded border-gray-300" checked />
+          <span>ブラウザ通知（タブが裏のとき・アプリ風）</span>
+        </label>
+        <label class="flex items-center gap-2">
+          <span class="text-xs text-gray-600 w-24 shrink-0">繰り返し間隔（秒）</span>
+          <input type="number" id="worker-alarm-interval" min="2" max="15" value="3" class="w-20 rounded-lg border border-gray-200 px-2 py-1 text-sm" />
+        </label>
+      </div>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button type="button" id="worker-alarm-test" class="px-3 py-2 rounded-xl bg-amber-100 text-amber-950 text-xs font-medium">テスト再生</button>
+        <button type="button" id="worker-alarm-perm" class="px-3 py-2 rounded-xl bg-gray-100 text-gray-800 text-xs font-medium">通知を許可</button>
+      </div>
+      <p class="text-[10px] text-gray-400 mb-3">
+        ※ iOS の Safari はバックグラウンドのプッシュ通知に制限があります。可能なら PWA 追加や Chrome をご利用ください。
+      </p>
+      <button type="button" id="modal-worker-alarm-close" class="w-full py-2.5 rounded-xl bg-gray-900 text-white font-medium text-sm">閉じる</button>
+    </div>
+  </div>
 
 </body>
 
