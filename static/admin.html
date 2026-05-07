@@ -367,6 +367,34 @@
         <ul id="inline-staff-accounts-list" class="space-y-0.5 max-h-48 overflow-y-auto"></ul>
       </div>
     </details>
+
+    <details
+      id="inline-staff-add-section"
+      class="wb-disclosure group rounded-2xl bg-white border border-indigo-100 shadow-sm overflow-hidden"
+      aria-label="add staff account"
+      open
+    >
+      <summary
+        class="cursor-pointer list-none px-4 py-2.5 bg-indigo-50/90 border-b border-indigo-100 flex justify-between items-start gap-2"
+      >
+        <div class="min-w-0">
+          <h2 class="text-sm font-semibold text-indigo-950" data-i18n="staff_form_add_title">アカウント追加</h2>
+        </div>
+        <span class="text-gray-400 text-xs shrink-0 mt-0.5 group-open:rotate-180 transition">▼</span>
+      </summary>
+      <div class="px-4 py-3 border-t border-indigo-50/50 space-y-2 text-sm">
+        <label class="block text-[10px] text-gray-500" data-i18n="staff_form_login_id">スタッフID（ログイン）</label>
+        <input id="inline-staff-new-login" type="text" maxlength="100" autocomplete="off" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+        <label class="block text-[10px] text-gray-500" data-i18n="staff_form_display_name">表示名</label>
+        <input id="inline-staff-new-name" type="text" maxlength="200" autocomplete="name" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+        <label class="block text-[10px] text-gray-500" data-i18n="staff_form_password">パスワード</label>
+        <input id="inline-staff-new-password" type="password" maxlength="200" autocomplete="new-password" class="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+        <button type="button" id="inline-staff-add-btn" class="w-full py-2 rounded-xl bg-indigo-900 text-white text-sm font-medium hover:bg-indigo-800" data-i18n="staff_add_btn">
+          追加
+        </button>
+        <p id="inline-staff-form-status" class="text-xs min-h-[1.1rem]"></p>
+      </div>
+    </details>
     </div>
 
     <details
@@ -627,8 +655,8 @@
       <button type="button" id="modal-words-close" class="mt-2 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800" data-i18n="modal_words_close">閉じる</button>
     </div>
   </div>
-  <div id="modal-users" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl max-h-[85vh] flex flex-col overflow-hidden">
+  <div id="modal-users" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-2 sm:p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full p-5 shadow-xl max-h-[92vh] sm:max-h-[85vh] flex flex-col overflow-hidden">
       <h3 class="font-semibold text-gray-900 mb-3" data-i18n="modal_users_title">スタッフ登録</h3>
 
       <div class="border-b border-gray-100 pb-3 mb-3 shrink-0">
@@ -2123,63 +2151,95 @@
         document.getElementById("modal-words-close").addEventListener("click", function () {
           document.getElementById("modal-words").classList.add("hidden");
         });
-        document.getElementById("m-users").addEventListener("click", function (e) {
-          e.stopPropagation();
-          menuDropdown.classList.add("hidden");
+        function refreshOnlineAndAccounts() {
           var ul = document.getElementById("modal-users-list");
           var empty = document.getElementById("modal-users-empty");
-          ul.innerHTML = "";
-          document.getElementById("staff-form-status").textContent = "";
-          fetch("/api/v1/workspaces/online-workers?admin_token=" + encodeURIComponent(token))
-            .then(function (r) {
-              return r.json();
-            })
+          if (ul) ul.innerHTML = "";
+          var modalStatus = document.getElementById("staff-form-status");
+          if (modalStatus) modalStatus.textContent = "";
+          var inlineStatus = document.getElementById("inline-staff-form-status");
+          if (inlineStatus) inlineStatus.textContent = "";
+          return fetch("/api/v1/workspaces/online-workers?admin_token=" + encodeURIComponent(token))
+            .then(function (r) { return r.json(); })
             .then(function (data) {
               var workers = data.workers || [];
-              if (!workers.length) {
-                empty.classList.remove("hidden");
-              } else {
-                empty.classList.add("hidden");
-                workers.forEach(function (w) {
-                  var li = document.createElement("li");
-                  li.className = "py-1.5 border-b border-gray-50";
-                  li.textContent = w.label;
-                  ul.appendChild(li);
-                });
+              if (ul && empty) {
+                if (!workers.length) {
+                  empty.classList.remove("hidden");
+                } else {
+                  empty.classList.add("hidden");
+                  workers.forEach(function (w) {
+                    var li = document.createElement("li");
+                    li.className = "py-1.5 border-b border-gray-50";
+                    li.textContent = w.label;
+                    ul.appendChild(li);
+                  });
+                }
               }
               return loadStaffGroups().then(function () {
                 return loadStaffAccountsList();
               });
             })
             .catch(function () {
-              empty.classList.remove("hidden");
-              ul.innerHTML = "";
-            })
-            .finally(function () {
-              document.getElementById("modal-users").classList.remove("hidden");
+              if (ul) ul.innerHTML = "";
+              if (empty) empty.classList.remove("hidden");
             });
+        }
+
+        document.getElementById("m-users").addEventListener("click", function (e) {
+          e.stopPropagation();
+          menuDropdown.classList.add("hidden");
+          var isPc = document.documentElement.classList.contains("admin-pc");
+          refreshOnlineAndAccounts().finally(function () {
+            if (isPc) {
+              // PC 레이아웃: 우측 인라인 패널로 스크롤 + 잠시 강조
+              var stack = document.getElementById("inline-staff-stack");
+              if (stack) {
+                stack.scrollIntoView({ behavior: "smooth", block: "start" });
+                stack.classList.add("ring-2", "ring-indigo-400", "ring-offset-2", "rounded-2xl");
+                setTimeout(function () {
+                  stack.classList.remove("ring-2", "ring-indigo-400", "ring-offset-2", "rounded-2xl");
+                }, 1500);
+              }
+              var loginEl = document.getElementById("inline-staff-new-login");
+              if (loginEl) loginEl.focus();
+            } else {
+              document.getElementById("modal-users").classList.remove("hidden");
+            }
+          });
         });
 
-        document.getElementById("staff-add-btn").addEventListener("click", function () {
+        function submitNewStaffAccount(loginInputId, nameInputId, pwInputId, statusElId) {
           var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
-          var st = document.getElementById("staff-form-status");
-          st.textContent = "";
-          st.className = "text-xs min-h-[1.1rem]";
+          var st = document.getElementById(statusElId);
+          if (st) {
+            st.textContent = "";
+            st.className = "text-xs min-h-[1.1rem]";
+          }
           if (!wid) {
-            st.textContent = t("save_err_ws");
-            st.className = "text-xs min-h-[1.1rem] text-rose-600";
+            if (st) {
+              st.textContent = t("save_err_ws");
+              st.className = "text-xs min-h-[1.1rem] text-rose-600";
+            }
             return;
           }
-          var login = (document.getElementById("staff-new-login").value || "").trim();
-          var name = (document.getElementById("staff-new-name").value || "").trim();
-          var pw = document.getElementById("staff-new-password").value || "";
+          var loginEl = document.getElementById(loginInputId);
+          var nameEl = document.getElementById(nameInputId);
+          var pwEl = document.getElementById(pwInputId);
+          var login = (loginEl && loginEl.value || "").trim();
+          var name = (nameEl && nameEl.value || "").trim();
+          var pw = (pwEl && pwEl.value) || "";
           if (!login || !pw) {
-            st.textContent = t("staff_form_required");
-            st.className = "text-xs min-h-[1.1rem] text-rose-600";
+            if (st) {
+              st.textContent = t("staff_form_required");
+              st.className = "text-xs min-h-[1.1rem] text-rose-600";
+            }
             return;
           }
-          st.textContent = t("staff_add_saving");
-          st.className = "text-xs min-h-[1.1rem] text-emerald-700";
+          if (st) {
+            st.textContent = t("staff_add_saving");
+            st.className = "text-xs min-h-[1.1rem] text-emerald-700";
+          }
           fetch(
             "/api/v1/workspaces/" + encodeURIComponent(wid) + "/staff-accounts?admin_token=" + encodeURIComponent(token),
             {
@@ -2190,24 +2250,39 @@
           )
             .then(function (r) {
               if (!r.ok) {
-                return fetchErrorMessage(r).then(function (msg) {
-                  throw new Error(msg);
-                });
+                return fetchErrorMessage(r).then(function (msg) { throw new Error(msg); });
               }
               return r.json();
             })
             .then(function () {
-              document.getElementById("staff-new-login").value = "";
-              document.getElementById("staff-new-name").value = "";
-              document.getElementById("staff-new-password").value = "";
-              st.textContent = t("staff_add_ok");
+              if (loginEl) loginEl.value = "";
+              if (nameEl) nameEl.value = "";
+              if (pwEl) pwEl.value = "";
+              if (st) st.textContent = t("staff_add_ok");
               return loadStaffAccountsList();
             })
             .catch(function (err) {
-              st.textContent = t("staff_add_fail") + (err.message ? " " + err.message : "");
-              st.className = "text-xs min-h-[1.1rem] text-rose-600";
+              if (st) {
+                st.textContent = t("staff_add_fail") + (err.message ? " " + err.message : "");
+                st.className = "text-xs min-h-[1.1rem] text-rose-600";
+              }
             });
+        }
+
+        document.getElementById("staff-add-btn").addEventListener("click", function () {
+          submitNewStaffAccount("staff-new-login", "staff-new-name", "staff-new-password", "staff-form-status");
         });
+        var inlineAddBtn = document.getElementById("inline-staff-add-btn");
+        if (inlineAddBtn) {
+          inlineAddBtn.addEventListener("click", function () {
+            submitNewStaffAccount(
+              "inline-staff-new-login",
+              "inline-staff-new-name",
+              "inline-staff-new-password",
+              "inline-staff-form-status"
+            );
+          });
+        }
         document.getElementById("new-group-add").addEventListener("click", function () {
           var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
           var nm = (document.getElementById("new-group-name") && document.getElementById("new-group-name").value) || "";
