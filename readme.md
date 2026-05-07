@@ -1,4 +1,6 @@
-# WorkBridge Japan — 프로젝트 정의서 (v1.7)
+# WorkBridge Japan — 프로젝트 정의서 (v1.8)
+
+**v1.8 변경점:** ① 워커는 **개인 스태프 계정 로그인 전용**(공유 비밀번호·QR 조인·자동 No. 채번 모두 제거). ② 응답 매칭이 **세션 토큰 + `staff_account_id`** 기반으로 변경되어, 재로그인 후에도 과거 응답을 인식한다(미응답 목록·이력에서 옛 지시가 다시 뜨던 버그 해결).
 
 일본 현장 외국인 근로자 실시간 소통 및 일본어 학습 통합 플랫폼
 
@@ -39,8 +41,8 @@
 4. **지시·응답 기록(관리자):** 보낸 지시마다 서버가 `instruction_id`(UUID)를 발급하고, WebSocket 지시 본문에 포함한다. 스태프 화면은 버튼 응답 시 같은 ID를 돌려보낸다(`worker_response`에 `instruction_id`). SQLite에 **전송 시점·수신자 스냅샷·버튼별 응답**이 쌓이고, 관리자 화면 **「보낸 지시 기록」**에서 **녹색(OK)·노랑(REPEAT)·빨강(NG)·그 외(CUSTOM)·회색(미응답)** 집계를 보여 주며, 색을 누르면 해당하는 **스태프 표시명**을 모달로 확인할 수 있다. **보관 기간은 약 60일**(1개월 이상을 전제로 `init_db` 및 조회 시 오래된 행 삭제).  
    - **API:** `GET /api/v1/workspaces/{workspace_id}/instruction-history?admin_token=…` (목록·집계), `GET /api/v1/workspaces/{workspace_id}/instruction-history/{instruction_id}?admin_token=…` (이름별 상세).  
    - 실시간 피드(「작업자의 응답」)에는 응답마다 **스태프 표시명**이 붙는다(WebSocket `worker_response`에 `worker_label` 등).
-5. **근로자 식별 표시:** 근로자 화면 상단에 **「スタッフ」+ 번호 또는 이름**을 표시. 조인 시 `user_label`이 없으면 워크스페이스별 자동 번호(`No.1`, `No.2` …), 있으면 해당 문자열(이름)을 표시·세션에 저장. (선택) `/worker?join_token=…&user_label=…` 또는 `GET /api/v1/auth/join?token=…&user_label=…` 로 이름 지정. 이후 이름 변경은 DB(향후) 또는 별도 API로 확장 가능.
-6. **포털 로그인 (MVP):** `/login` 에서 **管理者 / 現場スタッフ** 선택 후 **ログインID・パスワード**. `POST /api/v1/auth/portal-login` — 관리자는 **ワークスペース名** + `portal_admin_password`(기본 `admin`, `.env`로 변경), 스태프는 **ワークスペースID 또는同名** + `portal_worker_password`(기본 `worker`). 성공 시 `sessionStorage`에 토큰 저장 후 `/admin`·`/worker`로 이동. **メニュー**からログアウトで `/login`へ。管理者メニュー: **QRコード**（参加用）、**用語・単語登録**（説明モーダル）、**ユーザー一覧**（`online-workers`）。
+5. **근로자 식별 표시:** 근로자 화면 상단에 **「スタッフ」+ 표시 이름**을 표시. 표시 이름은 관리자가 등록한 개인 스태프 계정의 `display_name`을 사용한다(없으면 `login_id`). 세션 토큰에 `staff_account_id` 가 같이 저장되어, 재로그인 후에도 같은 인물로 인식된다(이전 응답·이력이 새 세션에서도 유지). 워크스페이스별 자동 번호(No.1, No.2 …)·QR 조인 경로는 v1.8에서 제거됨.
+6. **포털 로그인 (개인 계정 전용):** `/login` 에서 **管理者 / 現場スタッフ / 総運営** 선택 후 자격 증명 입력. `POST /api/v1/auth/portal-login` — 관리자는 **ワークスペース名** + `portal_admin_password`(기본 `admin`, `.env`로 변경). 스태프는 **ワークスペース名 또는 ID** + **スタッフID(`worker_account_login`)** + 관리자가 등록한 **개인 비밀번호**. 공유 워커 비밀번호 방식은 v1.8에서 폐지됨(스태프 ID 누락 시 422 `staff login id required`). 성공 시 `sessionStorage`에 토큰 저장 후 `/admin`·`/worker`로 이동. **メニュー**에서 로그아웃 → `/login`. 관리자 메뉴: **用語・単語登録**(설명 모달), **スタッフ登録**(개인 계정·그룹 관리), **마이 정보**.
 7. **総運営スーパー管理者（運営会社）:** `portal-login` 의 `role: super_admin` + `super_admin_password`(기본 `superadmin`, `.env`의 `SUPER_ADMIN_PASSWORD`). `GET /api/v1/workspaces?super_token=…` 로 전체 워크스페이스 목록, `POST /api/v1/auth/super-assume` 로 선택 워크스페이스의 **관리자 토큰 발급** 후 `/admin` 과 동일 UI. WebSocket 은 슈퍼 토큰으로 연결 불가(반드시 assume 후 관리자 토큰 사용). `/super` 페이지에서 목록·선택.
 8. **管理者 UI レイアウト:** メニューで **PCレイアウト**（広い2カラム・用語/追加管理者の説明パネル）と **スマホレイアウト**（従来の狭幅）を切替。`localStorage` 키 `wb_admin_layout`.
 9. **현장별 전용 사전:** 3계층 사전(Global / Industry / Site-specific) 적용 및 구글 스프레드시트 연동.
@@ -72,7 +74,7 @@
 
 ## 5. 개발 로드맵
 
-1. **Phase 1 (MVP):** WebSocket·QR/조인·포털·슈퍼관리자(목록·`super-assume`)·`GET /auth/session`·관리자 PC/모바일 레이아웃·메뉴(QR·用語·ユーザー)·지시 전송(전원·그룹·개별·**이미지 첨부**)·스태프 계정·그룹(폴더)·`online-workers`·근로자 표시명·**지시/응답 SQLite 기록·관리자 집계 UI**·**관리자 UI 6개국어 + `locale-config` 기반 국기 순서**·근로자용 i18n 번역/easy-ja API·**커리큘럼 시트 탭 UI + 지점 전용 용어/표현 DB**.
+1. **Phase 1 (MVP):** WebSocket·**개인 스태프 계정 포털 로그인**·슈퍼관리자(목록·`super-assume`)·`GET /auth/session`·관리자 PC/모바일 레이아웃·메뉴(用語·スタッフ登録·マイ情報)·지시 전송(전원·그룹·개별·**이미지 첨부**)·스태프 계정·그룹(폴더)·`online-workers`·**지시/응답 SQLite 기록(staff_account_id 기반 영속 매칭)·관리자 집계 UI**·**관리자 UI 6개국어 + `locale-config` 기반 국기 순서**·근로자용 i18n 번역/easy-ja API·**커리큘럼 시트 탭 UI + 지점 전용 용어/표현 DB**.
 2. **Phase 2 (LMS):** 개호 분야 학습 콘텐츠 연동 및 기초 게임화.
 3. **Phase 3 (고도화):** B2B 리포트 기능, giftee API 연동, PWA 최적화.
 
@@ -84,19 +86,19 @@
 2. **서버 구축:** `main.py`에 FastAPI 및 WebSocket 로직 구현.
 3. **데이터 연동:** `kaigo_project` 폴더 내 엑셀/시트 데이터를 읽어 JSON API로 제공.
 
-### 6.1 스마트폰으로 참가용 QR 스캔 시
+### 6.1 스태프 로그인 절차 (v1.8 — 개인 계정 전용)
 
-- QR·참가 URL은 `PUBLIC_BASE_URL`(기본 `http://127.0.0.1:8000`)을 사용합니다. **휴대폰은 `127.0.0.1`로 PC 서버에 접속할 수 없습니다** (그 주소는 폰 자신을 가리킵니다).
-- 같은 Wi‑Fi에서 테스트할 때: PC의 LAN IP를 확인한 뒤 `.env`에 `PUBLIC_BASE_URL=http://<LAN IP>:<포트>` 로 설정하고 서버를 재시작한 뒤 **관리자 화면에서 QR을 다시 열어** 새 코드를 사용합니다.
-- PC가 외부에서 접속을 받으려면 Uvicorn을 `0.0.0.0`에 바인딩해야 합니다. 예: `uvicorn main:app --host 0.0.0.0 --port 8000`
-- 참가 토큰은 **1회용**입니다. 이미 한 번 열면 같은 QR로는 다시 들어가지 못할 수 있으니, 필요하면 QR을 새로 발급합니다.
+1. **관리자가 스태프 계정 발급:** 관리자 화면 메뉴 → **「スタッフ登録」** → **「アカウント追加」**에서 스태프마다 `login_id`·표시명·개인 비밀번호를 등록한다. (선택) 그룹(폴더)에 배치하면 그룹 단위 송신 대상이 된다.
+2. **스태프가 `/login?role=worker`에서 로그인:** ① ワークスペース名 또는 UUID, ② スタッフID(`login_id`), ③ 개인 비밀번호. 셋 중 하나라도 빠지면 422/401.
+3. **외부망/스마트폰에서 접속할 때:** Uvicorn을 `0.0.0.0`에 바인딩(`uvicorn main:app --host 0.0.0.0 --port 8000`)하고, `.env`의 `PUBLIC_BASE_URL`을 PC의 LAN IP로 설정한다. **휴대폰의 `127.0.0.1`은 폰 자신을 가리키므로 PC 서버에 닿지 않는다.**
+4. **로그아웃·재로그인 후에도 같은 인물로 인식:** 응답·이력은 세션 토큰뿐 아니라 `staff_account_id`로도 매칭되므로, 재로그인해도 과거 OK/REPEAT/NG 응답이 그대로 인정된다(미응답 목록에 옛 지시가 다시 뜨지 않음).
 
 ### 6.2 워크스페이스 저장 (SQLite, 무료·로컬)
 
 - 워크스페이스(이름·회사·지점·부서 등)는 **Python 표준 `sqlite3`** 로 `data/workbridge.db` 파일에 저장됩니다. 별도 pip 패키지는 필요 없습니다.
 - 경로는 `.env`의 `DATABASE_URL`로 바꿀 수 있습니다 (기본 `sqlite:///./data/workbridge.db`). `data/`는 `.gitignore`에 포함되어 있습니다.
 - **영구 테이블(예시):** `staff_groups`, `workspace_staff_accounts`(컬럼 `group_id` 등), 지시 기록 `instruction_rounds`(선택 **`image_url`**) / 수신자 `instruction_recipients` / 응답 `instruction_replies`, 지점 전용 용어 `workspace_glossary_terms`·`workspace_expression_terms` 등. 마이그레이션은 `app/db/sqlite.py`의 `get_connection()` 시 `CREATE TABLE IF NOT EXISTS` 및 `ALTER TABLE`로 처리합니다. 관리자·스태프 아바타·**지시용 이미지**는 `static/uploads/` 하위(일부는 `.gitignore`로 업로드 실제 파일 제외, `.gitkeep`만 유지).
-- 로그인 세션·참가 토큰은 여전히 **메모리**에만 있어 서버 재시작 시 끊깁니다.
+- 로그인 세션 토큰은 여전히 **메모리**에만 있어 서버 재시작 시 끊깁니다(스태프 응답·이력은 `staff_account_id`로 영속 매칭되므로 재로그인해도 인식됨).
 
 ### 6.3 브라우저에서 쓰는 로그인·대표 URL (로컬 PC, 포트 8000 예시)
 

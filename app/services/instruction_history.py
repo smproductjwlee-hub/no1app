@@ -125,14 +125,24 @@ def list_worker_instruction_history(
     workspace_id: str,
     worker_token: str,
     limit: int = 80,
+    staff_account_id: Optional[str] = None,
 ) -> list[dict[str, Any]]:
-    """このワーカートークンが返信した指示の一覧（新しい順）。"""
+    """このワーカー（個人スタッフ ID または現セッショントークン）が返信した指示の一覧（新しい順）。"""
     conn = get_connection()
     _prune_old(conn)
     conn.commit()
     lim = max(1, min(int(limit), 200))
+    sid = staff_account_id.strip() if isinstance(staff_account_id, str) and staff_account_id.strip() else None
     rows = conn.execute(
         """
+        WITH my_replies AS (
+          SELECT instruction_id, button, custom_text, responded_at,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY instruction_id ORDER BY responded_at DESC
+                 ) AS rn
+          FROM instruction_replies
+          WHERE worker_token = ? OR (? IS NOT NULL AND staff_account_id = ?)
+        )
         SELECT
           r.id AS instruction_id,
           r.text AS text,
@@ -142,12 +152,12 @@ def list_worker_instruction_history(
           rep.custom_text AS custom_text,
           rep.responded_at AS responded_at
         FROM instruction_rounds r
-        INNER JOIN instruction_replies rep ON rep.instruction_id = r.id
-        WHERE r.workspace_id = ? AND rep.worker_token = ?
+        INNER JOIN my_replies rep ON rep.instruction_id = r.id AND rep.rn = 1
+        WHERE r.workspace_id = ?
         ORDER BY r.created_at DESC
         LIMIT ?
         """,
-        (workspace_id, worker_token, lim),
+        (worker_token, sid, sid, workspace_id, lim),
     ).fetchall()
     out: list[dict[str, Any]] = []
     for row in rows:
@@ -170,14 +180,24 @@ def list_worker_instruction_history_ng_only(
     workspace_id: str,
     worker_token: str,
     limit: int = 80,
+    staff_account_id: Optional[str] = None,
 ) -> list[dict[str, Any]]:
-    """「分からない」(button=NG) の返信だけ（新しい順）。"""
+    """「分からない」(button=NG) の返信だけ（新しい順）。最新の応答が NG のみ含む。"""
     conn = get_connection()
     _prune_old(conn)
     conn.commit()
     lim = max(1, min(int(limit), 200))
+    sid = staff_account_id.strip() if isinstance(staff_account_id, str) and staff_account_id.strip() else None
     rows = conn.execute(
         """
+        WITH my_replies AS (
+          SELECT instruction_id, button, custom_text, responded_at,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY instruction_id ORDER BY responded_at DESC
+                 ) AS rn
+          FROM instruction_replies
+          WHERE worker_token = ? OR (? IS NOT NULL AND staff_account_id = ?)
+        )
         SELECT
           r.id AS instruction_id,
           r.text AS text,
@@ -187,12 +207,12 @@ def list_worker_instruction_history_ng_only(
           rep.custom_text AS custom_text,
           rep.responded_at AS responded_at
         FROM instruction_rounds r
-        INNER JOIN instruction_replies rep ON rep.instruction_id = r.id
-        WHERE r.workspace_id = ? AND rep.worker_token = ? AND rep.button = 'NG'
+        INNER JOIN my_replies rep ON rep.instruction_id = r.id AND rep.rn = 1
+        WHERE r.workspace_id = ? AND rep.button = 'NG'
         ORDER BY r.created_at DESC
         LIMIT ?
         """,
-        (workspace_id, worker_token, lim),
+        (worker_token, sid, sid, workspace_id, lim),
     ).fetchall()
     out: list[dict[str, Any]] = []
     for row in rows:
@@ -265,12 +285,17 @@ def worker_can_submit_reply(
     ).fetchone()
     if row is None:
         return False
+    sid = staff_account_id.strip() if isinstance(staff_account_id, str) and staff_account_id.strip() else None
     prev = conn.execute(
         """
         SELECT 1 FROM instruction_replies
-        WHERE instruction_id = ? AND worker_token = ?
+        WHERE instruction_id = ?
+          AND (
+            worker_token = ?
+            OR (? IS NOT NULL AND staff_account_id = ?)
+          )
         """,
-        (instruction_id, worker_token),
+        (instruction_id, worker_token, sid, sid),
     ).fetchone()
     if prev:
         return True
@@ -296,12 +321,16 @@ def list_pending_instructions_for_worker(
         WHERE r.workspace_id = ?
         AND NOT EXISTS (
           SELECT 1 FROM instruction_replies rep
-          WHERE rep.instruction_id = r.id AND rep.worker_token = ?
+          WHERE rep.instruction_id = r.id
+            AND (
+              rep.worker_token = ?
+              OR (? IS NOT NULL AND rep.staff_account_id = ?)
+            )
         )
         ORDER BY r.created_at ASC
         LIMIT 400
         """,
-        (workspace_id, worker_token),
+        (workspace_id, worker_token, sid, sid),
     ).fetchall()
     out: list[dict[str, Any]] = []
     for row in rows:

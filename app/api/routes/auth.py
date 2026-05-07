@@ -25,9 +25,7 @@ from app.services.staff_accounts import staff_accounts
 from app.services.stores import (
     SUPER_WORKSPACE_ID,
     Role,
-    join_tokens,
     sessions,
-    worker_numbers,
     workspaces,
 )
 from app.ws.manager import manager
@@ -35,82 +33,11 @@ from app.ws.manager import manager
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-class JoinRequest(BaseModel):
-    join_token: str = Field(..., min_length=8)
-    user_label: Optional[str] = Field(None, max_length=100)
-
-
-class SessionOut(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    workspace_id: str
-    role: Role
-    expires_in_seconds: int
-    # 근로자 조인 시에만: 화면 표시용 (이름 또는 자동 No.n)
-    worker_display_label: Optional[str] = None
-
-
-def _normalize_worker_label(raw: Optional[str]) -> Optional[str]:
-    if raw is None:
-        return None
-    s = raw.strip()
-    return s if s else None
-
-
-def _exchange_join_token(
-    raw_token: str,
-    user_label: Optional[str],
-    settings: Settings,
-) -> SessionOut:
-    jt = join_tokens.consume(raw_token)
-    if jt is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired join token",
-        )
-    wid = jt.workspace_id
-    label = _normalize_worker_label(user_label)
-    if label is None:
-        label = f"No.{worker_numbers.next(wid)}"
-    sess = sessions.create(
-        wid,
-        Role.WORKER,
-        user_label=label,
-        ttl_seconds=settings.session_token_ttl_seconds,
-    )
-    return SessionOut(
-        access_token=sess.token,
-        workspace_id=sess.workspace_id,
-        role=sess.role,
-        expires_in_seconds=settings.session_token_ttl_seconds,
-        worker_display_label=label,
-    )
-
-
-@router.post("/join", response_model=SessionOut)
-async def join_with_token_post(
-    body: JoinRequest,
-    settings: Settings = Depends(get_settings),
-) -> SessionOut:
-    return _exchange_join_token(body.join_token, body.user_label, settings)
-
-
-@router.get("/join", response_model=SessionOut)
-async def join_with_token_get(
-    token: str = Query(..., min_length=8),
-    user_label: Optional[str] = Query(None, max_length=100),
-    settings: Settings = Depends(get_settings),
-) -> SessionOut:
-    """QR 링크용: GET /api/v1/auth/join?token=... (조인 토큰 1회 소모)."""
-    return _exchange_join_token(token, user_label, settings)
-
-
 class PortalLoginRequest(BaseModel):
     role: Literal["admin", "worker", "super_admin"]
     username: str = Field("", max_length=200)
     password: str = Field(..., min_length=1, max_length=200)
-    user_label: Optional[str] = Field(None, max_length=100)
-    # スタッフ個人アカウント（設定時）: 共有PWではなく DB の個人PWで検証
+    # 現場スタッフは個人アカウント必須（共有パスワード方式は廃止）
     worker_account_login: Optional[str] = Field(None, max_length=100)
 
 
@@ -207,38 +134,25 @@ async def portal_login(
             detail="Workspace not found",
         )
     acc_login = (body.worker_account_login or "").strip()
-    if acc_login:
-        acc = staff_accounts.get_by_workspace_login(ws.id, acc_login)
-        if acc is None or not staff_accounts.verify_password(body.password, acc.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials",
-            )
-        label = (acc.display_name or "").strip() or acc.login_id
-        sess = sessions.create(
-            ws.id,
-            Role.WORKER,
-            label,
-            ttl_seconds=ttl,
-            staff_account_id=acc.id,
+    if not acc_login:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="staff login id required",
         )
-        return PortalLoginOut(
-            access_token=sess.token,
-            role=sess.role,
-            workspace_id=ws.id,
-            workspace_name=ws.name,
-            worker_display_label=label,
-            expires_in_seconds=ttl,
-        )
-    if body.password != settings.portal_worker_password:
+    acc = staff_accounts.get_by_workspace_login(ws.id, acc_login)
+    if acc is None or not staff_accounts.verify_password(body.password, acc.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
-    label = _normalize_worker_label(body.user_label)
-    if label is None:
-        label = f"No.{worker_numbers.next(ws.id)}"
-    sess = sessions.create(ws.id, Role.WORKER, label, ttl_seconds=ttl)
+    label = (acc.display_name or "").strip() or acc.login_id
+    sess = sessions.create(
+        ws.id,
+        Role.WORKER,
+        label,
+        ttl_seconds=ttl,
+        staff_account_id=acc.id,
+    )
     return PortalLoginOut(
         access_token=sess.token,
         role=sess.role,
@@ -374,7 +288,9 @@ async def worker_ng_replies_only(
     limit: int = Query(80, ge=1, le=200),
 ) -> list[dict]:
     sess = _require_worker_session(token)
-    return list_worker_instruction_history_ng_only(sess.workspace_id, sess.token, limit=limit)
+    return list_worker_instruction_history_ng_only(
+        sess.workspace_id, sess.token, limit=limit, staff_account_id=sess.staff_account_id
+    )
 
 
 class WorkerGlossarySaveIn(BaseModel):
@@ -454,7 +370,9 @@ async def worker_instruction_history(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
     if sess.role != Role.WORKER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="worker only")
-    return list_worker_instruction_history(sess.workspace_id, sess.token, limit=limit)
+    return list_worker_instruction_history(
+        sess.workspace_id, sess.token, limit=limit, staff_account_id=sess.staff_account_id
+    )
 
 
 @router.get("/worker-pending-instructions")

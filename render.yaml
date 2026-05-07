@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: workbridge
+    runtime: docker
+    region: singapore
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: workbridge-data
+      mountPath: /app/data
+      sizeGB: 1
+    envVars:
+      - key: DATABASE_URL
+        value: sqlite:////app/data/workbridge.db
+      - key: PORTAL_ADMIN_PASSWORD
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: GOOGLE_CREDENTIALS_PATH
+        value: /etc/secrets/google_key.json

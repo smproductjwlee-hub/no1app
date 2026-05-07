@@ -23,14 +23,11 @@ class Settings(BaseSettings):
     # Base URL for QR / join links (set in production, e.g. https://app.example.com)
     public_base_url: str = "http://127.0.0.1:8000"
 
-    # Join token TTL (seconds)
-    join_token_ttl_seconds: int = 3600
     # Session token TTL (seconds)
     session_token_ttl_seconds: int = 86400
 
-    # ポータルログイン（MVP: .env で本番用に変更）
+    # ポータルログイン（MVP: .env で本番用に変更）。スタッフは個人アカウント必須。
     portal_admin_password: str = "admin"
-    portal_worker_password: str = "worker"
     # 運営会社スーパー管理者（全顧客ワークスペース閲覧用）
     super_admin_password: str = "superadmin"
 
