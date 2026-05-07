@@ -1,4 +1,4 @@
-"""ワークスペース単位の個人スタッフログイン（SQLite）。共有 portal_worker_password と併用可。"""
+"""ワークスペース単位の個人スタッフログイン（SQLite）。スタッフは個人アカウント必須。"""
 
 from __future__ import annotations
 

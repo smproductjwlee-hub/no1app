@@ -135,17 +135,6 @@
     </div>
   </div>
 
-  <!-- 参加用リンク -->
-  <div id="modal-join" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
-    <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
-      <h3 class="font-semibold text-gray-900 mb-2">スタッフ参加用リンク</h3>
-      <p class="text-xs text-gray-600 mb-3">共有パスワードで入るスタッフ向け。リンクは一定時間で切れます。</p>
-      <p class="break-all font-mono text-[11px] text-indigo-900 bg-gray-50 rounded-lg px-2 py-2 border" id="join-url-text"></p>
-      <button type="button" id="btn-copy-join" class="mt-3 text-indigo-700 underline text-sm">コピー</button>
-      <button type="button" id="modal-join-close" class="mt-4 w-full py-2.5 rounded-xl bg-gray-100 text-gray-800 text-sm font-medium">閉じる</button>
-    </div>
-  </div>
-
   <!-- 管理者URL発行 -->
   <div id="modal-admin" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
     <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-5">
@@ -174,7 +163,6 @@
 
       var modalOrg = document.getElementById("modal-org");
       var modalStaff = document.getElementById("modal-staff");
-      var modalJoin = document.getElementById("modal-join");
       var modalAdmin = document.getElementById("modal-admin");
 
       var ctxOrg = { id: null };
@@ -399,11 +387,6 @@
           actions.appendChild(
             mkBtn("スタッフ追加", btnBase + " border-gray-200 bg-white hover:bg-gray-50", function () {
               openStaffModal(w);
-            }),
-          );
-          actions.appendChild(
-            mkBtn("参加リンク", btnBase + " border-gray-200 bg-white hover:bg-gray-50", function () {
-              openJoinModal(w.id);
             }),
           );
           actions.appendChild(
@@ -640,31 +623,6 @@
       });
       modalStaff.addEventListener("click", function (ev) {
         if (ev.target === modalStaff) modalStaff.classList.add("hidden");
-      });
-
-      function openJoinModal(workspaceId) {
-        api("/api/v1/workspaces/" + encodeURIComponent(workspaceId) + "/join-info")
-          .then(function (r) {
-            if (!r.ok) throw new Error();
-            return r.json();
-          })
-          .then(function (d) {
-            document.getElementById("join-url-text").textContent = d.join_url || "";
-            modalJoin.classList.remove("hidden");
-          })
-          .catch(function () {
-            showErr("参加リンクを取得できませんでした。");
-          });
-      }
-      document.getElementById("btn-copy-join").addEventListener("click", function () {
-        var t = document.getElementById("join-url-text").textContent || "";
-        if (t) copyText(t);
-      });
-      document.getElementById("modal-join-close").addEventListener("click", function () {
-        modalJoin.classList.add("hidden");
-      });
-      modalJoin.addEventListener("click", function (ev) {
-        if (ev.target === modalJoin) modalJoin.classList.add("hidden");
       });
 
       function openAdminUrlModal(workspaceId) {

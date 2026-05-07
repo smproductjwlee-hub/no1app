@@ -42,13 +42,6 @@ class Workspace:
 
 
 @dataclass
-class JoinToken:
-    token: str
-    workspace_id: str
-    expires_at: float
-
-
-@dataclass
 class Session:
     token: str
     workspace_id: str
@@ -221,29 +214,6 @@ class WorkspaceStore:
         return _row_to_workspace(r) if r else None
 
 
-class JoinTokenStore:
-    def __init__(self) -> None:
-        self._by_token: dict[str, JoinToken] = {}
-
-    def issue(self, workspace_id: str, ttl_seconds: int) -> JoinToken:
-        raw = secrets.token_urlsafe(24)
-        jt = JoinToken(
-            token=raw,
-            workspace_id=workspace_id,
-            expires_at=time.time() + ttl_seconds,
-        )
-        self._by_token[raw] = jt
-        return jt
-
-    def consume(self, token: str) -> Optional[JoinToken]:
-        jt = self._by_token.pop(token, None)
-        if jt is None:
-            return None
-        if time.time() > jt.expires_at:
-            return None
-        return jt
-
-
 class SessionStore:
     def __init__(self) -> None:
         self._by_token: dict[str, Session] = {}
@@ -278,20 +248,6 @@ class SessionStore:
         return sess
 
 
-class WorkerNumberStore:
-    """워크스페이스별 근로자 자동 번호 (MVP 메모리, 서버 재시작 시 1부터 다시)."""
-
-    def __init__(self) -> None:
-        self._next: dict[str, int] = {}
-
-    def next(self, workspace_id: str) -> int:
-        n = self._next.get(workspace_id, 1)
-        self._next[workspace_id] = n + 1
-        return n
-
-
 # Singletons for MVP
 workspaces = WorkspaceStore()
-join_tokens = JoinTokenStore()
 sessions = SessionStore()
-worker_numbers = WorkerNumberStore()

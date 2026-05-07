@@ -66,18 +66,6 @@
       <button type="button" id="back-role" class="text-sm text-indigo-700 underline underline-offset-2"></button>
       <p id="form-title" class="text-sm font-semibold text-gray-800"></p>
 
-      <div id="worker-mode-wrap" class="hidden space-y-1">
-        <label for="worker-mode" id="worker-mode-section-label" class="block text-xs font-medium text-gray-600">入室のしかた</label>
-        <select
-          id="worker-mode"
-          class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base bg-white text-gray-900"
-        >
-          <option value="shared">共有パスワードで入る（スタッフIDなし）</option>
-          <option value="staff">スタッフ個人アカウントで入る（スタッフID＋個人パスワード）</option>
-        </select>
-        <p id="worker-mode-help" class="text-[11px] text-gray-500 leading-relaxed"></p>
-      </div>
-
       <div id="username-wrap">
         <label for="username" id="username-label" class="block text-xs font-medium text-gray-600">ログインID / ワークスペース</label>
         <input type="text" id="username" autocomplete="username" class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base bg-white" placeholder="" />
@@ -99,11 +87,6 @@
         <label for="password" id="password-label" class="block text-xs font-medium text-gray-600">パスワード</label>
         <input type="password" id="password" autocomplete="current-password" class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base bg-white" placeholder="" />
         <p id="password-hint" class="text-[11px] text-gray-500 mt-1 min-h-[1.1rem]"></p>
-      </div>
-
-      <div id="worker-name-wrap" class="hidden field-optional space-y-1">
-        <label for="user-label" id="worker-display-name-label" class="block text-xs">表示名（省略可）</label>
-        <input type="text" id="user-label" maxlength="100" class="w-full rounded-xl border px-3 py-3 text-base" placeholder="例：山田" />
       </div>
 
       <p id="login-err" class="text-sm text-rose-600 hidden"></p>
@@ -148,15 +131,8 @@
       var password = document.getElementById("password");
       var passwordLabel = document.getElementById("password-label");
       var passwordHint = document.getElementById("password-hint");
-      var userLabel = document.getElementById("user-label");
-      var workerNameWrap = document.getElementById("worker-name-wrap");
-      var workerModeWrap = document.getElementById("worker-mode-wrap");
-      var workerMode = document.getElementById("worker-mode");
-      var workerModeSectionLabel = document.getElementById("worker-mode-section-label");
-      var workerModeHelp = document.getElementById("worker-mode-help");
       var workerStaffWrap = document.getElementById("worker-staff-wrap");
       var workerStaffIdLabel = document.getElementById("worker-staff-id-label");
-      var workerDisplayNameLabel = document.getElementById("worker-display-name-label");
       var workerAccountLogin = document.getElementById("worker-account-login");
       var formFooterHint = document.getElementById("form-footer-hint");
       var btnLogin = document.getElementById("btn-login");
@@ -200,24 +176,11 @@
         if (pw) pw.textContent = loginT("pick_worker");
         if (ps) ps.textContent = loginT("pick_super");
         if (backRole) backRole.textContent = loginT("back");
-        if (workerModeSectionLabel) workerModeSectionLabel.textContent = loginT("worker_entry_mode");
-        var wm = workerMode;
-        if (wm) {
-          var prev = wm.value || "shared";
-          wm.innerHTML =
-            '<option value="shared">' +
-            loginT("mode_shared") +
-            "</option>" +
-            '<option value="staff">' +
-            loginT("mode_staff") +
-            "</option>";
-          wm.value = prev === "staff" ? "staff" : "shared";
-        }
         if (passwordLabel) passwordLabel.textContent = loginT("password_label");
         if (workerStaffIdLabel) workerStaffIdLabel.textContent = loginT("staff_id_label");
-        if (workerDisplayNameLabel) workerDisplayNameLabel.textContent = loginT("display_name_label");
-        if (userLabel) userLabel.setAttribute("placeholder", loginT("display_name_ph"));
-        syncWorkerModeUi();
+        if (role === "worker" && passwordHint) {
+          passwordHint.textContent = loginT("password_hint_staff");
+        }
         syncLoginLangButtons();
         if (role === "admin") {
           if (formTitle) formTitle.textContent = loginT("form_admin");
@@ -236,22 +199,6 @@
         if (btnLogin && !btnLogin.disabled) btnLogin.textContent = loginT("btn_login");
       }
 
-      function syncWorkerModeUi() {
-        if (role !== "worker") return;
-        var mode = workerMode.value || "shared";
-        if (mode === "staff") {
-          workerStaffWrap.classList.remove("hidden");
-          workerNameWrap.classList.add("hidden");
-          workerModeHelp.textContent = loginT("worker_mode_help_staff");
-          passwordHint.textContent = loginT("password_hint_staff");
-        } else {
-          workerStaffWrap.classList.add("hidden");
-          workerNameWrap.classList.remove("hidden");
-          workerModeHelp.textContent = loginT("worker_mode_help_shared");
-          passwordHint.textContent = loginT("password_hint_shared");
-        }
-      }
-
       function showForm(r) {
         role = r;
         stepRole.classList.add("hidden");
@@ -263,29 +210,24 @@
           username.placeholder = loginT("username_admin_ph");
           passwordHint.textContent = "";
           if (formFooterHint) formFooterHint.textContent = loginT("footer_admin");
-          workerModeWrap.classList.add("hidden");
           workerStaffWrap.classList.add("hidden");
-          workerNameWrap.classList.add("hidden");
           usernameWrap.classList.remove("hidden");
           usernameLabel.className = "block text-xs font-medium text-gray-600";
         } else if (r === "super_admin") {
           if (formTitle) formTitle.textContent = loginT("form_super");
           passwordHint.textContent = "";
           if (formFooterHint) formFooterHint.textContent = loginT("footer_super");
-          workerModeWrap.classList.add("hidden");
           workerStaffWrap.classList.add("hidden");
-          workerNameWrap.classList.add("hidden");
           usernameWrap.classList.add("hidden");
         } else {
           if (formTitle) formTitle.textContent = loginT("form_worker");
-          workerMode.value = "shared";
           if (usernameLabel) usernameLabel.textContent = loginT("username_ws");
           username.placeholder = loginT("username_ws_ph");
+          passwordHint.textContent = loginT("password_hint_staff");
           if (formFooterHint) formFooterHint.textContent = loginT("footer_worker");
-          workerModeWrap.classList.remove("hidden");
+          workerStaffWrap.classList.remove("hidden");
           usernameWrap.classList.remove("hidden");
           workerAccountLogin.value = "";
-          syncWorkerModeUi();
         }
         applyLoginLocale();
       }
@@ -311,8 +253,6 @@
           loginLangRow.appendChild(btn);
         });
       }
-
-      workerMode.addEventListener("change", syncWorkerModeUi);
 
       var pickAdmin = document.getElementById("pick-admin");
       var pickWorker = document.getElementById("pick-worker");
@@ -350,14 +290,13 @@
             return;
           }
         } else if (role === "worker") {
-          var mode = workerMode.value || "shared";
           var wal = (workerAccountLogin.value || "").trim();
           if (!u || !p) {
             loginErr.textContent = loginT("err_ws_pw");
             loginErr.classList.remove("hidden");
             return;
           }
-          if (mode === "staff" && !wal) {
+          if (!wal) {
             loginErr.textContent = loginT("err_staff_id");
             loginErr.classList.remove("hidden");
             return;
@@ -373,13 +312,8 @@
           password: p,
         };
         if (role === "worker") {
-          var modeW = workerMode.value || "shared";
-          if (modeW === "staff") {
-            var wid = (workerAccountLogin.value || "").trim();
-            if (wid) body.worker_account_login = wid;
-          }
-          var ul = (userLabel.value || "").trim();
-          if (modeW === "shared" && ul) body.user_label = ul;
+          var wid = (workerAccountLogin.value || "").trim();
+          if (wid) body.worker_account_login = wid;
         }
         btnLogin.disabled = true;
         btnLogin.textContent = loginT("btn_logging_in");

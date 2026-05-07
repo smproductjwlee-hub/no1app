@@ -76,23 +76,17 @@
 
   <div id="gate" class="max-w-md mx-auto px-5 py-10">
 
-    <h1 class="text-xl font-bold text-gray-900 mb-2">リンクまたはログインが必要です</h1>
+    <h1 class="text-xl font-bold text-gray-900 mb-2">ログインが必要です</h1>
 
     <p class="text-gray-600 text-sm leading-relaxed mb-3">
 
-      QR または <code class="bg-gray-100 px-1 rounded text-xs">/worker?join_token=…</code> で開くか、ログイン画面からスタッフとして入ってください。
+      ログイン画面で「現場スタッフ」を選び、ワークスペース名・スタッフID・個人パスワードを入力してください。
 
     </p>
 
     <a id="gate-to-login" href="/login?role=worker" class="inline-flex w-full justify-center py-3 rounded-xl bg-indigo-900 text-white font-semibold text-sm shadow-md hover:bg-indigo-800 transition mb-4">ログイン画面へ</a>
 
     <p id="gate-login-url-hint" class="text-[11px] text-gray-600 leading-relaxed mb-2"></p>
-
-    <p class="text-gray-500 text-xs leading-relaxed">
-
-      表示名（名前）を付ける場合は <code class="bg-gray-100 px-1 rounded text-[10px]">&amp;user_label=山田</code> のように URL に追加できます。未指定の場合は自動で No.1, No.2 … が付きます。
-
-    </p>
 
   </div>
 
@@ -643,10 +637,6 @@
 
 
 
-      var params = new URLSearchParams(location.search);
-
-      var joinToken = params.get("join_token");
-
       var gate = document.getElementById("gate");
 
       var loading = document.getElementById("loading");
@@ -715,7 +705,7 @@
 
       var savedLabel = sessionStorage.getItem("wb_worker_label");
 
-      if (!joinToken && !savedTok) return;
+      if (!savedTok) return;
 
       gate.classList.add("hidden");
 
@@ -2093,85 +2083,43 @@
 
 
 
-      if (savedTok && !joinToken) {
+      fetch("/api/v1/auth/session?token=" + encodeURIComponent(savedTok))
 
-        fetch("/api/v1/auth/session?token=" + encodeURIComponent(savedTok))
+        .then(function (r) {
 
-          .then(function (r) {
+          return r.ok ? r.json() : Promise.reject();
 
-            return r.ok ? r.json() : Promise.reject();
+        })
 
-          })
+        .then(function (info) {
 
-          .then(function (info) {
+          var lab =
 
-            var lab =
+            (info && typeof info.worker_display_label === "string"
 
-              (info && typeof info.worker_display_label === "string"
+              ? info.worker_display_label
 
-                ? info.worker_display_label
+              : null) ||
 
-                : null) ||
+            savedLabel ||
 
-              savedLabel ||
+            "";
 
-              "";
+          if (info && typeof info.worker_display_label === "string") {
 
-            if (info && typeof info.worker_display_label === "string") {
+            sessionStorage.setItem("wb_worker_label", lab);
 
-              sessionStorage.setItem("wb_worker_label", lab);
+          }
 
-            }
+          finishAuth({ access_token: savedTok, worker_display_label: lab });
 
-            finishAuth({ access_token: savedTok, worker_display_label: lab });
+        })
 
-          })
+        .catch(function () {
 
-          .catch(function () {
+          finishAuth({ access_token: savedTok, worker_display_label: savedLabel || "" });
 
-            finishAuth({ access_token: savedTok, worker_display_label: savedLabel || "" });
-
-          });
-
-      } else {
-
-        (function () {
-
-          var joinQs = "token=" + encodeURIComponent(joinToken);
-
-          var nameParam = params.get("user_label");
-
-          if (nameParam) joinQs += "&user_label=" + encodeURIComponent(nameParam);
-
-          return fetch("/api/v1/auth/join?" + joinQs);
-
-        })()
-
-          .then(function (r) {
-
-            if (!r.ok) throw new Error("join failed");
-
-            return r.json();
-
-          })
-
-          .then(function (data) {
-
-            sessionStorage.setItem("wb_worker_token", data.access_token);
-
-            sessionStorage.setItem("wb_worker_label", data.worker_display_label || "");
-
-            finishAuth(data);
-
-          })
-
-          .catch(function () {
-
-            loading.innerHTML = "<p class=\"text-rose-600 text-sm\">参加に失敗しました。リンクの有効期限を確認してください。</p>";
-
-          });
-
-      }
+        });
 
 
 

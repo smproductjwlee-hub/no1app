@@ -124,8 +124,7 @@
           <button type="button" id="m-alarm-settings" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="menu_alarm">
             通知・アラーム
           </button>
-          <button type="button" id="m-qr" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100" data-i18n="qr">QRコード（参加用）</button>
-          <button type="button" id="m-words" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="words">用語・単語登録</button>
+          <button type="button" id="m-words" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100" data-i18n="words">用語・単語登録</button>
           <button type="button" id="m-users" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800" data-i18n="users">スタッフ登録</button>
           <button type="button" id="m-myinfo" class="w-full text-left px-3 py-2.5 hover:bg-gray-50 text-gray-800 border-t border-gray-100" data-i18n="myinfo">マイ情報</button>
           <button type="button" id="m-logout" class="w-full text-left px-3 py-2.5 text-rose-600 hover:bg-rose-50 border-t border-gray-100" data-i18n="logout">ログアウト</button>
@@ -620,17 +619,6 @@
     </div>
   </div>
 
-  <div id="modal-qr" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl">
-      <h3 class="font-semibold text-gray-900 mb-2" data-i18n="modal_qr_title">参加用 QR</h3>
-      <img id="qr-img" alt="QR" class="mx-auto w-48 h-48 object-contain border rounded-lg bg-white" />
-      <p class="text-[11px] text-gray-500 mt-2 break-all" id="qr-url-text"></p>
-      <p id="modal-qr-tip" class="text-[10px] text-amber-900 bg-amber-50 rounded-lg px-2 py-2 mt-2 leading-relaxed border border-amber-100" data-i18n="modal_qr_tip">
-        スマホで読み取る場合: .env の PUBLIC_BASE_URL を PC の LAN アドレスにし、サーバーを --host 0.0.0.0 で起動してください。127.0.0.1 はスマホ自身を指します。
-      </p>
-      <button type="button" id="modal-qr-close" class="mt-4 w-full py-2 rounded-xl bg-gray-100 font-medium text-gray-800" data-i18n="modal_qr_close">閉じる</button>
-    </div>
-  </div>
   <div id="modal-words" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
     <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl text-sm text-gray-700">
       <h3 class="font-semibold text-gray-900 mb-2" data-i18n="modal_words_title">用語・単語登録</h3>
@@ -2126,31 +2114,6 @@
         });
         document.addEventListener("click", function () {
           menuDropdown.classList.add("hidden");
-        });
-        document.getElementById("m-qr").addEventListener("click", function (e) {
-          e.stopPropagation();
-          menuDropdown.classList.add("hidden");
-          var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
-          if (!wid) {
-            alert(t("alert_no_ws"));
-            return;
-          }
-          document.getElementById("qr-img").src =
-            "/api/v1/workspaces/" + encodeURIComponent(wid) + "/qr.png";
-          fetch("/api/v1/workspaces/" + encodeURIComponent(wid) + "/join-info")
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (j) {
-              document.getElementById("qr-url-text").textContent = j.join_url || "";
-            })
-            .catch(function () {
-              document.getElementById("qr-url-text").textContent = t("alert_qr_fail");
-            });
-          document.getElementById("modal-qr").classList.remove("hidden");
-        });
-        document.getElementById("modal-qr-close").addEventListener("click", function () {
-          document.getElementById("modal-qr").classList.add("hidden");
         });
         document.getElementById("m-words").addEventListener("click", function (e) {
           e.stopPropagation();

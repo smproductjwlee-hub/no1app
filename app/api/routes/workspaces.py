@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import io
 import uuid
 from typing import Any, Optional
-
-import qrcode
 
 # 管理者 UI 言語（Chrome 等の Web Speech API で実用しやすいもののみ）
 ALLOWED_ADMIN_UI_LOCALES = frozenset({"ja", "en", "ko", "zh", "vi", "id"})
@@ -17,7 +14,7 @@ from app.services.instruction_images import save_instruction_image_bytes
 from app.services.staff_avatar_files import save_admin_square_jpeg, save_square_jpeg
 from app.services.staff_accounts import PATCH_OMIT, staff_accounts
 from app.services.staff_groups import staff_groups
-from app.services.stores import Role, Workspace, join_tokens, sessions, workspaces
+from app.services.stores import Role, Workspace, sessions, workspaces
 from app.services.ws_presence import ws_presence
 from app.services.workspace_expression_terms import workspace_expression_terms
 from app.services.workspace_glossary_terms import workspace_glossary_terms
@@ -38,13 +35,6 @@ class WorkspaceOut(BaseModel):
     id: str
     name: str
     admin_token: str
-
-
-class JoinInfoOut(BaseModel):
-    workspace_id: str
-    join_url: str
-    join_token: str
-    expires_in_seconds: int
 
 
 class OnlineWorkerRow(BaseModel):
@@ -605,40 +595,6 @@ async def create_workspace(
         ttl_seconds=settings.session_token_ttl_seconds,
     )
     return WorkspaceOut(id=ws.id, name=ws.name, admin_token=admin_sess.token)
-
-
-@router.get("/{workspace_id}/join-info", response_model=JoinInfoOut)
-async def get_join_info(
-    workspace_id: str,
-    settings: Settings = Depends(get_settings),
-) -> JoinInfoOut:
-    ws = workspaces.get(workspace_id)
-    if ws is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
-    jt = join_tokens.issue(workspace_id, settings.join_token_ttl_seconds)
-    join_url = f"{settings.public_base_url.rstrip('/')}/worker?join_token={jt.token}"
-    return JoinInfoOut(
-        workspace_id=workspace_id,
-        join_url=join_url,
-        join_token=jt.token,
-        expires_in_seconds=settings.join_token_ttl_seconds,
-    )
-
-
-@router.get("/{workspace_id}/qr.png")
-async def workspace_join_qr_png(
-    workspace_id: str,
-    settings: Settings = Depends(get_settings),
-) -> Response:
-    ws = workspaces.get(workspace_id)
-    if ws is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
-    jt = join_tokens.issue(workspace_id, settings.join_token_ttl_seconds)
-    join_url = f"{settings.public_base_url.rstrip('/')}/worker?join_token={jt.token}"
-    img = qrcode.make(join_url)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return Response(content=buf.getvalue(), media_type="image/png")
 
 
 @router.post("/{workspace_id}/glossary-terms", status_code=status.HTTP_201_CREATED)
