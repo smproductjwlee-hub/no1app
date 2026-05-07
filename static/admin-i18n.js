@@ -545,7 +545,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_admin_p: "같은 워크스페이스 이름으로 관리자 로그인하면 같은 현장에 다른 관리자 세션이 추가됩니다. 비밀번호는 고객 공유 비밀번호입니다.",
     pc_words_title: "용어·단어 등록(PC)",
     pc_words_p:
-      "스프레드시트 편집과 함께 위의 「현장 스태프용 용어 추가」에서 이 현장 전용 용어를 등록할 수 있습니다(중복 불가). 아래 시나리오·용어에서 API를 확인합니다.",
+      "스프레드시트 편집과 함께 위의 「용어」「표현」 추가로 이 현장 전용 데이터를 SQLite에 저장할 수 있습니다(시트 원본은 변경하지 않습니다). 아래 시나리오·용어에서 API를 확인합니다.",
     wg_section_title: "현장 스태프용 용어 추가",
     wg_help:
       "분야(시트 탭)를 고른 뒤 일본어 단어·뜻·설명을 입력합니다. 시트에 같은 단어가 있거나 이 현장에서 이미 등록한 단어는 등록되지 않습니다. 스태프 용어 목록·학습 영역에 표시됩니다.",
@@ -766,7 +766,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_admin_p: "使用相同工作区名以管理员登录时，会在同一场地增加另一管理员会话。密码为客户共享密码。",
     pc_words_title: "术语·词汇登记（PC）",
     pc_words_p:
-      "除编辑 Google 表格外，可在上方「为现场员工添加术语」登记本现场用语（不可重复）。下方「场景·术语」可查看 API。",
+      "除编辑 Google 表格外，可在上方「术语」「表达」添加处将本现场专用数据保存至 SQLite（不修改表格本身）。下方「场景·术语」可查看 API。",
     wg_section_title: "为现场员工添加术语",
     wg_help:
       "先选择领域（工作表标签），再填写日语词汇、释义与说明。若表中已有相同词或本现场已登记，则无法重复添加。员工在术语列表与学习区可见。",
@@ -989,7 +989,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_admin_p: "Phiên quản trị khác tham gia cùng hiện trường khi đăng nhập quản trị cùng tên workspace. Mật khẩu là mật khẩu dùng chung cho khách.",
     pc_words_title: "Đăng ký thuật ngữ (PC)",
     pc_words_p:
-      "Chỉnh Google Sheets và dùng mục « Thêm thuật ngữ cho nhân viên » phía trên để thêm cho hiện trường (không trùng). Xem API ở « Kịch bản · thuật ngữ ».",
+      "Chỉnh Google Sheets và dùng « Thuật ngữ » / « Diễn đạt » phía trên để lưu dữ liệu riêng hiện trường vào SQLite (không đổi sheet). Xem API ở « Kịch bản · thuật ngữ ».",
     wg_section_title: "Thêm thuật ngữ cho nhân viên hiện trường",
     wg_help:
       "Chọn lĩnh vực (tab sheet), nhập từ・nghĩa・ghi chú tiếng Nhật. Không đăng ký được nếu đã có trên sheet hoặc đã thêm cho không gian làm việc này.",
@@ -1213,7 +1213,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_admin_p: "Sesi admin lain bergabung ke lokasi yang sama saat login admin dengan nama workspace yang sama. Kata sandi adalah kata sandi bersama pelanggan.",
     pc_words_title: "Pendaftaran istilah (PC)",
     pc_words_p:
-      "Edit Google Sheets dan gunakan « Tambah istilah untuk staf » di atas untuk istilah khusus lokasi (tanpa duplikat). Pratinjau API di « Skenario · istilah ».",
+      "Edit Google Sheets dan gunakan « Istilah » / « Ungkapan » di atas untuk menyimpan data khusus lokasi di SQLite (sheet tidak diubah). Pratinjau API di « Skenario · istilah ».",
     wg_section_title: "Tambah istilah untuk staf lapangan",
     wg_help:
       "Pilih bidang (tab sheet), lalu isi kata・arti・catatan bahasa Jepang. Tidak bisa jika sudah ada di sheet atau sudah didaftarkan untuk workspace ini.",
