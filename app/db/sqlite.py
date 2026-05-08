@@ -158,13 +158,27 @@ class _PgConnAdapter:
 
 
 def _build_pg_pool():
+    import psycopg
     from psycopg_pool import ConnectionPool
     url = _database_url()
-    # Supabase Pooler (port 6543, mode=transaction) を推奨。直接接続(5432)でも動くが、
-    # connection 数が増えると Supabase の上限(60-200)に当たるので Pooler が安全。
+    # ログに出ても安全なように password を伏せる
+    safe_url = re.sub(r":[^:@/]+@", ":***@", url)
+    # スモークテスト: プール構築前に実際の接続を試して、本当のエラーを表面化させる
+    # （PoolTimeout が本当の原因をマスクしてしまうのを避ける）
+    print(f"[db] testing Postgres connection to: {safe_url}")
+    try:
+        with psycopg.connect(url, connect_timeout=10) as test_conn:
+            test_conn.execute("SELECT 1").fetchone()
+        print("[db] Postgres smoke test OK")
+    except Exception as e:
+        raise RuntimeError(
+            f"Cannot connect to Postgres ({safe_url}): {type(e).__name__}: {e}"
+        ) from e
+    # Supabase Pooler (port 6543, mode=transaction) を推奨。
+    # min_size=1 で起動を速く（後で必要に応じて増える）。
     return ConnectionPool(
         url,
-        min_size=2,
+        min_size=1,
         max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "16")),
         timeout=30,
         max_lifetime=3600,
