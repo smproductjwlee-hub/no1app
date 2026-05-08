@@ -549,15 +549,6 @@
     </div>
     </div>
 
-    <div
-      id="admin-locale-dock"
-      class="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200/80 bg-white/95 backdrop-blur-md shadow-[0_-4px_12px_rgba(0,0,0,0.06)]"
-    >
-      <div class="max-w-md mx-auto px-2 pt-1.5 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        <p class="text-[10px] text-gray-500 text-center mb-1" data-i18n="locale_quick_caption">表示言語（タップで切替・自動保存）</p>
-        <div class="flex justify-center gap-1.5 flex-wrap" id="admin-locale-buttons-dock"></div>
-      </div>
-    </div>
   </div>
 
   <div id="modal-inst-detail" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
@@ -1266,7 +1257,6 @@
 
       var _adminLocaleRowsInit = mergeAdminLocaleTargets(null);
       setupLocaleButtons(document.getElementById("admin-locale-buttons-micro"), _adminLocaleRowsInit);
-      setupLocaleButtons(document.getElementById("admin-locale-buttons-dock"), _adminLocaleRowsInit);
       syncLocaleQuickButtons();
       syncSendTargetVisibility();
 
@@ -1300,7 +1290,6 @@
             })
             .then(function (localeRows) {
               setupLocaleButtons(document.getElementById("admin-locale-buttons-micro"), localeRows);
-              setupLocaleButtons(document.getElementById("admin-locale-buttons-dock"), localeRows);
               syncLocaleQuickButtons();
               applyAdminLocale(adminLocale);
             });
