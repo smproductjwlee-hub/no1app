@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.services.workspace_chat import append as chat_append, list_recent as chat_list_recent
 
+from app.api.deps import run_db
 from app.core.config import Settings, get_settings
 from app.services.instruction_history import (
     list_pending_instructions_for_worker,
@@ -112,7 +113,9 @@ async def portal_login(
                 detail="Invalid credentials",
             )
         name = body.username.strip() or "default"
-        ws = workspaces.find_by_name(name) or workspaces.create(name)
+        ws = await run_db(workspaces.find_by_name, name)
+        if ws is None:
+            ws = await run_db(workspaces.create, name)
         sess = sessions.create(ws.id, Role.ADMIN, "admin", ttl_seconds=ttl)
         return PortalLoginOut(
             access_token=sess.token,
@@ -127,7 +130,7 @@ async def portal_login(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="username required",
         )
-    ws = _resolve_workspace(body.username)
+    ws = await run_db(_resolve_workspace, body.username)
     if ws is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -139,8 +142,8 @@ async def portal_login(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="staff login id required",
         )
-    acc = staff_accounts.get_by_workspace_login(ws.id, acc_login)
-    if acc is None or not staff_accounts.verify_password(body.password, acc.password_hash):
+    acc = await run_db(staff_accounts.get_by_workspace_login, ws.id, acc_login)
+    if acc is None or not await run_db(staff_accounts.verify_password, body.password, acc.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
@@ -175,7 +178,7 @@ async def session_info(token: str = Query(..., min_length=8)) -> dict:
             "workspace_name": None,
             "role": sess.role.value,
         }
-    ws = workspaces.get(sess.workspace_id)
+    ws = await run_db(workspaces.get, sess.workspace_id)
     out: dict = {
         "workspace_id": sess.workspace_id,
         "workspace_name": ws.name if ws else None,
@@ -208,7 +211,7 @@ async def worker_profile(token: str = Query(..., min_length=8)) -> dict[str, Any
     }
     if not sess.staff_account_id:
         return out
-    acc = staff_accounts.get(sess.staff_account_id)
+    acc = await run_db(staff_accounts.get, sess.staff_account_id)
     if acc is None or acc.workspace_id != wid:
         return out
     out["login_id"] = acc.login_id
@@ -234,12 +237,12 @@ async def worker_change_password(
     sess = _require_worker_session(token)
     if not sess.staff_account_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="staff account required")
-    acc = staff_accounts.get(sess.staff_account_id)
+    acc = await run_db(staff_accounts.get, sess.staff_account_id)
     if acc is None or acc.workspace_id != sess.workspace_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="account not found")
-    if not staff_accounts.verify_password(body.current_password, acc.password_hash):
+    if not await run_db(staff_accounts.verify_password, body.current_password, acc.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid current password")
-    staff_accounts.update(acc.id, sess.workspace_id, plain_password=body.new_password)
+    await run_db(staff_accounts.update, acc.id, sess.workspace_id, plain_password=body.new_password)
     return {"ok": True}
 
 
@@ -251,17 +254,17 @@ async def worker_upload_own_avatar(
     sess = _require_worker_session(token)
     if not sess.staff_account_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="staff account required")
-    acc = staff_accounts.get(sess.staff_account_id)
+    acc = await run_db(staff_accounts.get, sess.staff_account_id)
     if acc is None or acc.workspace_id != sess.workspace_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="account not found")
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="empty file")
     try:
-        ts = save_square_jpeg(acc.id, content)
+        ts = await run_db(save_square_jpeg, acc.id, content)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
-    a = staff_accounts.update(acc.id, sess.workspace_id, avatar_updated_at=ts)
+    a = await run_db(staff_accounts.update, acc.id, sess.workspace_id, avatar_updated_at=ts)
     if a is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="account not found")
     return {
@@ -275,10 +278,10 @@ async def worker_delete_own_avatar(token: str = Query(..., min_length=8)) -> dic
     sess = _require_worker_session(token)
     if not sess.staff_account_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="staff account required")
-    acc = staff_accounts.get(sess.staff_account_id)
+    acc = await run_db(staff_accounts.get, sess.staff_account_id)
     if acc is None or acc.workspace_id != sess.workspace_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="account not found")
-    staff_accounts.clear_avatar_image(acc.id, sess.workspace_id)
+    await run_db(staff_accounts.clear_avatar_image, acc.id, sess.workspace_id)
     return {"ok": True}
 
 
@@ -288,8 +291,9 @@ async def worker_ng_replies_only(
     limit: int = Query(80, ge=1, le=200),
 ) -> list[dict]:
     sess = _require_worker_session(token)
-    return list_worker_instruction_history_ng_only(
-        sess.workspace_id, sess.token, limit=limit, staff_account_id=sess.staff_account_id
+    return await run_db(
+        list_worker_instruction_history_ng_only,
+        sess.workspace_id, sess.token, limit=limit, staff_account_id=sess.staff_account_id,
     )
 
 
@@ -308,7 +312,7 @@ async def worker_list_glossary_saves(
     sess = _require_worker_session(token)
     if not sess.staff_account_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="staff account required")
-    return worker_glossary_saves.list(sess.workspace_id, sess.staff_account_id, kind, limit=limit)
+    return await run_db(worker_glossary_saves.list, sess.workspace_id, sess.staff_account_id, kind, limit=limit)
 
 
 @router.post("/worker-glossary-saves")
@@ -319,7 +323,8 @@ async def worker_add_glossary_save(
     sess = _require_worker_session(token)
     if not sess.staff_account_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="staff account required")
-    row = worker_glossary_saves.add(
+    row = await run_db(
+        worker_glossary_saves.add,
         sess.workspace_id,
         sess.staff_account_id,
         body.kind,
@@ -339,7 +344,7 @@ async def worker_remove_glossary_save(
     sess = _require_worker_session(token)
     if not sess.staff_account_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="staff account required")
-    ok = worker_glossary_saves.delete(sess.workspace_id, sess.staff_account_id, save_id)
+    ok = await run_db(worker_glossary_saves.delete, sess.workspace_id, sess.staff_account_id, save_id)
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="not found")
     return {"ok": True}
@@ -356,7 +361,7 @@ async def worker_food_glossary_merged(
 ) -> Any:
     """Google シートの用語＋当ワークスペース管理者が追加した用語を結合して返す。"""
     sess = _require_worker_session(token)
-    return workspace_glossary_terms.merged_food_glossary(sess.workspace_id, settings, sheet_gid)
+    return await run_db(workspace_glossary_terms.merged_food_glossary, sess.workspace_id, settings, sheet_gid)
 
 
 @router.get("/worker-instruction-history")
@@ -370,8 +375,9 @@ async def worker_instruction_history(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
     if sess.role != Role.WORKER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="worker only")
-    return list_worker_instruction_history(
-        sess.workspace_id, sess.token, limit=limit, staff_account_id=sess.staff_account_id
+    return await run_db(
+        list_worker_instruction_history,
+        sess.workspace_id, sess.token, limit=limit, staff_account_id=sess.staff_account_id,
     )
 
 
@@ -386,7 +392,8 @@ async def worker_pending_instructions(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
     if sess.role != Role.WORKER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="worker only")
-    return list_pending_instructions_for_worker(
+    return await run_db(
+        list_pending_instructions_for_worker,
         sess.workspace_id,
         sess.token,
         sess.staff_account_id,
@@ -405,7 +412,8 @@ async def worker_recent_instructions(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
     if sess.role != Role.WORKER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="worker only")
-    return list_recent_eligible_instructions(
+    return await run_db(
+        list_recent_eligible_instructions,
         sess.workspace_id,
         sess.token,
         sess.staff_account_id,
@@ -431,14 +439,15 @@ async def worker_instruction_reply_rest(
     if sess.role != Role.WORKER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="worker only")
     wid = sess.workspace_id
-    if not worker_can_submit_reply(wid, body.instruction_id, sess.token, sess.staff_account_id):
+    if not await run_db(worker_can_submit_reply, wid, body.instruction_id, sess.token, sess.staff_account_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not allowed for this instruction")
     custom_text: Optional[str] = None
     if body.button == "CUSTOM":
         if isinstance(body.custom_text, str):
             s = body.custom_text.strip()
             custom_text = s[:4000] if s else None
-    ok = record_reply(
+    ok = await run_db(
+        record_reply,
         wid,
         body.instruction_id,
         sess.token,
@@ -474,7 +483,7 @@ async def super_assume_workspace(
     s = sessions.get(body.super_token)
     if s is None or s.role != Role.SUPER_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="super admin only")
-    ws = workspaces.get(body.workspace_id)
+    ws = await run_db(workspaces.get, body.workspace_id)
     if ws is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     admin_sess = sessions.create(
@@ -505,7 +514,7 @@ async def get_chat_messages(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
     if sess.role == Role.SUPER_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not available for super admin")
-    return chat_list_recent(sess.workspace_id, limit=limit)
+    return await run_db(chat_list_recent, sess.workspace_id, limit=limit)
 
 
 @router.post("/chat-message")
@@ -526,7 +535,8 @@ async def post_chat_message(
     ts = time.time()
     if sess.role == Role.ADMIN:
         lab = (sess.user_label or "").strip() or "管理者"
-        row = chat_append(
+        row = await run_db(
+            chat_append,
             wid,
             from_role="admin",
             from_label=lab,
@@ -545,7 +555,8 @@ async def post_chat_message(
         return {"ok": True, "id": row["id"]}
     if sess.role == Role.WORKER:
         wlab = (sess.user_label or "").strip() or "?"
-        row = chat_append(
+        row = await run_db(
+            chat_append,
             wid,
             from_role="worker",
             from_label=wlab,

@@ -7,6 +7,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, WebSocket, status
 from starlette.websockets import WebSocketDisconnect
 
+from app.api.deps import run_db
 from app.services.instruction_history import create_round, record_reply
 from app.services.instruction_images import is_allowed_instruction_image_url
 from app.services.staff_accounts import staff_accounts
@@ -89,7 +90,8 @@ async def comm_websocket(websocket: WebSocket) -> None:
 
     workspace_id = sess.workspace_id
     await manager.connect(workspace_id, websocket, sess.token)
-    ws_presence.upsert(
+    await run_db(
+        ws_presence.upsert,
         workspace_id,
         session_token=sess.token,
         role=sess.role,
@@ -115,7 +117,7 @@ async def comm_websocket(websocket: WebSocket) -> None:
                 continue
 
             msg_type = payload.get("type")
-            ws_presence.touch(workspace_id, session_token=sess.token)
+            await run_db(ws_presence.touch, workspace_id, session_token=sess.token)
             if msg_type == "ping":
                 await websocket.send_json({"type": "pong"})
                 continue
@@ -148,12 +150,12 @@ async def comm_websocket(websocket: WebSocket) -> None:
                     gids = list(dict.fromkeys(gids))
                     if gids:
                         for gid in gids:
-                            token_set |= _worker_tokens_in_group(workspace_id, gid)
+                            token_set |= await run_db(_worker_tokens_in_group, workspace_id, gid)
                         mode_str = "group"
                         target_gid = ",".join(gids) if len(gids) > 1 else gids[0]
                 elif isinstance(raw_group, str) and raw_group.strip():
                     target_gid = raw_group.strip()
-                    token_set = _worker_tokens_in_group(workspace_id, target_gid)
+                    token_set = await run_db(_worker_tokens_in_group, workspace_id, target_gid)
                     mode_str = "group"
                 elif isinstance(targets, list) and len(targets) > 0:
                     token_set = {t for t in targets if isinstance(t, str) and t.strip()}
@@ -167,7 +169,8 @@ async def comm_websocket(websocket: WebSocket) -> None:
                     mode_str = "broadcast"
 
                 rec_payload = _recipients_payload(workspace_id, token_set)
-                instruction_id = create_round(
+                instruction_id = await run_db(
+                    create_round,
                     workspace_id,
                     body,
                     mode_str,
@@ -234,7 +237,8 @@ async def comm_websocket(websocket: WebSocket) -> None:
                 elif btn == "CUSTOM":
                     custom_text = None
                 if iid:
-                    record_reply(
+                    await run_db(
+                        record_reply,
                         workspace_id,
                         iid,
                         sess.token,
@@ -270,7 +274,8 @@ async def comm_websocket(websocket: WebSocket) -> None:
                     await websocket.send_json({"type": "error", "detail": "empty_text"})
                     continue
                 lab = (sess.user_label or "").strip() or "管理者"
-                row = chat_append(
+                row = await run_db(
+                    chat_append,
                     workspace_id,
                     from_role="admin",
                     from_label=lab,
@@ -299,7 +304,8 @@ async def comm_websocket(websocket: WebSocket) -> None:
                     await websocket.send_json({"type": "error", "detail": "empty_text"})
                     continue
                 wlab = (sess.user_label or "").strip() or "?"
-                row = chat_append(
+                row = await run_db(
+                    chat_append,
                     workspace_id,
                     from_role="worker",
                     from_label=wlab,
@@ -336,7 +342,10 @@ async def comm_websocket(websocket: WebSocket) -> None:
         pass
     finally:
         manager.disconnect(workspace_id, websocket)
-        ws_presence.delete(workspace_id, session_token=sess.token)
+        try:
+            await run_db(ws_presence.delete, workspace_id, session_token=sess.token)
+        except Exception:
+            pass
         await manager.broadcast_json(
             workspace_id,
             {

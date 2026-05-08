@@ -8,6 +8,7 @@ ALLOWED_ADMIN_UI_LOCALES = frozenset({"ja", "en", "ko", "zh", "vi", "id"})
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field
 
+from app.api.deps import run_db
 from app.core.config import Settings, get_settings
 from app.services.instruction_history import get_detail, list_rounds
 from app.services.instruction_images import save_instruction_image_bytes
@@ -168,6 +169,7 @@ async def list_all_workspaces(super_token: str = Query(..., description="総運�
     sess = sessions.get(super_token)
     if sess is None or sess.role != Role.SUPER_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="super admin only")
+    rows = await run_db(workspaces.list_all)
     return [
         WorkspaceListRow(
             id=w.id,
@@ -176,7 +178,7 @@ async def list_all_workspaces(super_token: str = Query(..., description="総運�
             branch_name=w.branch_name or "",
             department_name=w.department_name or "",
         )
-        for w in workspaces.list_all()
+        for w in rows
     ]
 
 
@@ -189,7 +191,7 @@ async def reorder_workspaces_super(
     if sess is None or sess.role != Role.SUPER_ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="super admin only")
     try:
-        workspaces.reorder_super(body.ordered_workspace_ids)
+        await run_db(workspaces.reorder_super, body.ordered_workspace_ids)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -224,7 +226,7 @@ async def get_workspace_org(
     super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
 ) -> WorkspaceOrgOut:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    ws = workspaces.get(workspace_id)
+    ws = await run_db(workspaces.get, workspace_id)
     if ws is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     return _workspace_org_out(ws)
@@ -240,7 +242,7 @@ async def patch_workspace_org(
     _require_admin_or_super(workspace_id, admin_token, super_token)
     d = body.model_dump(exclude_unset=True)
     if d.pop("clear_admin_avatar", None):
-        workspaces.clear_admin_avatar(workspace_id)
+        await run_db(workspaces.clear_admin_avatar, workspace_id)
     if "admin_ui_locale" in d and d["admin_ui_locale"] is not None:
         al = str(d["admin_ui_locale"]).strip()
         if al and al not in ALLOWED_ADMIN_UI_LOCALES:
@@ -254,9 +256,9 @@ async def patch_workspace_org(
             org_kw[key] = d[key]
     ws: Optional[Workspace] = None
     if org_kw:
-        ws = workspaces.update_org(workspace_id, **org_kw)
+        ws = await run_db(workspaces.update_org, workspace_id, **org_kw)
     if ws is None:
-        ws = workspaces.get(workspace_id)
+        ws = await run_db(workspaces.get, workspace_id)
     if ws is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     return _workspace_org_out(ws)
@@ -273,17 +275,17 @@ async def upload_admin_avatar(
     file: UploadFile = File(...),
 ) -> WorkspaceOrgOut:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    if workspaces.get(workspace_id) is None:
+    if await run_db(workspaces.get, workspace_id) is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="empty file")
     try:
-        ts = save_admin_square_jpeg(workspace_id, content)
+        ts = await run_db(save_admin_square_jpeg, workspace_id, content)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
-    workspaces.set_admin_avatar_updated_at(workspace_id, ts)
-    ws = workspaces.get(workspace_id)
+    await run_db(workspaces.set_admin_avatar_updated_at, workspace_id, ts)
+    ws = await run_db(workspaces.get, workspace_id)
     if ws is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     return _workspace_org_out(ws)
@@ -324,7 +326,8 @@ async def list_staff_groups(
     super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
 ) -> list[StaffGroupOut]:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    return [_group_row(g) for g in staff_groups.list_for_workspace(workspace_id)]
+    rows = await run_db(staff_groups.list_for_workspace, workspace_id)
+    return [_group_row(g) for g in rows]
 
 
 @router.post(
@@ -340,7 +343,7 @@ async def create_staff_group(
 ) -> StaffGroupOut:
     _require_admin_or_super(workspace_id, admin_token, super_token)
     try:
-        g = staff_groups.create(workspace_id, body.name)
+        g = await run_db(staff_groups.create, workspace_id, body.name)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return _group_row(g)
@@ -356,7 +359,7 @@ async def patch_staff_group(
 ) -> StaffGroupOut:
     _require_admin_or_super(workspace_id, admin_token, super_token)
     try:
-        g = staff_groups.rename(group_id, workspace_id, body.name)
+        g = await run_db(staff_groups.rename, group_id, workspace_id, body.name)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     if g is None:
@@ -372,7 +375,7 @@ async def delete_staff_group(
     super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
 ) -> Response:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    if not staff_groups.delete(group_id, workspace_id):
+    if not await run_db(staff_groups.delete, group_id, workspace_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -384,7 +387,8 @@ async def list_staff_accounts(
     super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
 ) -> list[StaffAccountOut]:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    return [_staff_row(a) for a in staff_accounts.list_for_workspace(workspace_id)]
+    rows = await run_db(staff_accounts.list_for_workspace, workspace_id)
+    return [_staff_row(a) for a in rows]
 
 
 @router.post(
@@ -399,10 +403,11 @@ async def create_staff_account(
     super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
 ) -> StaffAccountOut:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    if body.group_id and staff_groups.get(body.group_id, workspace_id) is None:
+    if body.group_id and await run_db(staff_groups.get, body.group_id, workspace_id) is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid group_id")
     try:
-        a = staff_accounts.create(
+        a = await run_db(
+            staff_accounts.create,
             workspace_id,
             body.login_id,
             body.display_name,
@@ -432,15 +437,16 @@ async def patch_staff_account(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     d = body.model_dump(exclude_unset=True)
     if d.get("clear_avatar"):
-        staff_accounts.clear_avatar_image(account_id, workspace_id)
+        await run_db(staff_accounts.clear_avatar_image, account_id, workspace_id)
     d.pop("clear_avatar", None)
     gid_kw = PATCH_OMIT
     if "group_id" in d:
         raw_g = d["group_id"]
         gid_kw = (str(raw_g).strip() or None) if raw_g is not None else None
-        if gid_kw and staff_groups.get(gid_kw, workspace_id) is None:
+        if gid_kw and await run_db(staff_groups.get, gid_kw, workspace_id) is None:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid group_id")
-    a = staff_accounts.update(
+    a = await run_db(
+        staff_accounts.update,
         account_id,
         workspace_id,
         display_name=d["display_name"] if "display_name" in d else PATCH_OMIT,
@@ -471,17 +477,17 @@ async def upload_staff_avatar(
         uuid.UUID(account_id)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
-    acc = staff_accounts.get(account_id)
+    acc = await run_db(staff_accounts.get, account_id)
     if acc is None or acc.workspace_id != workspace_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     content = await file.read()
     if not content:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="empty file")
     try:
-        ts = save_square_jpeg(account_id, content)
+        ts = await run_db(save_square_jpeg, account_id, content)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
-    a = staff_accounts.update(account_id, workspace_id, avatar_updated_at=ts)
+    a = await run_db(staff_accounts.update, account_id, workspace_id, avatar_updated_at=ts)
     if a is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return _staff_row(a)
@@ -495,7 +501,7 @@ async def delete_staff_account(
     super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
 ) -> Response:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    if not staff_accounts.delete(account_id, workspace_id):
+    if not await run_db(staff_accounts.delete, account_id, workspace_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Account not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -509,7 +515,7 @@ async def upload_instruction_image(
     """指示用の画像を 1 枚アップロード（本文は WebSocket instruction の image_url に付与）。"""
     _require_admin_for_workspace(admin_token, workspace_id)
     raw = await file.read()
-    url = save_instruction_image_bytes(workspace_id, raw, file.content_type or "application/octet-stream")
+    url = await run_db(save_instruction_image_bytes, workspace_id, raw, file.content_type or "application/octet-stream")
     return {"url": url}
 
 
@@ -521,7 +527,7 @@ async def instruction_history_list(
     limit: int = Query(100, ge=1, le=500),
 ) -> list[dict]:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    return list_rounds(workspace_id, limit=limit)
+    return await run_db(list_rounds, workspace_id, limit=limit)
 
 
 @router.get("/{workspace_id}/instruction-history/{instruction_id}")
@@ -532,7 +538,7 @@ async def instruction_history_detail(
     super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
 ) -> dict:
     _require_admin_or_super(workspace_id, admin_token, super_token)
-    d = get_detail(workspace_id, instruction_id)
+    d = await run_db(get_detail, workspace_id, instruction_id)
     if d is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instruction not found")
     return d
@@ -559,7 +565,7 @@ async def list_online_workers(
                 detail="workspace_id required with super_token",
             )
         wid = workspace_id.strip()
-        if workspaces.get(wid) is None:
+        if await run_db(workspaces.get, wid) is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     elif admin_token:
         sess = sessions.get(admin_token)
@@ -572,8 +578,8 @@ async def list_online_workers(
             detail="admin_token or super_token required",
         )
     workspace_id = wid
-    ws_presence.cleanup_stale(stale_seconds=120)
-    pres = ws_presence.list_online_workers(workspace_id)
+    await run_db(ws_presence.cleanup_stale, stale_seconds=120)
+    pres = await run_db(ws_presence.list_online_workers, workspace_id)
     return OnlineWorkersOut(
         workers=[
             OnlineWorkerRow(token=p.token, label=p.label, staff_account_id=p.staff_account_id)
@@ -587,7 +593,7 @@ async def create_workspace(
     body: WorkspaceCreate,
     settings: Settings = Depends(get_settings),
 ) -> WorkspaceOut:
-    ws = workspaces.create(body.name)
+    ws = await run_db(workspaces.create, body.name)
     admin_sess = sessions.create(
         ws.id,
         Role.ADMIN,
@@ -607,7 +613,8 @@ async def add_workspace_glossary_term(
     """管理者が分野（シート）を選び、日本語の単語・意味・説明を登録。シート既存語と重複なら 409。"""
     _require_admin_for_workspace(admin_token, workspace_id)
     try:
-        item = workspace_glossary_terms.add(
+        item = await run_db(
+            workspace_glossary_terms.add,
             workspace_id,
             body.sheet_gid,
             body.word_ja,
@@ -633,7 +640,8 @@ async def add_workspace_expression_term(
     """管理者が分野（用語シートのタブ）を選び、現場専用の「表現」を SQLite に保存（Google シートは変更しない）。"""
     _require_admin_for_workspace(admin_token, workspace_id)
     try:
-        item = workspace_expression_terms.add(
+        item = await run_db(
+            workspace_expression_terms.add,
             workspace_id,
             body.sheet_gid,
             body.word_ja,
