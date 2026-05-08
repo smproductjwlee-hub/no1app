@@ -215,8 +215,29 @@ class WorkspaceStore:
 
 
 class SessionStore:
-    def __init__(self) -> None:
-        self._by_token: dict[str, Session] = {}
+    """JWT (HS256) ベースのステートレスセッション。
+
+    インメモリ dict は廃止。トークン自体に workspace_id / role / user_label /
+    staff_account_id / exp が入っており、サーバ側に状態を持たない。
+
+    効果:
+      - 複数インスタンス（マルチプロセス・スケールアウト）でも全てのインスタンスが
+        同じ秘密鍵で署名検証できる → ロードバランサ越しでも認証が通る。
+      - 再起動時にセッションが消えない（トークン期限内なら再ログイン不要）。
+
+    制約:
+      - JWT は明示的に「revoke」できない（= 期限が来るまで有効）。必要なら
+        revocation list を SQLite/PG/Redis に持つ拡張で対応する（将来の課題）。
+    """
+
+    @staticmethod
+    def _algo() -> str:
+        return "HS256"
+
+    @staticmethod
+    def _secret() -> str:
+        from app.core.config import get_settings
+        return get_settings().session_secret
 
     def create(
         self,
@@ -226,26 +247,56 @@ class SessionStore:
         ttl_seconds: int,
         staff_account_id: Optional[str] = None,
     ) -> Session:
-        raw = secrets.token_urlsafe(32)
-        sess = Session(
-            token=raw,
+        from jose import jwt
+
+        now = time.time()
+        exp = now + ttl_seconds
+        claims = {
+            "sub": workspace_id or "",
+            "role": role.value,
+            "lab": user_label or "",
+            "sai": staff_account_id or "",
+            "iat": int(now),
+            "exp": int(exp),
+        }
+        token = jwt.encode(claims, self._secret(), algorithm=self._algo())
+        return Session(
+            token=token,
             workspace_id=workspace_id,
             role=role,
             user_label=user_label,
-            expires_at=time.time() + ttl_seconds,
+            expires_at=exp,
             staff_account_id=staff_account_id,
         )
-        self._by_token[raw] = sess
-        return sess
 
     def get(self, token: str) -> Optional[Session]:
-        sess = self._by_token.get(token)
-        if sess is None:
+        if not token:
             return None
-        if time.time() > sess.expires_at:
-            self._by_token.pop(token, None)
+        from jose import jwt
+        from jose.exceptions import JWTError, ExpiredSignatureError
+        try:
+            claims = jwt.decode(token, self._secret(), algorithms=[self._algo()])
+        except (JWTError, ExpiredSignatureError):
             return None
-        return sess
+        try:
+            role = Role(claims.get("role", ""))
+        except ValueError:
+            return None
+        sub = claims.get("sub", "") or ""
+        lab = claims.get("lab") or None
+        sai = claims.get("sai") or None
+        try:
+            exp = float(claims.get("exp", 0))
+        except (TypeError, ValueError):
+            exp = 0.0
+        return Session(
+            token=token,
+            workspace_id=sub,
+            role=role,
+            user_label=lab,
+            expires_at=exp,
+            staff_account_id=sai,
+        )
 
 
 # Singletons for MVP
