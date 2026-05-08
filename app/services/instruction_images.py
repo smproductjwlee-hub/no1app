@@ -48,6 +48,31 @@ def ensure_dir(workspace_id: str) -> Path:
     return d
 
 
+def delete_workspace_dir(workspace_id: str) -> int:
+    """指定ワークスペースの指示画像ディレクトリを丸ごと削除（best-effort）。
+    削除した個別ファイル数を返す。ディレクトリが存在しなければ 0。
+    """
+    d = INSTR_IMG_DIR / workspace_id
+    if not d.is_dir():
+        return 0
+    count = 0
+    try:
+        for child in d.iterdir():
+            try:
+                if child.is_file():
+                    child.unlink()
+                    count += 1
+            except OSError:
+                pass
+        try:
+            d.rmdir()
+        except OSError:
+            pass
+    except Exception:
+        pass
+    return count
+
+
 def save_instruction_image_bytes(workspace_id: str, raw: bytes, content_type: str) -> str:
     """Validate and save image bytes; return URL path under /static/…"""
     ct = (content_type or "").split(";")[0].strip().lower()
