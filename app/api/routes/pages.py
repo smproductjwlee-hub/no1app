@@ -80,23 +80,36 @@ def _read_html(name: str) -> str:
 
 
 def _admin_html() -> HTMLResponse:
-    return HTMLResponse(content=_read_html("admin.html"))
+    return HTMLResponse(content=_read_html("admin.html"), headers=_NO_CACHE_HEADERS)
 
 
 def _worker_html() -> HTMLResponse:
-    return HTMLResponse(content=_read_html("worker.html"))
+    return HTMLResponse(content=_read_html("worker.html"), headers=_NO_CACHE_HEADERS)
 
 
 def _login_html() -> HTMLResponse:
-    return HTMLResponse(content=_read_html("login.html"))
+    return HTMLResponse(content=_read_html("login.html"), headers=_NO_CACHE_HEADERS)
 
 
 def _super_html() -> HTMLResponse:
-    return HTMLResponse(content=_read_html("super.html"))
+    return HTMLResponse(content=_read_html("super.html"), headers=_NO_CACHE_HEADERS)
+
+
+# i18n JS は内容が変わるたびにブラウザが必ず再取得するよう no-cache を強制。
+# これらのファイルは小さく(数十KB)、毎回取りに行っても帯域・速度への影響は無視できる。
+_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 
 def _admin_i18n_js() -> FileResponse:
-    return FileResponse(_STATIC / "admin-i18n.js", media_type="application/javascript")
+    return FileResponse(
+        _STATIC / "admin-i18n.js",
+        media_type="application/javascript",
+        headers=_NO_CACHE_HEADERS,
+    )
 
 
 @router.get("/static/admin-i18n.js")
@@ -107,13 +120,21 @@ async def admin_i18n_js() -> FileResponse:
 @router.get("/static/login-i18n.js")
 async def login_i18n_js() -> FileResponse:
     """ログイン画面の多言語辞書（ブラウザが /static/... で読み込む）。"""
-    return FileResponse(_STATIC / "login-i18n.js", media_type="application/javascript")
+    return FileResponse(
+        _STATIC / "login-i18n.js",
+        media_type="application/javascript",
+        headers=_NO_CACHE_HEADERS,
+    )
 
 
 @router.get("/static/worker-i18n.js")
 async def worker_i18n_js() -> FileResponse:
     """スタッフ画面の多言語辞書。"""
-    return FileResponse(_STATIC / "worker-i18n.js", media_type="application/javascript")
+    return FileResponse(
+        _STATIC / "worker-i18n.js",
+        media_type="application/javascript",
+        headers=_NO_CACHE_HEADERS,
+    )
 
 
 @router.get("/static/uploads/staff-avatars/{account_id}.jpg")

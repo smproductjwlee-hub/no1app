@@ -1308,6 +1308,9 @@
           // staffGroupsCache が後着のときは loadStaffGroups 内で staff 一覧を再描画する。
           loadStaffGroups().catch(function () {});
           loadStaffAccountsList().catch(function () {});
+          // オンライン状態を即座に取得して staff 一覧の ●色 を更新する。
+          // WS 接続を待たずに緑●を表示できる。
+          refreshOnlineWorkers();
           connectAdminWebSocket();
           loadInstructionHistory().catch(function () {});
           initAdminWorkspaceGlossary();
