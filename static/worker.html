@@ -256,6 +256,9 @@
           </p>
         </section>
 
+        <!-- 応答状態バッジ（送信完了したら表示）-->
+        <p id="worker-answered-badge" class="hidden text-center text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5"></p>
+
         <!-- 応答ボタン（언어별 라벨） -->
         <div class="grid grid-cols-2 gap-3">
 
@@ -1520,6 +1523,14 @@
 
       function setInstruction(text, imageUrl) {
 
+        // 別の指示が表示される時点で 「応答済み」 状態をリセット。
+        // 同じ指示の再表示時はクリアしない（応答後のリロードで状態を保つため）。
+        if (lastAnsweredInstructionId && currentInstructionId !== lastAnsweredInstructionId) {
+
+          clearAnsweredState();
+
+        }
+
         lastInstruction = (text || "").trim();
 
         lastInstructionImageUrl = (typeof imageUrl === "string" && imageUrl.trim()) ? imageUrl.trim() : "";
@@ -2163,6 +2174,56 @@
       var workerWsPingTimer = null;
 
       var currentInstructionId = null;
+      var lastAnsweredInstructionId = null;
+      var lastAnsweredButton = null; // "OK" | "REPEAT" | "NG" | "CUSTOM"
+
+      // 응답 후: 같은 지시에 다시 답변 못 하게 버튼 비활성화 + 선택한 버튼 강조 + 작은 「응답완료」 뱃지.
+      function applyAnsweredState(code, instructionId) {
+        lastAnsweredInstructionId = instructionId || currentInstructionId;
+        lastAnsweredButton = code;
+        document.querySelectorAll(".btn-r[data-btn]").forEach(function (btn) {
+          var k = btn.getAttribute("data-btn");
+          btn.disabled = true;
+          if (k === code) {
+            btn.classList.add("ring-4", "ring-offset-2", "ring-indigo-300");
+            btn.classList.remove("opacity-40");
+          } else {
+            btn.classList.add("opacity-40", "cursor-not-allowed");
+            btn.classList.remove("ring-4", "ring-offset-2", "ring-indigo-300");
+          }
+        });
+        var badge = document.getElementById("worker-answered-badge");
+        if (badge) {
+          var labelMap = {
+            OK: "✓ 応答済み（わかりました）",
+            REPEAT: "✓ 応答済み（もういちど）",
+            NG: "✓ 応答済み（わかりません）",
+            CUSTOM: "✓ 応答済み（自分で答えた）",
+          };
+          badge.textContent = labelMap[code] || "✓ 応答済み";
+          badge.classList.remove("hidden");
+        }
+      }
+
+      function clearAnsweredState() {
+        lastAnsweredInstructionId = null;
+        lastAnsweredButton = null;
+        document.querySelectorAll(".btn-r[data-btn]").forEach(function (btn) {
+          btn.disabled = false;
+          btn.classList.remove(
+            "ring-4",
+            "ring-offset-2",
+            "ring-indigo-300",
+            "opacity-40",
+            "cursor-not-allowed",
+          );
+        });
+        var badge = document.getElementById("worker-answered-badge");
+        if (badge) {
+          badge.classList.add("hidden");
+          badge.textContent = "";
+        }
+      }
 
       var pendingCustomInstructionId = null;
 
@@ -2336,7 +2397,28 @@
 
           .then(function (rows) {
 
-            renderInstructionHistory(rows || []);
+            rows = rows || [];
+
+            renderInstructionHistory(rows);
+
+            // 現在表示中の指示が既に応答済みなら、ボタンを 「応答済み」 状態に。
+            // (リロードや別端末からの再接続でも応答状態を表示できる)
+
+            if (currentInstructionId) {
+
+              for (var i = 0; i < rows.length; i++) {
+
+                if (rows[i].instruction_id === currentInstructionId && rows[i].button) {
+
+                  applyAnsweredState(rows[i].button, currentInstructionId);
+
+                  break;
+
+                }
+
+              }
+
+            }
 
           })
 
@@ -2609,6 +2691,13 @@
         function afterSend() {
 
           unregisterWorkerAlarmNeed(iid);
+
+          // 응답한 지시가 현재 메인에 표시 중인 것이라면 버튼 상태를 「応答済み」 로
+          if (iid === currentInstructionId) {
+
+            applyAnsweredState(code, iid);
+
+          }
 
           window.setTimeout(function () {
 
