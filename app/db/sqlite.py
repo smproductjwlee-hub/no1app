@@ -1,22 +1,438 @@
-"""標準 sqlite3 のみ（追加 pip 不要）。将来 PostgreSQL 等は別ドライバで拡張可能。"""
+"""DB ディスパッチャ:
+- DATABASE_URL が `sqlite:///...` ならローカル SQLite を使う（既存ロジック）。
+- DATABASE_URL が `postgresql://...` (or `postgres://...`) なら psycopg + connection pool を使う。
+
+呼び出し側は `get_connection()` / `init_db()` を変更なしで使える。
+SQL は `?` プレースホルダのまま書く（Postgres 経路でランタイムに `%s` へ翻訳）。
+スキーマの CREATE TABLE は両エンジンに通る型（TEXT, INTEGER, REAL, DOUBLE PRECISION）で書く。
+"""
 
 from __future__ import annotations
 
+import os
+import re
 import sqlite3
 import threading
 import time
 from pathlib import Path
+from typing import Any, Optional, Sequence
 
 from app.core.config import get_settings
 
 _local = threading.local()
 
 
+# --------- driver detection ---------
+
+
+def _database_url() -> str:
+    return get_settings().database_url
+
+
+def _is_postgres_url(url: str) -> bool:
+    return url.startswith(("postgresql://", "postgres://"))
+
+
+def _is_sqlite_url(url: str) -> bool:
+    return url.startswith("sqlite:")
+
+
+def _driver_kind() -> str:
+    url = _database_url()
+    if _is_postgres_url(url):
+        return "postgres"
+    if _is_sqlite_url(url):
+        return "sqlite"
+    raise ValueError(f"Unsupported DATABASE_URL: {url}")
+
+
+# --------- Postgres path ---------
+
+
+_pg_pool = None
+_pg_pool_lock = threading.Lock()
+_PARAM_QMARK_RE = re.compile(r"\?")
+
+
+def _translate_qmark_to_pg(sql: str) -> str:
+    """`?` → `%s` placeholder translation. Code uses `?` everywhere; here we adapt for psycopg.
+    Our SQL never contains literal `?` characters in strings, so a global replace is safe.
+    """
+    return _PARAM_QMARK_RE.sub("%s", sql)
+
+
+class _HybridRow:
+    """sqlite3.Row 互換の行: row[0] / row['col'] どちらでもアクセス可能。"""
+
+    __slots__ = ("_cols", "_vals", "_index")
+
+    def __init__(self, cols: Sequence[str], vals: Sequence[Any]) -> None:
+        self._cols = list(cols)
+        self._vals = list(vals)
+        self._index = {c: i for i, c in enumerate(self._cols)}
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._vals[key]
+        return self._vals[self._index[key]]
+
+    def get(self, key, default=None):
+        i = self._index.get(key)
+        return default if i is None else self._vals[i]
+
+    def keys(self):
+        return list(self._cols)
+
+    def __iter__(self):
+        return iter(self._vals)
+
+    def __len__(self):
+        return len(self._vals)
+
+    def __contains__(self, key):
+        return key in self._index
+
+
+def _pg_row_factory(cursor):
+    cols = [d.name for d in cursor.description] if cursor.description else []
+    def make(values):
+        return _HybridRow(cols, values)
+    return make
+
+
+class _PgCursorAdapter:
+    def __init__(self, cur) -> None:
+        self._cur = cur
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    @property
+    def lastrowid(self):
+        # 互換のため。Postgres では SERIAL / IDENTITY 等を使うべき。
+        return None
+
+    def close(self):
+        try:
+            self._cur.close()
+        except Exception:
+            pass
+
+
+class _PgConnAdapter:
+    """sqlite3.Connection 互換 API: execute / executemany / commit / rollback。
+    SQL は `?` で渡してよい（内部で `%s` に翻訳）。
+    フェッチ結果は _HybridRow で sqlite3.Row 同様に利用可。
+    """
+
+    def __init__(self, conn) -> None:
+        self._conn = conn
+
+    def execute(self, sql: str, params: Optional[Sequence[Any]] = ()) -> _PgCursorAdapter:
+        translated = _translate_qmark_to_pg(sql)
+        cur = self._conn.execute(translated, tuple(params) if params else ())
+        return _PgCursorAdapter(cur)
+
+    def executemany(self, sql: str, seq_of_params) -> _PgCursorAdapter:
+        translated = _translate_qmark_to_pg(sql)
+        cur = self._conn.cursor()
+        cur.executemany(translated, list(seq_of_params))
+        return _PgCursorAdapter(cur)
+
+    def commit(self) -> None:
+        self._conn.commit()
+
+    def rollback(self) -> None:
+        self._conn.rollback()
+
+    def close(self) -> None:
+        # スレッド寿命中は接続をプールに戻さない（次の呼び出しで再利用）。
+        pass
+
+
+def _build_pg_pool():
+    from psycopg_pool import ConnectionPool
+    url = _database_url()
+    # Supabase Pooler (port 6543, mode=transaction) を推奨。直接接続(5432)でも動くが、
+    # connection 数が増えると Supabase の上限(60-200)に当たるので Pooler が安全。
+    return ConnectionPool(
+        url,
+        min_size=2,
+        max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "16")),
+        timeout=30,
+        max_lifetime=3600,
+        kwargs={"row_factory": _pg_row_factory},
+    )
+
+
+def _get_pg_pool():
+    global _pg_pool
+    if _pg_pool is not None:
+        return _pg_pool
+    with _pg_pool_lock:
+        if _pg_pool is None:
+            _pg_pool = _build_pg_pool()
+    return _pg_pool
+
+
+def _init_db_pg() -> None:
+    """Postgres 経路: 初回起動時にすべてのテーブル / インデックスを冪等に作成する。
+    SQLite と違い、過去の旧スキーマからの逐次 ALTER 移行は不要（新規 DB を前提とする）。
+    """
+    pool = _get_pg_pool()
+    with pool.connection() as conn:
+        # workspaces（インクリメンタル ALTER 後の最終形）
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspaces (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL,
+                company_name TEXT NOT NULL DEFAULT '',
+                branch_name TEXT NOT NULL DEFAULT '',
+                department_name TEXT NOT NULL DEFAULT '',
+                admin_ui_locale TEXT NOT NULL DEFAULT 'ja',
+                admin_avatar_color_index INTEGER NOT NULL DEFAULT 0,
+                admin_avatar_updated_at DOUBLE PRECISION,
+                sort_order DOUBLE PRECISION NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_staff_accounts (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                login_id TEXT NOT NULL,
+                display_name TEXT NOT NULL DEFAULT '',
+                password_hash TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL,
+                group_id TEXT,
+                profile_phone TEXT NOT NULL DEFAULT '',
+                profile_email TEXT NOT NULL DEFAULT '',
+                avatar_color_index INTEGER NOT NULL DEFAULT 0,
+                avatar_updated_at DOUBLE PRECISION,
+                UNIQUE(workspace_id, login_id)
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_wsa_workspace ON workspace_staff_accounts(workspace_id)")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS staff_groups (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL,
+                UNIQUE(workspace_id, name)
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_staff_groups_ws ON staff_groups(workspace_id)")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS instruction_rounds (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                text TEXT NOT NULL,
+                mode TEXT NOT NULL,
+                target_group_id TEXT,
+                created_at DOUBLE PRECISION NOT NULL,
+                image_url TEXT
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_inst_rounds_ws_time ON instruction_rounds(workspace_id, created_at DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS instruction_recipients (
+                instruction_id TEXT NOT NULL,
+                worker_token TEXT NOT NULL,
+                worker_label TEXT NOT NULL DEFAULT '',
+                staff_account_id TEXT,
+                PRIMARY KEY (instruction_id, worker_token),
+                FOREIGN KEY (instruction_id) REFERENCES instruction_rounds(id) ON DELETE CASCADE
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_inst_rec_inst ON instruction_recipients(instruction_id)")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS instruction_replies (
+                instruction_id TEXT NOT NULL,
+                worker_token TEXT NOT NULL,
+                button TEXT NOT NULL,
+                worker_label TEXT NOT NULL DEFAULT '',
+                staff_account_id TEXT,
+                responded_at DOUBLE PRECISION NOT NULL,
+                custom_text TEXT,
+                PRIMARY KEY (instruction_id, worker_token),
+                FOREIGN KEY (instruction_id) REFERENCES instruction_rounds(id) ON DELETE CASCADE
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS ws_presence (
+                workspace_id TEXT NOT NULL,
+                session_token TEXT NOT NULL,
+                role TEXT NOT NULL,
+                user_label TEXT NOT NULL DEFAULT '',
+                staff_account_id TEXT,
+                connected_at DOUBLE PRECISION NOT NULL,
+                last_seen_at DOUBLE PRECISION NOT NULL,
+                PRIMARY KEY (workspace_id, session_token)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_ws_presence_ws_role_seen ON ws_presence(workspace_id, role, last_seen_at DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_chat_messages (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                from_role TEXT NOT NULL,
+                worker_session_token TEXT,
+                staff_account_id TEXT,
+                from_label TEXT NOT NULL DEFAULT '',
+                text TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_workspace_chat_ws_time ON workspace_chat_messages(workspace_id, created_at DESC)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_glossary_terms (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                sheet_gid INTEGER NOT NULL,
+                word_ja TEXT NOT NULL,
+                meaning_ja TEXT NOT NULL,
+                note_ja TEXT NOT NULL DEFAULT '',
+                word_norm TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL,
+                UNIQUE (workspace_id, sheet_gid, word_norm)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_wgt_ws_sheet ON workspace_glossary_terms(workspace_id, sheet_gid)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS workspace_expression_terms (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                sheet_gid INTEGER NOT NULL,
+                phrase_ja TEXT NOT NULL,
+                meaning_ja TEXT NOT NULL,
+                note_ja TEXT NOT NULL DEFAULT '',
+                phrase_norm TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL,
+                UNIQUE (workspace_id, sheet_gid, phrase_norm)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_wet_ws_sheet ON workspace_expression_terms(workspace_id, sheet_gid)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS worker_glossary_saves (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                staff_account_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                sheet_gid INTEGER NOT NULL DEFAULT 0,
+                item_json TEXT NOT NULL,
+                item_hash TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL,
+                UNIQUE (staff_account_id, kind, item_hash)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_wg_save_ws_staff ON worker_glossary_saves(workspace_id, staff_account_id, kind)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS translation_cache (
+                source_text TEXT NOT NULL,
+                target_locale TEXT NOT NULL,
+                translated_text TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL,
+                last_used_at DOUBLE PRECISION NOT NULL,
+                hit_count INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (source_text, target_locale)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_translation_cache_last_used ON translation_cache(last_used_at)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS easy_ja_cache (
+                source_text TEXT NOT NULL,
+                glossary_version TEXT NOT NULL,
+                easy_text TEXT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL,
+                last_used_at DOUBLE PRECISION NOT NULL,
+                hit_count INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (source_text, glossary_version)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_easy_ja_cache_last_used ON easy_ja_cache(last_used_at)"
+        )
+        # 古いデータの整理（60日以上前の指示・1日以上前の presence）
+        cutoff = time.time() - 60 * 24 * 60 * 60
+        conn.execute("DELETE FROM instruction_rounds WHERE created_at < %s", (cutoff,))
+        conn.execute("DELETE FROM ws_presence WHERE last_seen_at < %s", (time.time() - 60 * 60 * 24,))
+        conn.commit()
+
+
+def _get_connection_pg():
+    """スレッドローカルに 1 つの psycopg 接続をぶら下げる（プールから借りっぱなし）。
+    asyncio.to_thread の executor は同じスレッドを使い回すので、接続は再利用される。
+    プール max_size = DB_POOL_MAX_SIZE (default 16) より多い同時アクセスは待ち。
+    """
+    conn = getattr(_local, "pg_conn_adapter", None)
+    if conn is not None:
+        return conn
+    pool = _get_pg_pool()
+    raw = pool.getconn(timeout=30)
+    # autocommit OFF（明示的 commit を期待する API 互換性のため）
+    raw.autocommit = False
+    adapter = _PgConnAdapter(raw)
+    _local.pg_conn_adapter = adapter
+    _local.pg_raw_conn = raw
+    return adapter
+
+
+# --------- SQLite path (既存ロジック保存) ---------
+
+
 def _sqlite_file_path() -> Path:
-    url = get_settings().database_url
-    if not url.startswith("sqlite"):
+    url = _database_url()
+    if not _is_sqlite_url(url):
         raise NotImplementedError(
-            "このビルドは sqlite:/// のみ対応です。PostgreSQL 等はドライバ追加後に対応予定。"
+            "SQLite 経路で呼ばれましたが DATABASE_URL は sqlite:/// ではありません。"
         )
     if ":memory:" in url:
         raise ValueError("SQLite :memory: は未対応です。")
@@ -30,7 +446,26 @@ def _sqlite_file_path() -> Path:
     return p
 
 
+# --------- 公開 API: ドライバ分岐 ---------
+
+
 def init_db() -> None:
+    if _driver_kind() == "postgres":
+        _init_db_pg()
+    else:
+        _init_db_sqlite()
+
+
+def get_connection():
+    if _driver_kind() == "postgres":
+        return _get_connection_pg()
+    return _get_connection_sqlite()
+
+
+# --------- SQLite: 元の init_db / get_connection 本体（リネーム保存） ---------
+
+
+def _init_db_sqlite() -> None:
     path = _sqlite_file_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, check_same_thread=False)
@@ -288,7 +723,7 @@ def _ensure_staff_accounts_group_id(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
-def get_connection() -> sqlite3.Connection:
+def _get_connection_sqlite() -> sqlite3.Connection:
     """スレッドごとに接続を分離（Uvicorn ワーカー内）。"""
     if not getattr(_local, "conn", None):
         path = _sqlite_file_path()

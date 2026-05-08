@@ -67,9 +67,10 @@ def create_round(
         sid = sid.strip() if isinstance(sid, str) and sid.strip() else None
         conn.execute(
             """
-            INSERT OR IGNORE INTO instruction_recipients
+            INSERT INTO instruction_recipients
             (instruction_id, worker_token, worker_label, staff_account_id)
             VALUES (?, ?, ?, ?)
+            ON CONFLICT DO NOTHING
             """,
             (rid, tok, lab, sid),
         )
