@@ -137,6 +137,13 @@ async def worker_i18n_js() -> FileResponse:
     )
 
 
+# アバター・指示画像は URL に ?t=<timestamp> が付くのでブラウザキャッシュは効くが、
+# 同じ URL でファイル再書き込みされた場合に古いものを掴まないよう must-revalidate。
+_AVATAR_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, must-revalidate",
+}
+
+
 @router.get("/static/uploads/staff-avatars/{account_id}.jpg")
 async def staff_avatar_jpeg_file(account_id: str) -> FileResponse:
     """スタッフプロフィール画像（管理者アップロード）。"""
@@ -147,7 +154,7 @@ async def staff_avatar_jpeg_file(account_id: str) -> FileResponse:
     path = _STATIC / "uploads" / "staff-avatars" / f"{account_id}.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(path, media_type="image/jpeg")
+    return FileResponse(path, media_type="image/jpeg", headers=_AVATAR_CACHE_HEADERS)
 
 
 @router.get("/static/uploads/admin-avatars/{workspace_id}.jpg")
@@ -160,7 +167,7 @@ async def admin_avatar_jpeg_file(workspace_id: str) -> FileResponse:
     path = _STATIC / "uploads" / "admin-avatars" / f"{workspace_id}.jpg"
     if not path.is_file():
         raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(path, media_type="image/jpeg")
+    return FileResponse(path, media_type="image/jpeg", headers=_AVATAR_CACHE_HEADERS)
 
 
 @router.get("/static/uploads/instruction-images/{workspace_id}/{filename}")

@@ -1710,20 +1710,30 @@
         var inner = document.createElement("div");
         inner.className =
           "rounded-full overflow-hidden border border-gray-200 shadow-sm w-full h-full flex items-center justify-center bg-gray-100";
-        if (acc.avatar_url) {
-          var im = document.createElement("img");
-          im.src = acc.avatar_url;
-          im.alt = "";
-          im.className = "w-full h-full object-cover";
-          inner.appendChild(im);
-        } else {
+
+        function makeFallback() {
           var c = document.createElement("div");
           c.className = "w-full h-full flex items-center justify-center text-white text-xs font-bold";
           var ci = Number(acc.avatar_color_index || 0) % AVATAR_THEME_COLORS.length;
           c.style.backgroundColor = AVATAR_THEME_COLORS[ci];
           var label = (acc.display_name || acc.login_id || "?").trim();
           c.textContent = label ? label.charAt(0).toUpperCase() : "?";
-          inner.appendChild(c);
+          return c;
+        }
+
+        if (acc.avatar_url) {
+          var im = document.createElement("img");
+          im.src = acc.avatar_url;
+          im.alt = "";
+          im.className = "w-full h-full object-cover";
+          // 画像取得失敗時（404・破損ファイル等）は破損アイコンの代わりに色付きイニシャルを表示。
+          im.addEventListener("error", function () {
+            inner.innerHTML = "";
+            inner.appendChild(makeFallback());
+          });
+          inner.appendChild(im);
+        } else {
+          inner.appendChild(makeFallback());
         }
         container.appendChild(inner);
       }
