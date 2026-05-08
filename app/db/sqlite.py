@@ -130,24 +130,48 @@ class _PgConnAdapter:
     """sqlite3.Connection 互換 API: execute / executemany / commit / rollback。
     SQL は `?` で渡してよい（内部で `%s` に翻訳）。
     フェッチ結果は _HybridRow で sqlite3.Row 同様に利用可。
+
+    重要: Postgres は SQL が 1 度失敗するとその transaction が aborted 状態に
+    なり、同一接続の後続クエリは全て InFailedSqlTransaction で失敗する。
+    SQLite は autocommit 風の動きなのでこの問題が無いが、PG 経路では execute /
+    executemany に try/except を仕込んで失敗時に必ず rollback() するのが必須。
     """
 
     def __init__(self, conn) -> None:
         self._conn = conn
 
+    def _safe_rollback(self) -> None:
+        try:
+            self._conn.rollback()
+        except Exception:
+            pass
+
     def execute(self, sql: str, params: Optional[Sequence[Any]] = ()) -> _PgCursorAdapter:
         translated = _translate_qmark_to_pg(sql)
-        cur = self._conn.execute(translated, tuple(params) if params else ())
-        return _PgCursorAdapter(cur)
+        try:
+            cur = self._conn.execute(translated, tuple(params) if params else ())
+            return _PgCursorAdapter(cur)
+        except Exception:
+            # aborted transaction を残さない。次の呼び出しのために rollback する。
+            self._safe_rollback()
+            raise
 
     def executemany(self, sql: str, seq_of_params) -> _PgCursorAdapter:
         translated = _translate_qmark_to_pg(sql)
-        cur = self._conn.cursor()
-        cur.executemany(translated, list(seq_of_params))
-        return _PgCursorAdapter(cur)
+        try:
+            cur = self._conn.cursor()
+            cur.executemany(translated, list(seq_of_params))
+            return _PgCursorAdapter(cur)
+        except Exception:
+            self._safe_rollback()
+            raise
 
     def commit(self) -> None:
-        self._conn.commit()
+        try:
+            self._conn.commit()
+        except Exception:
+            self._safe_rollback()
+            raise
 
     def rollback(self) -> None:
         self._conn.rollback()
@@ -155,6 +179,17 @@ class _PgConnAdapter:
     def close(self) -> None:
         # スレッド寿命中は接続をプールに戻さない（次の呼び出しで再利用）。
         pass
+
+
+def is_unique_violation(exc: BaseException) -> bool:
+    """SQLite IntegrityError と psycopg UniqueViolation を統一的に判定する。
+    重複（UNIQUE 制約違反）であれば True。
+    """
+    name = type(exc).__name__
+    if name not in ("IntegrityError", "UniqueViolation"):
+        return False
+    msg = str(exc).lower()
+    return "unique" in msg or "duplicate" in msg
 
 
 def _build_pg_pool():

@@ -143,6 +143,7 @@ class StaffAccountStore:
         aid = str(uuid.uuid4())
         now = time.time()
         h = _pwd.hash(plain_password)
+        from app.db.sqlite import is_unique_violation
         conn = get_connection()
         try:
             conn.execute(
@@ -154,8 +155,9 @@ class StaffAccountStore:
                 """,
                 (aid, workspace_id, lid, display_name.strip(), h, now, group_id),
             )
-        except sqlite3.IntegrityError as e:
-            if "UNIQUE" in str(e).upper() or "unique" in str(e).lower():
+        except Exception as e:
+            # SQLite / Postgres 両方の UNIQUE 違反を捕捉。
+            if is_unique_violation(e):
                 raise ValueError("login_id already exists") from e
             raise
         conn.commit()
