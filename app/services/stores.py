@@ -213,6 +213,126 @@ class WorkspaceStore:
         r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
         return _row_to_workspace(r) if r else None
 
+    def delete_with_cascade(self, workspace_id: str) -> dict:
+        """ワークスペースとその所有データを全て削除する（GDPR / 個人情報保護法 削除依頼対応）。
+
+        単一トランザクションで関連テーブルを全て DELETE。失敗時は全てロールバック。
+        DB トランザクション成功後、ファイルシステム上のアップロード（アバター・指示画像）も
+        best-effort で削除する。
+
+        戻り値: {table_name: deleted_row_count, "files_deleted": int}
+        """
+        from app.services.staff_avatar_files import delete_file as _delete_staff_avatar
+        from app.services.instruction_images import delete_workspace_dir
+
+        conn = get_connection()
+        counts: dict[str, int] = {}
+        # アバターファイル削除のためにスタッフ ID を先に取得
+        staff_ids: list[str] = []
+        try:
+            rows = conn.execute(
+                "SELECT id FROM workspace_staff_accounts WHERE workspace_id = ?",
+                (workspace_id,),
+            ).fetchall()
+            staff_ids = [r["id"] for r in rows]
+            # 依存順（子 → 親）で DELETE。
+            # instruction_recipients / instruction_replies は instruction_rounds の FK ON DELETE CASCADE で自動削除される。
+            for table in (
+                "worker_glossary_saves",
+                "workspace_expression_terms",
+                "workspace_glossary_terms",
+                "workspace_chat_messages",
+                "ws_presence",
+                "instruction_rounds",
+                "staff_groups",
+                "workspace_staff_accounts",
+            ):
+                cur = conn.execute(f"DELETE FROM {table} WHERE workspace_id = ?", (workspace_id,))
+                counts[table] = int(getattr(cur, "rowcount", 0) or 0)
+            cur = conn.execute("DELETE FROM workspaces WHERE id = ?", (workspace_id,))
+            counts["workspaces"] = int(getattr(cur, "rowcount", 0) or 0)
+            conn.commit()
+        except Exception:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            raise
+
+        # ファイルシステム掃除（best-effort、トランザクション後）
+        files_deleted = 0
+        try:
+            delete_admin_file(workspace_id)
+            files_deleted += 1
+        except Exception:
+            pass
+        for sid in staff_ids:
+            try:
+                _delete_staff_avatar(sid)
+                files_deleted += 1
+            except Exception:
+                pass
+        try:
+            files_deleted += delete_workspace_dir(workspace_id)
+        except Exception:
+            pass
+        counts["files_deleted"] = files_deleted
+        return counts
+
+    def export_full(self, workspace_id: str) -> Optional[dict]:
+        """ワークスペース所有データを 1 つの JSON に書き出す（データポータビリティ要請対応）。
+
+        個人パスワードハッシュは除外（流出時の被害最小化）。
+        スタッフのアバター画像本体は含めず、URL のみ含む。
+        """
+        conn = get_connection()
+        ws_row = conn.execute(
+            "SELECT * FROM workspaces WHERE id = ?", (workspace_id,)
+        ).fetchone()
+        if ws_row is None:
+            return None
+
+        def _rows(table: str, key: str = "workspace_id") -> list[dict]:
+            cur = conn.execute(f"SELECT * FROM {table} WHERE {key} = ?", (workspace_id,))
+            cols = [d[0] for d in cur.description] if cur.description else []
+            out: list[dict] = []
+            for r in cur.fetchall():
+                out.append({c: r[c] for c in cols if c != "password_hash"})
+            return out
+
+        staff_accounts_rows = _rows("workspace_staff_accounts")
+        # instruction_rounds 経由で recipients / replies を取得
+        rounds = _rows("instruction_rounds")
+        rid_list = [r["id"] for r in rounds]
+        recipients: list[dict] = []
+        replies: list[dict] = []
+        if rid_list:
+            qs = ",".join(["?"] * len(rid_list))
+            for r in conn.execute(
+                f"SELECT * FROM instruction_recipients WHERE instruction_id IN ({qs})",
+                tuple(rid_list),
+            ).fetchall():
+                recipients.append({k: r[k] for k in r.keys()})
+            for r in conn.execute(
+                f"SELECT * FROM instruction_replies WHERE instruction_id IN ({qs})",
+                tuple(rid_list),
+            ).fetchall():
+                replies.append({k: r[k] for k in r.keys()})
+
+        return {
+            "workspace": {k: ws_row[k] for k in ws_row.keys()},
+            "staff_groups": _rows("staff_groups"),
+            "staff_accounts": staff_accounts_rows,
+            "instruction_rounds": rounds,
+            "instruction_recipients": recipients,
+            "instruction_replies": replies,
+            "ws_presence": _rows("ws_presence"),
+            "workspace_chat_messages": _rows("workspace_chat_messages"),
+            "workspace_glossary_terms": _rows("workspace_glossary_terms"),
+            "workspace_expression_terms": _rows("workspace_expression_terms"),
+            "worker_glossary_saves": _rows("worker_glossary_saves"),
+        }
+
 
 class SessionStore:
     """JWT (HS256) ベースのステートレスセッション。

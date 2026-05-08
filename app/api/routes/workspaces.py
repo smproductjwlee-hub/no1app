@@ -544,6 +544,67 @@ async def instruction_history_detail(
     return d
 
 
+# --------- データポータビリティ・削除依頼対応 (GDPR / 個人情報保護法) ---------
+
+
+@router.get("/{workspace_id}/export")
+async def export_workspace(
+    workspace_id: str,
+    admin_token: Optional[str] = Query(None, description="管理者セッショントークン"),
+    super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
+) -> dict:
+    """ワークスペース所有データを 1 つの JSON で書き出す。
+    顧客の「自社データを引き渡してほしい」要請（データポータビリティ）に対応。
+    パスワードハッシュは除外。アバター画像本体は含めない（URL のみ）。
+    """
+    _require_admin_or_super(workspace_id, admin_token, super_token)
+    payload = await run_db(workspaces.export_full, workspace_id)
+    if payload is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    return payload
+
+
+@router.delete("/{workspace_id}", status_code=status.HTTP_200_OK)
+async def delete_workspace(
+    workspace_id: str,
+    confirm: str = Query(
+        ...,
+        description="安全のため confirm=DELETE を明示的に渡す必要がある",
+    ),
+    admin_token: Optional[str] = Query(None, description="管理者セッショントークン"),
+    super_token: Optional[str] = Query(None, description="総運営スーパー管理者トークン"),
+) -> dict:
+    """ワークスペースとその所有データを完全に削除する（削除依頼対応）。
+
+    削除対象:
+    - workspaces 行
+    - workspace_staff_accounts (個人スタッフアカウント全て)
+    - staff_groups
+    - instruction_rounds → instruction_recipients / instruction_replies (FK CASCADE)
+    - ws_presence
+    - workspace_chat_messages
+    - workspace_glossary_terms / workspace_expression_terms
+    - worker_glossary_saves
+    - 管理者・スタッフのアバター画像、指示画像
+
+    保持されるもの:
+    - translation_cache / easy_ja_cache (workspace に紐付かないため)
+    - GCP 上の翻訳ログ（Google 管轄、Google Cloud Console から削除）
+
+    削除は不可逆。事前にエクスポート (`/export`) を行うことを推奨。
+    """
+    _require_admin_or_super(workspace_id, admin_token, super_token)
+    if confirm != "DELETE":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="confirm=DELETE が必要です（誤削除防止）",
+        )
+    if await run_db(workspaces.get, workspace_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    counts = await run_db(workspaces.delete_with_cascade, workspace_id)
+    return {"ok": True, "deleted": counts}
+
+
 @router.get("/online-workers", response_model=OnlineWorkersOut)
 async def list_online_workers(
     admin_token: Optional[str] = Query(None),
