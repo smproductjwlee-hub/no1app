@@ -2883,6 +2883,19 @@
               im.src = p.avatar_url;
               im.className = "w-full h-full object-cover";
               im.alt = "";
+              // 画像取得失敗時は色付きイニシャルへ自動フォールバック（破損アイコン防止）
+              im.addEventListener("error", function () {
+                holder.innerHTML = "";
+                var ci2 =
+                  typeof p.avatar_color_index === "number"
+                    ? p.avatar_color_index
+                    : workerHashString(lab) % 8;
+                var dvf = document.createElement("div");
+                dvf.className = "w-full h-full flex items-center justify-center";
+                dvf.style.backgroundColor = WORKER_AVATAR_COLORS[ci2 % 8];
+                dvf.textContent = lab.charAt(0).toUpperCase() || "?";
+                holder.appendChild(dvf);
+              });
               holder.appendChild(im);
               finish(onDone);
               return;
