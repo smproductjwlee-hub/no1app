@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     portal_admin_password: str = "admin"
     # 運営会社スーパー管理者（全顧客ワークスペース閲覧用）
     super_admin_password: str = "superadmin"
+    # セッショントークン（JWT）の署名鍵。本番では必ず長くランダムな値を .env に設定する。
+    # 鍵が変わると既存の発行済みトークンは全て無効になる（=全ユーザーが再ログイン）。
+    session_secret: str = "dev-only-change-me-in-production-please-3xKp9wL"
 
     # Google Sheets: (A) json 키 파일 or (B) 로컬 ADC + 서비스 계정 가장(키 발급 막힌 조직용)
     google_use_adc_impersonate: bool = False

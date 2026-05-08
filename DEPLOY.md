@@ -27,6 +27,7 @@ Blueprint 화면에서 `sync: false` 로 비워둔 항목을 채워 넣습니다
 |---|---|---|
 | `PORTAL_ADMIN_PASSWORD` | 원하는 강한 비번 | 관리자 로그인 비번 |
 | `SUPER_ADMIN_PASSWORD` | 원하는 강한 비번 | 총운영 로그인 비번 |
+| `SESSION_SECRET` | 랜덤 48바이트 문자열 | JWT 서명 키. `python -c "import secrets;print(secrets.token_urlsafe(48))"` 으로 생성. 바꾸면 모든 사용자 재로그인 |
 | `PUBLIC_BASE_URL` | (일단 비워두고 첫 deploy 후 채우기) | Render가 발급하는 `https://workbridge-xxxx.onrender.com` |
 
 `PUBLIC_BASE_URL`은 Render가 도메인을 발급한 다음에야 알 수 있으므로, 일단 빈값으로 deploy → 발급된 URL을 복사해서 환경변수에 넣고 → 한 번 더 재시작하면 됩니다.
