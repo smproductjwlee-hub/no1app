@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException as FastAPIHTTPException, Request
@@ -17,6 +19,11 @@ from app.ws import comm
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # asyncio.to_thread / FastAPI のスレッドプール容量を拡張。
+    # デフォルトは min(32, CPU+4) で、同時 DB 呼び出しが多いと枯渇する。
+    # 64 にしておくと数百同時接続時の SQLite 呼び出しが詰まらない。
+    loop = asyncio.get_running_loop()
+    loop.set_default_executor(ThreadPoolExecutor(max_workers=64, thread_name_prefix="wb-db"))
     yield
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from app.api.deps import run_db
 from app.core.config import Settings, get_settings
 from app.services.easy_japanese import build_easy_japanese
 from app.services.google_translate import translate_ja_to_target
@@ -46,7 +47,7 @@ async def translate_for_worker(
     """언어 탭 선택 시에만 호출: 일본어 원문 → 해당 언어."""
     _require_worker(token)
     try:
-        out = translate_ja_to_target(body.text, body.target_locale, settings)
+        out = await run_db(translate_ja_to_target, body.text, body.target_locale, settings)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -64,7 +65,7 @@ async def easy_japanese_for_worker(
     """분야·매장 용어 시트를 참고한やさしい日本語(치환)."""
     _require_worker(token)
     try:
-        out = build_easy_japanese(body.text, settings)
+        out = await run_db(build_easy_japanese, body.text, settings)
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
