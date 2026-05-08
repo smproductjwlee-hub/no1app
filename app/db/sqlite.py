@@ -35,6 +35,10 @@ def init_db() -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, check_same_thread=False)
     try:
+        # WAL モードで読み書きの並列性を大幅に上げる（複数の読みと 1 書きが同時に走れる）。
+        # synchronous=NORMAL は WAL 推奨設定で、性能と耐久性のバランスがとれる。
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS workspaces (
@@ -200,6 +204,40 @@ def init_db() -> None:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_workspace_chat_ws_time ON workspace_chat_messages(workspace_id, created_at DESC)"
+        )
+        # 翻訳結果の永続キャッシュ — 同じ日本語原文 + 言語の組み合わせは API を再呼び出ししない。
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS translation_cache (
+                source_text TEXT NOT NULL,
+                target_locale TEXT NOT NULL,
+                translated_text TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                last_used_at REAL NOT NULL,
+                hit_count INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (source_text, target_locale)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_translation_cache_last_used ON translation_cache(last_used_at)"
+        )
+        # やさしい日本語キャッシュ — 用語シートが変わるたびに glossary_version が変わる。
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS easy_ja_cache (
+                source_text TEXT NOT NULL,
+                glossary_version TEXT NOT NULL,
+                easy_text TEXT NOT NULL,
+                created_at REAL NOT NULL,
+                last_used_at REAL NOT NULL,
+                hit_count INTEGER NOT NULL DEFAULT 1,
+                PRIMARY KEY (source_text, glossary_version)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_easy_ja_cache_last_used ON easy_ja_cache(last_used_at)"
         )
         conn.commit()
         conn.execute("PRAGMA foreign_keys = ON")

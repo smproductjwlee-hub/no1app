@@ -104,6 +104,7 @@ def _merge_pairs(settings: "Settings") -> list[tuple[str, str]]:
 
 _glossary_pairs: list[tuple[str, str]] | None = None
 _glossary_at: float = 0.0
+_glossary_version: str = ""
 _TTL = 300.0
 
 
@@ -111,27 +112,52 @@ def _cache_ttl_seconds(settings: "Settings") -> float:
     return float(settings.glossary_cache_ttl_seconds)
 
 
+def _refresh_pairs_if_stale(settings: "Settings") -> None:
+    """글로서리 페어를 시트에서 다시 읽고 버전 해시를 갱신."""
+    global _glossary_pairs, _glossary_at, _glossary_version
+    ttl = _cache_ttl_seconds(settings)
+    if _glossary_pairs is not None and (time.time() - _glossary_at) <= ttl:
+        return
+    from app.services.translation_cache import glossary_version
+    try:
+        _glossary_pairs = _merge_pairs(settings)
+    except Exception:
+        _glossary_pairs = []
+    _glossary_version = glossary_version(_glossary_pairs or [])
+    _glossary_at = time.time()
+
+
 def build_easy_japanese(text: str, settings: "Settings") -> str:
-    """用語シート 기반으로 치환. 실패 시 원문 유지."""
-    global _glossary_pairs, _glossary_at
+    """用語シート 기반으로 치환. 실패 시 원문 유지.
+    SQLite easy_ja_cache 로 (원문, 글로서리 버전) 동일 시 즉시 반환.
+    """
     t = (text or "").strip()
     if not t:
         return ""
-    ttl = _cache_ttl_seconds(settings)
-    if (
-        _glossary_pairs is None
-        or time.time() - _glossary_at > ttl
-    ):
-        try:
-            _glossary_pairs = _merge_pairs(settings)
-        except Exception:
-            _glossary_pairs = []
-        _glossary_at = time.time()
+    _refresh_pairs_if_stale(settings)
     pairs = _glossary_pairs or []
+    ver = _glossary_version
+    # 캐시 lookup
+    if ver:
+        from app.services.translation_cache import get_easy_ja, store_easy_ja
+        try:
+            cached = get_easy_ja(t, ver)
+            if cached is not None:
+                return cached
+        except Exception:
+            pass
     out = t
     for term, easy in pairs:
         if len(term) < 2:
             continue
         if term in out:
             out = out.replace(term, easy)
-    return out if out.strip() else t
+    final = out if out.strip() else t
+    # 캐시 write
+    if ver:
+        from app.services.translation_cache import store_easy_ja
+        try:
+            store_easy_ja(t, ver, final)
+        except Exception:
+            pass
+    return final
