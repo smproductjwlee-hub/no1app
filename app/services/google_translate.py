@@ -50,13 +50,24 @@ def get_translate_service(settings: "Settings"):
 
 
 def translate_ja_to_target(text: str, target_locale: str, settings: "Settings") -> str:
-    """일본어 원문을 target_locale 으로 번역. ja 이면 그대로."""
+    """일본어 원문을 target_locale 으로 번역. ja 이면 그대로.
+    SQLite translation_cache 를 통해 이미 번역된 표현은 API 호출 없이 즉시 반환.
+    """
     t = (text or "").strip()
     if not t:
         return ""
     tgt = TARGET_TO_GOOGLE.get(target_locale, target_locale)
     if tgt == "ja":
         return t
+    # 캐시 lookup — 같은 (원문, 대상언어) 가 이미 있으면 API 호출 없이 즉시 반환
+    from app.services.translation_cache import get_translation, store_translation
+    try:
+        cached = get_translation(t, tgt)
+        if cached is not None:
+            return cached
+    except Exception:
+        # キャッシュ層は静かに失敗（API へフォールバック）
+        pass
     svc = get_translate_service(settings)
     resp = (
         svc.translations()
@@ -73,4 +84,10 @@ def translate_ja_to_target(text: str, target_locale: str, settings: "Settings") 
     trs = resp.get("translations") or []
     if not trs:
         return t
-    return str(trs[0].get("translatedText", t) or t)
+    out = str(trs[0].get("translatedText", t) or t)
+    # キャッシュ書き込み — 失敗しても本筋に影響させない
+    try:
+        store_translation(t, tgt, out)
+    except Exception:
+        pass
+    return out
