@@ -1304,11 +1304,10 @@
               syncLocaleQuickButtons();
               applyAdminLocale(adminLocale);
             });
-          loadStaffGroups()
-            .then(function () {
-              return loadStaffAccountsList();
-            })
-            .catch(function () {});
+          // グループとスタッフ一覧を並行ロード。片方が失敗してももう片方は実行される。
+          // staffGroupsCache が後着のときは loadStaffGroups 内で staff 一覧を再描画する。
+          loadStaffGroups().catch(function () {});
+          loadStaffAccountsList().catch(function () {});
           connectAdminWebSocket();
           loadInstructionHistory().catch(function () {});
           initAdminWorkspaceGlossary();
@@ -1704,6 +1703,10 @@
             staffGroupsCache = data || [];
             renderGroupsPanel();
             fillSendGroupCheckboxes();
+            // staff 一覧が groups よりも先に届いていた場合、グループ選択肢を反映するため再描画。
+            if (Array.isArray(lastStaffAccountsItems) && lastStaffAccountsItems.length) {
+              renderStaffAccountsRows(lastStaffAccountsItems);
+            }
           });
       }
 
@@ -2683,11 +2686,10 @@
           syncSendButton();
           setFooterState({ type: "connected" });
           refreshOnlineWorkers();
-          loadStaffGroups()
-            .then(function () {
-              return loadStaffAccountsList();
-            })
-            .catch(function () {});
+          // グループとスタッフ一覧を並行ロード。片方が失敗してももう片方は実行される。
+          // staffGroupsCache が後着のときは loadStaffGroups 内で staff 一覧を再描画する。
+          loadStaffGroups().catch(function () {});
+          loadStaffAccountsList().catch(function () {});
           loadInstructionHistory().catch(function () {});
           onlinePollInterval = setInterval(refreshOnlineWorkers, 4000);
           adminWsPingTimer = setInterval(function () {
