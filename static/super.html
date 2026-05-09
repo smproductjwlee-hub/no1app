@@ -61,8 +61,66 @@
         </p>
       </div>
 
-      <!-- 右: 一覧 -->
+      <!-- 右: 一覧 + 請求レポート -->
       <aside class="lg:col-span-7 lg:sticky lg:top-6 space-y-3">
+
+        <!-- 請求レポート（Phase 1.5）-->
+        <details class="rounded-2xl bg-white border border-emerald-200 shadow-sm overflow-hidden">
+          <summary class="cursor-pointer list-none px-4 py-3 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between text-sm font-semibold text-emerald-900">
+            請求レポート (代理店分配の集計)
+            <span class="text-emerald-700/60 text-xs">▼</span>
+          </summary>
+          <div class="p-4 space-y-3">
+            <div class="flex flex-wrap gap-2 items-end">
+              <label class="block text-xs text-gray-600">年
+                <input id="billing-year" type="number" min="2024" max="2099" class="mt-1 w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+              </label>
+              <label class="block text-xs text-gray-600">月
+                <input id="billing-month" type="number" min="1" max="12" class="mt-1 w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+              </label>
+              <button type="button" id="billing-fetch-btn" class="px-4 py-1.5 rounded-lg bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-600">
+                取得
+              </button>
+              <button type="button" id="billing-csv-btn" class="px-4 py-1.5 rounded-lg bg-white border border-emerald-300 text-emerald-800 text-sm font-medium hover:bg-emerald-50 disabled:opacity-40" disabled>
+                CSV ダウンロード
+              </button>
+            </div>
+            <p class="text-[11px] text-gray-500 leading-snug">
+              ワークスペースの「月額料金」「代理店名」「手数料率」は、各ワークスペース行の「請求設定」ボタンから設定できます。
+            </p>
+            <div id="billing-summary" class="hidden text-sm space-y-2"></div>
+            <div id="billing-rows" class="hidden text-xs overflow-x-auto"></div>
+            <p id="billing-status" class="text-xs min-h-[1rem] text-gray-600"></p>
+          </div>
+        </details>
+
+        <!-- 請求設定モーダル -->
+        <div id="modal-billing" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" aria-hidden="true">
+          <div class="bg-white rounded-2xl shadow-xl max-w-md w-full p-5">
+            <h3 class="font-semibold text-gray-900 mb-1">請求設定</h3>
+            <p id="modal-billing-ws" class="text-xs text-gray-500 font-mono mb-4"></p>
+            <div class="space-y-3">
+              <label class="block text-xs text-gray-600">代理店名（直販なら空欄）
+                <input id="billing-distributor" type="text" maxlength="200" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="例: PoPo" />
+              </label>
+              <label class="block text-xs text-gray-600">月額料金 (税抜・JPY)
+                <input id="billing-price" type="number" min="0" max="100000000" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="9800" />
+              </label>
+              <label class="block text-xs text-gray-600">代理店手数料率 (%) — 0 は直販
+                <input id="billing-rate" type="number" min="0" max="100" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" placeholder="20" />
+              </label>
+              <label class="block text-xs text-gray-600">課金開始日 (YYYY-MM-DD, 未設定なら作成日)
+                <input id="billing-start" type="date" class="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+              </label>
+            </div>
+            <p id="modal-billing-status" class="text-xs min-h-[1rem] mt-3 text-rose-600"></p>
+            <div class="flex gap-2 mt-4">
+              <button type="button" id="modal-billing-save" class="flex-1 py-2.5 rounded-xl bg-indigo-900 text-white text-sm font-medium hover:bg-indigo-800">保存</button>
+              <button type="button" id="modal-billing-close" class="flex-1 py-2.5 rounded-xl bg-gray-100 text-gray-800 text-sm font-medium">閉じる</button>
+            </div>
+          </div>
+        </div>
+
         <div class="flex flex-col gap-2 border-b border-gray-200 pb-2 sm:flex-row sm:items-end sm:justify-between">
           <h2 class="text-base font-semibold text-gray-900 shrink-0">ワークスペース一覧</h2>
           <div class="flex flex-1 flex-col gap-1 min-w-0 sm:max-w-xs sm:ml-auto">
@@ -394,6 +452,11 @@
               openAdminUrlModal(w.id);
             }),
           );
+          actions.appendChild(
+            mkBtn("請求設定", btnBase + " border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-900", function () {
+              openBillingModal(w);
+            }),
+          );
 
           main.appendChild(head);
           main.appendChild(actions);
@@ -656,6 +719,203 @@
       });
       modalAdmin.addEventListener("click", function (ev) {
         if (ev.target === modalAdmin) modalAdmin.classList.add("hidden");
+      });
+
+      // ========= 請求設定モーダル + 請求レポート (Phase 1.5) =========
+      var modalBilling = document.getElementById("modal-billing");
+      var billingCtx = { id: null };
+      function openBillingModal(w) {
+        billingCtx.id = w.id;
+        document.getElementById("modal-billing-ws").textContent = w.id + " · " + (w.name || "");
+        document.getElementById("billing-distributor").value = w.distributor_name || "";
+        document.getElementById("billing-price").value = w.monthly_price_jpy || "";
+        document.getElementById("billing-rate").value = (w.commission_rate_pct === null || w.commission_rate_pct === undefined) ? 20 : w.commission_rate_pct;
+        var bs = w.billing_start_at;
+        if (bs) {
+          var d = new Date(Number(bs) * 1000);
+          var iso = d.toISOString().slice(0, 10);
+          document.getElementById("billing-start").value = iso;
+        } else {
+          document.getElementById("billing-start").value = "";
+        }
+        document.getElementById("modal-billing-status").textContent = "";
+        modalBilling.classList.remove("hidden");
+      }
+      document.getElementById("modal-billing-close").addEventListener("click", function () {
+        modalBilling.classList.add("hidden");
+      });
+      modalBilling.addEventListener("click", function (ev) {
+        if (ev.target === modalBilling) modalBilling.classList.add("hidden");
+      });
+      document.getElementById("modal-billing-save").addEventListener("click", function () {
+        if (!billingCtx.id) return;
+        var statusEl = document.getElementById("modal-billing-status");
+        statusEl.textContent = "";
+        var dn = (document.getElementById("billing-distributor").value || "").trim();
+        var pv = parseInt(document.getElementById("billing-price").value || "0", 10);
+        var rv = parseInt(document.getElementById("billing-rate").value || "20", 10);
+        if (isNaN(pv) || pv < 0) { statusEl.textContent = "月額料金が不正です"; return; }
+        if (isNaN(rv) || rv < 0 || rv > 100) { statusEl.textContent = "手数料率は 0〜100 の範囲で"; return; }
+        var sd = (document.getElementById("billing-start").value || "").trim();
+        var body = {
+          distributor_name: dn,
+          monthly_price_jpy: pv,
+          commission_rate_pct: rv,
+        };
+        if (sd) {
+          var ts = Math.floor(new Date(sd + "T00:00:00Z").getTime() / 1000);
+          body.billing_start_at = ts;
+        } else {
+          body.billing_start_at = 0;
+        }
+        api(
+          "/api/v1/workspaces/" + encodeURIComponent(billingCtx.id) +
+            "/billing?super_token=" + encodeURIComponent(tok),
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          },
+        )
+          .then(function (r) {
+            if (!r.ok) return r.json().then(function (j) { throw new Error(j.detail || r.status); });
+            return r.json();
+          })
+          .then(function () {
+            modalBilling.classList.add("hidden");
+            loadList();  // 一覧再描画でメタが反映
+          })
+          .catch(function (e) {
+            statusEl.textContent = "保存失敗: " + (e.message || e);
+          });
+      });
+
+      // 請求レポート取得
+      var billingFetchBtn = document.getElementById("billing-fetch-btn");
+      var billingCsvBtn = document.getElementById("billing-csv-btn");
+      var lastBillingReport = null;
+
+      function fmtJPY(n) {
+        return "¥" + (Number(n) || 0).toLocaleString("ja-JP");
+      }
+
+      // 既定値: 当月
+      (function () {
+        var now = new Date();
+        document.getElementById("billing-year").value = now.getFullYear();
+        document.getElementById("billing-month").value = now.getMonth() + 1;
+      })();
+
+      billingFetchBtn.addEventListener("click", function () {
+        var year = parseInt(document.getElementById("billing-year").value || "0", 10);
+        var month = parseInt(document.getElementById("billing-month").value || "0", 10);
+        var statusEl = document.getElementById("billing-status");
+        statusEl.textContent = "取得中…";
+        document.getElementById("billing-summary").classList.add("hidden");
+        document.getElementById("billing-rows").classList.add("hidden");
+        billingCsvBtn.disabled = true;
+        api(
+          "/api/v1/workspaces/billing-report?super_token=" + encodeURIComponent(tok) +
+            "&year=" + year + "&month=" + month,
+        )
+          .then(function (r) {
+            if (!r.ok) return r.json().then(function (j) { throw new Error(j.detail || r.status); });
+            return r.json();
+          })
+          .then(function (data) {
+            lastBillingReport = data;
+            renderBillingReport(data);
+            statusEl.textContent = "";
+            billingCsvBtn.disabled = false;
+          })
+          .catch(function (e) {
+            statusEl.textContent = "失敗: " + (e.message || e);
+          });
+      });
+
+      function renderBillingReport(data) {
+        var sumEl = document.getElementById("billing-summary");
+        var rowsEl = document.getElementById("billing-rows");
+        var html = '<div class="rounded-lg bg-emerald-50 border border-emerald-200 p-3">';
+        html += '<p class="font-semibold text-emerald-900 mb-1">期間: ' + data.period_start + ' 〜 ' + data.period_end + ' (' + data.period_days + '日)</p>';
+        html += '<p>総売上: <span class="font-bold">' + fmtJPY(data.grand_total_base) + '</span> ／ 当社取り分: <span class="font-bold text-indigo-700">' + fmtJPY(data.grand_total_company) + '</span> ／ 代理店取り分: <span class="font-bold text-amber-700">' + fmtJPY(data.grand_total_distributor) + '</span></p>';
+        html += '</div>';
+        var byDist = data.totals_by_distributor || {};
+        var keys = Object.keys(byDist);
+        if (keys.length) {
+          html += '<div class="mt-2 text-xs"><p class="font-semibold mb-1">代理店別小計</p><ul class="space-y-0.5">';
+          keys.forEach(function (k) {
+            var v = byDist[k];
+            html += '<li>' + escapeHtml(k) + ' (' + v.workspace_count + '件): 売上 ' + fmtJPY(v.base) + ' / 当社 ' + fmtJPY(v.company) + ' / 代理店 ' + fmtJPY(v.distributor) + '</li>';
+          });
+          html += '</ul></div>';
+        }
+        sumEl.innerHTML = html;
+        sumEl.classList.remove("hidden");
+
+        var rows = data.rows || [];
+        if (!rows.length) {
+          rowsEl.innerHTML = '<p class="text-gray-500 mt-2">対象データがありません。</p>';
+          rowsEl.classList.remove("hidden");
+          return;
+        }
+        var t = '<table class="min-w-full text-xs mt-2 border-collapse"><thead class="bg-gray-50"><tr>';
+        ['ワークスペース', '会社', '支店', '代理店', '月額', '手数料%', '日割', '売上', '当社', '代理店'].forEach(function (h) {
+          t += '<th class="border-b border-gray-200 px-2 py-1 text-left font-semibold">' + h + '</th>';
+        });
+        t += '</tr></thead><tbody>';
+        rows.forEach(function (r) {
+          t += '<tr>';
+          t += '<td class="border-b border-gray-100 px-2 py-1">' + escapeHtml(r.workspace_name) + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1">' + escapeHtml(r.company_name || "") + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1">' + escapeHtml(r.branch_name || "") + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1">' + escapeHtml(r.distributor_name) + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + fmtJPY(r.monthly_price_jpy) + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + r.commission_rate_pct + '%</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + r.days_active_in_period + '/' + r.period_days + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + fmtJPY(r.base_amount) + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + fmtJPY(r.company_amount) + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + fmtJPY(r.distributor_amount) + '</td>';
+          t += '</tr>';
+        });
+        t += '</tbody></table>';
+        rowsEl.innerHTML = t;
+        rowsEl.classList.remove("hidden");
+      }
+
+      billingCsvBtn.addEventListener("click", function () {
+        if (!lastBillingReport) return;
+        var d = lastBillingReport;
+        var lines = [];
+        lines.push('期間,' + d.period_start + ' 〜 ' + d.period_end);
+        lines.push('');
+        lines.push(['workspace_id', 'workspace_name', 'company_name', 'branch_name', 'distributor_name', 'monthly_price_jpy', 'commission_rate_pct', 'days_active', 'period_days', 'base_amount', 'company_amount', 'distributor_amount'].join(','));
+        (d.rows || []).forEach(function (r) {
+          var row = [
+            r.workspace_id, r.workspace_name, r.company_name || "", r.branch_name || "",
+            r.distributor_name, r.monthly_price_jpy, r.commission_rate_pct,
+            r.days_active_in_period, r.period_days,
+            r.base_amount, r.company_amount, r.distributor_amount,
+          ].map(function (v) {
+            var s = String(v == null ? "" : v);
+            if (s.indexOf(",") >= 0 || s.indexOf('"') >= 0 || s.indexOf("\n") >= 0) {
+              s = '"' + s.replace(/"/g, '""') + '"';
+            }
+            return s;
+          });
+          lines.push(row.join(','));
+        });
+        lines.push('');
+        lines.push('合計,,,,,,,,, ' + d.grand_total_base + ',' + d.grand_total_company + ',' + d.grand_total_distributor);
+        var blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "billing_report_" + d.period_start.replace(/-/g, "") + "_" + d.period_end.replace(/-/g, "") + ".csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       });
 
       document.getElementById("btn-create-ws").addEventListener("click", function () {
