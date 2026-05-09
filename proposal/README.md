@@ -10,6 +10,7 @@
 | `PROPOSAL_LINGUASYNC_JP.md` | **LinguaSync / 新가격 + MVP費 ¥5M** | 고객사 전용 제안서 (Markdown) ⭐ |
 | `SAAS_PRICING_JP.xlsx` | WorkBridge Japan / 旧가격 | Excel 견적기 (5 시트) |
 | `PRICING_LINGUASYNC_JP.xlsx` | **LinguaSync / 新가격 + MVP費 ¥5M** | Excel 견적기 ⭐ |
+| `NDA_LINGUASYNC_JP.md` | **LinguaSync 비밀유지계약서 (양면 NDA)** | 검토단계 정보보호 (16장 / 가장 먼저 체결) ⭐ |
 | `SOW_LINGUASYNC_JP.md` | **LinguaSync 작업범위서 (Statement of Work)** | 계약 본문 초안 (20장) ⭐ |
 | `DPA_LINGUASYNC_JP.md` | **LinguaSync 개인정보 처리 위탁계약서** | 개인정보·GDPR/APPI 준거 (16장 + 별지 3) ⭐ |
 | `_build_xlsx.py` | (둘 다 한 번에 재생성) | Excel 빌드 스크립트 (CONFIGS 딕셔너리) |
@@ -195,12 +196,17 @@ Google Docs에서 **「ファイル」 → 「ダウンロード」 → 「PDF (
 ### 계약 단계 송부 패키지 예시 (LinguaSync C社)
 
 ```
-1. PROPOSAL_LINGUASYNC_JP.md   ← 영업·검토용 (먼저)
+0. NDA_LINGUASYNC_JP.md         ← 가장 먼저 (정보 공유 전)  ⭐ 추가
+1. PROPOSAL_LINGUASYNC_JP.md   ← 영업·검토용
 2. PRICING_LINGUASYNC_JP.xlsx  ← 시뮬레이터로 합의 도달
 3. SECURITY.md                  ← 보안팀 검토용
 4. SOW_LINGUASYNC_JP.md         ← 계약 본문 (서명용)
-5. DPA_LINGUASYNC_JP.md         ← 개인정보 처리 위탁 (서명용)  ⭐ 추가
+5. DPA_LINGUASYNC_JP.md         ← 개인정보 처리 위탁 (서명용)
 ```
+
+### NDA 체결 타이밍
+
+NDA 는 「상세한 견적·고객 정보·데모」 가 오가기 **전** 에 체결하는 것이 원칙. 일본 대기업·상장사 영업에서는 거의 필수입니다. 「데모 전에 NDA 부터 보내주세요」 라고 먼저 제안하면 「제대로 된 회사」 라는 인상이 남습니다.
 
 ### 4 + 5 (SOW + DPA) 의 관계
 
