@@ -39,6 +39,11 @@ class Workspace:
     admin_ui_locale: str = "ja"
     admin_avatar_color_index: int = 0
     admin_avatar_updated_at: Optional[float] = None
+    # Phase 1.5: 請求 / 代理店分配
+    distributor_name: str = ""        # 代理店名 (例: "PoPo"). 空なら直販
+    monthly_price_jpy: int = 0         # 当該ワークスペースの月額利用料 (税抜)
+    commission_rate_pct: int = 20      # 代理店の手数料率 (0-100). 0は直販
+    billing_start_at: Optional[float] = None  # 課金開始日(UNIX秒). 月割り計算で使う
 
 
 @dataclass
@@ -75,6 +80,28 @@ def _row_to_workspace(row: sqlite3.Row) -> Workspace:
             so = float(row["sort_order"])
         except (TypeError, ValueError):
             so = 0.0
+    # Phase 1.5 billing fields
+    dist = ""
+    if "distributor_name" in keys and row["distributor_name"]:
+        dist = str(row["distributor_name"]).strip()
+    mprice = 0
+    if "monthly_price_jpy" in keys and row["monthly_price_jpy"] is not None:
+        try:
+            mprice = int(row["monthly_price_jpy"])
+        except (TypeError, ValueError):
+            mprice = 0
+    crate = 20
+    if "commission_rate_pct" in keys and row["commission_rate_pct"] is not None:
+        try:
+            crate = max(0, min(100, int(row["commission_rate_pct"])))
+        except (TypeError, ValueError):
+            crate = 20
+    bstart = None
+    if "billing_start_at" in keys and row["billing_start_at"] is not None:
+        try:
+            bstart = float(row["billing_start_at"])
+        except (TypeError, ValueError):
+            bstart = None
     return Workspace(
         id=row["id"],
         name=row["name"],
@@ -86,6 +113,10 @@ def _row_to_workspace(row: sqlite3.Row) -> Workspace:
         admin_ui_locale=loc,
         admin_avatar_color_index=aci,
         admin_avatar_updated_at=av_ad,
+        distributor_name=dist,
+        monthly_price_jpy=mprice,
+        commission_rate_pct=crate,
+        billing_start_at=bstart,
     )
 
 
@@ -189,6 +220,56 @@ class WorkspaceStore:
             vals.append(workspace_id)
             conn.execute(sql, vals)
             conn.commit()
+        r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
+        return _row_to_workspace(r) if r else None
+
+    def update_billing(
+        self,
+        workspace_id: str,
+        *,
+        distributor_name: Any = None,
+        monthly_price_jpy: Any = None,
+        commission_rate_pct: Any = None,
+        billing_start_at: Any = None,
+    ) -> Optional[Workspace]:
+        """Phase 1.5 — 代理店名・月額料金・手数料率・課金開始日の更新（None は変更なし）。"""
+        conn = get_connection()
+        sets: list[str] = []
+        vals: list[Any] = []
+        if distributor_name is not None:
+            sets.append("distributor_name = ?")
+            vals.append(str(distributor_name).strip())
+        if monthly_price_jpy is not None:
+            try:
+                v = max(0, int(monthly_price_jpy))
+            except (TypeError, ValueError):
+                v = 0
+            sets.append("monthly_price_jpy = ?")
+            vals.append(v)
+        if commission_rate_pct is not None:
+            try:
+                v = max(0, min(100, int(commission_rate_pct)))
+            except (TypeError, ValueError):
+                v = 20
+            sets.append("commission_rate_pct = ?")
+            vals.append(v)
+        if billing_start_at is not None:
+            # 0 / 空文字 / 'null' は NULL クリア扱い
+            try:
+                fv = float(billing_start_at) if billing_start_at not in ("", None, 0, "0") else None
+            except (TypeError, ValueError):
+                fv = None
+            sets.append("billing_start_at = ?")
+            vals.append(fv)
+        if not sets:
+            r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
+            return _row_to_workspace(r) if r else None
+        vals.append(workspace_id)
+        conn.execute(
+            "UPDATE workspaces SET " + ", ".join(sets) + " WHERE id = ?",
+            vals,
+        )
+        conn.commit()
         r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
         return _row_to_workspace(r) if r else None
 

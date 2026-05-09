@@ -250,10 +250,25 @@ def _init_db_pg() -> None:
                 admin_ui_locale TEXT NOT NULL DEFAULT 'ja',
                 admin_avatar_color_index INTEGER NOT NULL DEFAULT 0,
                 admin_avatar_updated_at DOUBLE PRECISION,
-                sort_order DOUBLE PRECISION NOT NULL DEFAULT 0
+                sort_order DOUBLE PRECISION NOT NULL DEFAULT 0,
+                distributor_name TEXT NOT NULL DEFAULT '',
+                monthly_price_jpy INTEGER NOT NULL DEFAULT 0,
+                commission_rate_pct INTEGER NOT NULL DEFAULT 20,
+                billing_start_at DOUBLE PRECISION
             )
             """
         )
+        # 既存 PG DB に対する idempotent ALTER (新規DBなら何も起きない)
+        for col, ddl in (
+            ("distributor_name", "ADD COLUMN IF NOT EXISTS distributor_name TEXT NOT NULL DEFAULT ''"),
+            ("monthly_price_jpy", "ADD COLUMN IF NOT EXISTS monthly_price_jpy INTEGER NOT NULL DEFAULT 0"),
+            ("commission_rate_pct", "ADD COLUMN IF NOT EXISTS commission_rate_pct INTEGER NOT NULL DEFAULT 20"),
+            ("billing_start_at", "ADD COLUMN IF NOT EXISTS billing_start_at DOUBLE PRECISION"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE workspaces {ddl}")
+            except Exception:
+                pass
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS workspace_staff_accounts (
@@ -565,6 +580,17 @@ def _init_db_sqlite() -> None:
                     "UPDATE workspaces SET sort_order = ? WHERE id = ?",
                     (float(i), rw[0]),
                 )
+        # Phase 1.5 — billing fields. SQLite path にも legacy migration として追加。
+        cur_w4 = conn.execute("PRAGMA table_info(workspaces)")
+        wcols4 = {row[1] for row in cur_w4.fetchall()}
+        if "distributor_name" not in wcols4:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN distributor_name TEXT NOT NULL DEFAULT ''")
+        if "monthly_price_jpy" not in wcols4:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN monthly_price_jpy INTEGER NOT NULL DEFAULT 0")
+        if "commission_rate_pct" not in wcols4:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN commission_rate_pct INTEGER NOT NULL DEFAULT 20")
+        if "billing_start_at" not in wcols4:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN billing_start_at REAL")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS workspace_staff_accounts (

@@ -373,6 +373,22 @@
           追加
         </button>
         <p id="inline-staff-form-status" class="text-xs min-h-[1.1rem]"></p>
+
+        <!-- CSV 一括登録 -->
+        <div class="border-t border-indigo-50 pt-3 mt-3">
+          <p class="text-[11px] font-semibold text-indigo-950 mb-1">CSV で一括登録</p>
+          <p class="text-[10px] text-gray-500 mb-2 leading-snug">
+            スタッフが多い場合、CSV ファイル (UTF-8) で一括追加できます。
+            <button type="button" id="bulk-staff-template-btn" class="text-indigo-700 underline">
+              テンプレートをダウンロード
+            </button>
+          </p>
+          <input id="bulk-staff-csv-file" type="file" accept=".csv,text/csv" class="block w-full text-xs file:mr-2 file:py-1 file:px-2 file:rounded-md file:border-0 file:bg-indigo-100 file:text-indigo-900 file:font-medium hover:file:bg-indigo-200" />
+          <button type="button" id="bulk-staff-upload-btn" class="mt-2 w-full py-2 rounded-xl bg-emerald-700 text-white text-sm font-medium hover:bg-emerald-600 disabled:opacity-50" disabled>
+            アップロードして一括登録
+          </button>
+          <div id="bulk-staff-result" class="hidden mt-2 text-xs space-y-1"></div>
+        </div>
       </div>
     </details>
     </div>
@@ -2231,6 +2247,97 @@
               "inline-staff-new-password",
               "inline-staff-form-status"
             );
+          });
+        }
+
+        // CSV 一括登録 — テンプレートダウンロード
+        var bulkTplBtn = document.getElementById("bulk-staff-template-btn");
+        if (bulkTplBtn) {
+          bulkTplBtn.addEventListener("click", function () {
+            var sample =
+              "login_id,display_name,password,group_name\n" +
+              "tanaka01,田中太郎,pass1234,キッチン\n" +
+              "yamada02,山田花子,pass5678,フロア\n" +
+              "suzuki03,鈴木次郎,pass9012,\n";
+            // BOM 付きで Excel が日本語を正しく表示できるように
+            var blob = new Blob(["﻿" + sample], { type: "text/csv;charset=utf-8" });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement("a");
+            a.href = url;
+            a.download = "staff_template.csv";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          });
+        }
+
+        // CSV 一括登録 — ファイル選択時にボタン有効化
+        var bulkFile = document.getElementById("bulk-staff-csv-file");
+        var bulkUploadBtn = document.getElementById("bulk-staff-upload-btn");
+        if (bulkFile && bulkUploadBtn) {
+          bulkFile.addEventListener("change", function () {
+            bulkUploadBtn.disabled = !(bulkFile.files && bulkFile.files[0]);
+          });
+
+          bulkUploadBtn.addEventListener("click", function () {
+            var wid = sessionStorage.getItem("wb_workspace_id") || workspaceId;
+            var f = bulkFile.files && bulkFile.files[0];
+            var resultEl = document.getElementById("bulk-staff-result");
+            if (!wid || !f) return;
+            resultEl.classList.add("hidden");
+            resultEl.innerHTML = "";
+            bulkUploadBtn.disabled = true;
+            bulkUploadBtn.textContent = "アップロード中…";
+            var fd = new FormData();
+            fd.append("file", f);
+            fetch(
+              "/api/v1/workspaces/" +
+                encodeURIComponent(wid) +
+                "/staff-accounts/bulk-csv?admin_token=" +
+                encodeURIComponent(token),
+              { method: "POST", body: fd }
+            )
+              .then(function (r) {
+                return r.json().then(function (j) { return { ok: r.ok, body: j, status: r.status }; });
+              })
+              .then(function (x) {
+                if (!x.ok) {
+                  resultEl.classList.remove("hidden");
+                  resultEl.innerHTML =
+                    '<p class="text-rose-700">エラー: ' +
+                    escapeHtml((x.body && x.body.detail) || ("HTTP " + x.status)) +
+                    "</p>";
+                  return;
+                }
+                var b = x.body || {};
+                var html = '<p class="text-emerald-800 font-semibold">' +
+                  "登録 " + (b.created_count || 0) + " 件 / 失敗 " + (b.error_count || 0) + " 件" +
+                  "</p>";
+                if (Array.isArray(b.errors) && b.errors.length) {
+                  html += '<ul class="text-rose-700 list-disc pl-5 max-h-40 overflow-y-auto">';
+                  b.errors.forEach(function (e) {
+                    html +=
+                      "<li>行 " + e.row + " (" + escapeHtml(e.login_id || "") + "): " +
+                      escapeHtml(e.error || "") + "</li>";
+                  });
+                  html += "</ul>";
+                }
+                resultEl.classList.remove("hidden");
+                resultEl.innerHTML = html;
+                bulkFile.value = "";
+                // スタッフ一覧 / グループ一覧を再描画
+                if (typeof loadStaffGroups === "function") loadStaffGroups().catch(function () {});
+                if (typeof loadStaffAccountsList === "function") loadStaffAccountsList().catch(function () {});
+              })
+              .catch(function () {
+                resultEl.classList.remove("hidden");
+                resultEl.innerHTML = '<p class="text-rose-700">通信エラー</p>';
+              })
+              .finally(function () {
+                bulkUploadBtn.textContent = "アップロードして一括登録";
+                bulkUploadBtn.disabled = !(bulkFile.files && bulkFile.files[0]);
+              });
           });
         }
         document.getElementById("new-group-add").addEventListener("click", function () {
