@@ -10,6 +10,7 @@
 | `PROPOSAL_LINGUASYNC_JP.md` | **LinguaSync / 新가격 + MVP費 ¥5M** | 고객사 전용 제안서 (Markdown) ⭐ |
 | `SAAS_PRICING_JP.xlsx` | WorkBridge Japan / 旧가격 | Excel 견적기 (5 시트) |
 | `PRICING_LINGUASYNC_JP.xlsx` | **LinguaSync / 新가격 + MVP費 ¥5M** | Excel 견적기 ⭐ |
+| `SOW_LINGUASYNC_JP.md` | **LinguaSync 작업범위서 (Statement of Work)** | 계약 본문 초안 (20장) ⭐ |
 | `_build_xlsx.py` | (둘 다 한 번에 재생성) | Excel 빌드 스크립트 (CONFIGS 딕셔너리) |
 | `README.md` | (이 파일) | 사용 안내 |
 
@@ -185,9 +186,20 @@ Google Docs에서 **「ファイル」 → 「ダウンロード」 → 「PDF (
 | 자료 | 위치 | 용도 |
 |---|---|---|
 | **SECURITY.md** | 프로젝트 루트 | DPA·보안 검토 시 |
-| **가격 견적서** (Excel) | 별도 작성 | 고객 규모별 정밀 견적 |
+| **가격 견적서** (Excel) | `proposal/PRICING_*.xlsx` | 고객 규모별 정밀 견적 |
+| **SOW (작업범위서)** | `proposal/SOW_LINGUASYNC_JP.md` | 계약 단계 본문 |
 | **데모 환경 URL** | (Render 배포 URL) | 실제 화면 시연 |
 | **케이스 스터디** | (실제 도입 후) | 본격 영업 단계에서 |
+
+### 계약 단계 송부 패키지 예시 (LinguaSync C社)
+
+```
+1. PROPOSAL_LINGUASYNC_JP.md   ← 영업·검토용 (먼저)
+2. PRICING_LINGUASYNC_JP.xlsx  ← 시뮬레이터로 합의 도달
+3. SECURITY.md                  ← 보안팀 검토용
+4. SOW_LINGUASYNC_JP.md         ← 계약 본문 (서명용)  ⭐ 추가
+5. DPA (별도 작성 예정)         ← 개인정보 처리 위탁
+```
 
 ---
 
