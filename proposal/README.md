@@ -10,6 +10,7 @@
 | `PROPOSAL_LINGUASYNC_JP.md` | **LinguaSync / 新가격 + MVP費 ¥5M** | 고객사 전용 제안서 (Markdown) ⭐ |
 | `SAAS_PRICING_JP.xlsx` | WorkBridge Japan / 旧가격 | Excel 견적기 (5 시트) |
 | `PRICING_LINGUASYNC_JP.xlsx` | **LinguaSync / 新가격 + MVP費 ¥5M** | Excel 견적기 ⭐ |
+| `EXEC_SUMMARY_LINGUASYNC_JP.md` | **LinguaSync 1페이지 임원 요약** | 결재자 60초 어필용 (제일 먼저 보여주기) ⭐ |
 | `NDA_LINGUASYNC_JP.md` | **LinguaSync 비밀유지계약서 (양면 NDA)** | 검토단계 정보보호 (16장 / 가장 먼저 체결) ⭐ |
 | `SOW_LINGUASYNC_JP.md` | **LinguaSync 작업범위서 (Statement of Work)** | 계약 본문 초안 (20장) ⭐ |
 | `DPA_LINGUASYNC_JP.md` | **LinguaSync 개인정보 처리 위탁계약서** | 개인정보·GDPR/APPI 준거 (16장 + 별지 3) ⭐ |
@@ -196,13 +197,23 @@ Google Docs에서 **「ファイル」 → 「ダウンロード」 → 「PDF (
 ### 계약 단계 송부 패키지 예시 (LinguaSync C社)
 
 ```
-0. NDA_LINGUASYNC_JP.md         ← 가장 먼저 (정보 공유 전)  ⭐ 추가
-1. PROPOSAL_LINGUASYNC_JP.md   ← 영업·검토용
-2. PRICING_LINGUASYNC_JP.xlsx  ← 시뮬레이터로 합의 도달
-3. SECURITY.md                  ← 보안팀 검토용
-4. SOW_LINGUASYNC_JP.md         ← 계약 본문 (서명용)
-5. DPA_LINGUASYNC_JP.md         ← 개인정보 처리 위탁 (서명용)
+ⓞ EXEC_SUMMARY_LINGUASYNC_JP.md  ← 1 페이지 요약 (결재자에게 먼저)  ⭐ 추가
+0. NDA_LINGUASYNC_JP.md          ← NDA (정보 공유 전)
+1. PROPOSAL_LINGUASYNC_JP.md     ← 영업·검토용
+2. PRICING_LINGUASYNC_JP.xlsx    ← 시뮬레이터로 합의 도달
+3. SECURITY.md                    ← 보안팀 검토용
+4. SOW_LINGUASYNC_JP.md           ← 계약 본문 (서명용)
+5. DPA_LINGUASYNC_JP.md           ← 개인정보 처리 위탁 (서명용)
 ```
+
+### Executive Summary 활용 시나리오
+
+| 상황 | 사용법 |
+|---|---|
+| 첫 미팅에서 결재자가 동석 | 책상에 1 페이지 「먼저 이것만」 으로 둠 |
+| 메일로 첫 인사 | PDF 첨부 (PROPOSAL 12 페이지보다 먼저) |
+| 사내 결재 신청 | 부장·임원이 60 초로 판단 가능 |
+| 영업 회의에 들고 갈 자료 | 「뒷장에 상세 12 페이지가 있습니다」 라고 말함 |
 
 ### NDA 체결 타이밍
 
