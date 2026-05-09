@@ -29,13 +29,15 @@ class EasyJaOut(BaseModel):
     easy_ja: str
 
 
-def _require_worker(token: str) -> None:
+def _require_worker_session(token: str):
+    """セッションを返す版（workspace_id を取り出す必要があるため）。"""
     sess = sessions.get(token)
     if sess is None or sess.role != Role.WORKER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="worker session required",
         )
+    return sess
 
 
 @router.post("/translate", response_model=TranslateOut)
@@ -45,9 +47,11 @@ async def translate_for_worker(
     settings: Settings = Depends(get_settings),
 ) -> TranslateOut:
     """언어 탭 선택 시에만 호출: 일본어 원문 → 해당 언어."""
-    _require_worker(token)
+    sess = _require_worker_session(token)
     try:
-        out = await run_db(translate_ja_to_target, body.text, body.target_locale, settings)
+        out = await run_db(
+            translate_ja_to_target, body.text, body.target_locale, settings, sess.workspace_id
+        )
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -63,7 +67,7 @@ async def easy_japanese_for_worker(
     settings: Settings = Depends(get_settings),
 ) -> EasyJaOut:
     """분야·매장 용어 시트를 참고한やさしい日本語(치환)."""
-    _require_worker(token)
+    _require_worker_session(token)
     try:
         out = await run_db(build_easy_japanese, body.text, settings)
     except Exception as exc:

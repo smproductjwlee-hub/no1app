@@ -49,9 +49,17 @@ def get_translate_service(settings: "Settings"):
     return _translate_service(False, resolved, "")
 
 
-def translate_ja_to_target(text: str, target_locale: str, settings: "Settings") -> str:
+def translate_ja_to_target(
+    text: str,
+    target_locale: str,
+    settings: "Settings",
+    workspace_id: "str | None" = None,
+) -> str:
     """일본어 원문을 target_locale 으로 번역. ja 이면 그대로.
     SQLite translation_cache 를 통해 이미 번역된 표현은 API 호출 없이 즉시 반환.
+
+    workspace_id が渡されると、ワークスペース別の API 使用量を集計する
+    (translation_usage テーブル, 請求レポートに使う)。
     """
     t = (text or "").strip()
     if not t:
@@ -59,14 +67,19 @@ def translate_ja_to_target(text: str, target_locale: str, settings: "Settings") 
     tgt = TARGET_TO_GOOGLE.get(target_locale, target_locale)
     if tgt == "ja":
         return t
-    # 캐시 lookup — 같은 (원문, 대상언어) 가 이미 있으면 API 호출 없이 즉시 반환
+    char_count = len(t)
+    # 캐시 lookup
     from app.services.translation_cache import get_translation, store_translation
+    from app.services import translation_usage as _usage
     try:
         cached = get_translation(t, tgt)
         if cached is not None:
+            try:
+                _usage.record_cache_hit(workspace_id, char_count)
+            except Exception:
+                pass
             return cached
     except Exception:
-        # キャッシュ層は静かに失敗（API へフォールバック）
         pass
     svc = get_translate_service(settings)
     resp = (
@@ -85,7 +98,11 @@ def translate_ja_to_target(text: str, target_locale: str, settings: "Settings") 
     if not trs:
         return t
     out = str(trs[0].get("translatedText", t) or t)
-    # キャッシュ書き込み — 失敗しても本筋に影響させない
+    # API 実呼び出し記録 (workspace_id 別)
+    try:
+        _usage.record_api_call(workspace_id, char_count)
+    except Exception:
+        pass
     try:
         store_translation(t, tgt, out)
     except Exception:

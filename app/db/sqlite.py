@@ -464,6 +464,24 @@ def _init_db_pg() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_easy_ja_cache_last_used ON easy_ja_cache(last_used_at)"
         )
+        # 翻訳API使用量トラッキング (Phase 1.5 オプションA): ワークスペース×月別
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS translation_usage (
+                workspace_id TEXT NOT NULL,
+                year_month TEXT NOT NULL,
+                api_chars BIGINT NOT NULL DEFAULT 0,
+                cached_chars BIGINT NOT NULL DEFAULT 0,
+                api_calls INTEGER NOT NULL DEFAULT 0,
+                cache_hits INTEGER NOT NULL DEFAULT 0,
+                last_updated_at DOUBLE PRECISION NOT NULL,
+                PRIMARY KEY (workspace_id, year_month)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_translation_usage_ym ON translation_usage(year_month, workspace_id)"
+        )
         # 古いデータの整理（60日以上前の指示・1日以上前の presence）
         cutoff = time.time() - 60 * 24 * 60 * 60
         conn.execute("DELETE FROM instruction_rounds WHERE created_at < %s", (cutoff,))
@@ -748,6 +766,24 @@ def _init_db_sqlite() -> None:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_easy_ja_cache_last_used ON easy_ja_cache(last_used_at)"
+        )
+        # 翻訳API使用量トラッキング (Phase 1.5 オプションA)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS translation_usage (
+                workspace_id TEXT NOT NULL,
+                year_month TEXT NOT NULL,
+                api_chars INTEGER NOT NULL DEFAULT 0,
+                cached_chars INTEGER NOT NULL DEFAULT 0,
+                api_calls INTEGER NOT NULL DEFAULT 0,
+                cache_hits INTEGER NOT NULL DEFAULT 0,
+                last_updated_at REAL NOT NULL,
+                PRIMARY KEY (workspace_id, year_month)
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_translation_usage_ym ON translation_usage(year_month, workspace_id)"
         )
         conn.commit()
         conn.execute("PRAGMA foreign_keys = ON")

@@ -839,6 +839,11 @@
         var html = '<div class="rounded-lg bg-emerald-50 border border-emerald-200 p-3">';
         html += '<p class="font-semibold text-emerald-900 mb-1">期間: ' + data.period_start + ' 〜 ' + data.period_end + ' (' + data.period_days + '日)</p>';
         html += '<p>総売上: <span class="font-bold">' + fmtJPY(data.grand_total_base) + '</span> ／ 当社取り分: <span class="font-bold text-indigo-700">' + fmtJPY(data.grand_total_company) + '</span> ／ 代理店取り分: <span class="font-bold text-amber-700">' + fmtJPY(data.grand_total_distributor) + '</span></p>';
+        var apiCost = data.grand_total_api_cost || 0;
+        var realMargin = data.grand_total_actual_margin || 0;
+        var marginPct = data.grand_total_company ? Math.round(realMargin * 100 / data.grand_total_company) : 0;
+        var marginColor = marginPct >= 70 ? 'text-emerald-700' : (marginPct >= 40 ? 'text-amber-700' : 'text-rose-700');
+        html += '<p class="mt-1 text-[12px]">推定 API コスト: <span class="font-semibold text-rose-700">' + fmtJPY(apiCost) + '</span> ／ 当社実マージン: <span class="font-bold ' + marginColor + '">' + fmtJPY(realMargin) + ' (' + marginPct + '%)</span></p>';
         html += '</div>';
         var byDist = data.totals_by_distributor || {};
         var keys = Object.keys(byDist);
@@ -860,11 +865,15 @@
           return;
         }
         var t = '<table class="min-w-full text-xs mt-2 border-collapse"><thead class="bg-gray-50"><tr>';
-        ['ワークスペース', '会社', '支店', '代理店', '月額', '手数料%', '日割', '売上', '当社', '代理店'].forEach(function (h) {
-          t += '<th class="border-b border-gray-200 px-2 py-1 text-left font-semibold">' + h + '</th>';
+        ['ワークスペース', '会社', '支店', '代理店', '月額', '手数料%', '日割', '売上', '当社', '代理店',
+         'API字数', 'キャッシュ%', 'APIコスト', '実マージン'].forEach(function (h) {
+          t += '<th class="border-b border-gray-200 px-2 py-1 text-left font-semibold whitespace-nowrap">' + h + '</th>';
         });
         t += '</tr></thead><tbody>';
         rows.forEach(function (r) {
+          // 実マージン色: 70%以上 緑 / 40-70% 黄 / 40%未満 赤
+          var mp = r.actual_margin_pct || 0;
+          var marginColor = mp >= 70 ? 'text-emerald-700 font-semibold' : (mp >= 40 ? 'text-amber-700' : 'text-rose-700 font-semibold');
           t += '<tr>';
           t += '<td class="border-b border-gray-100 px-2 py-1">' + escapeHtml(r.workspace_name) + '</td>';
           t += '<td class="border-b border-gray-100 px-2 py-1">' + escapeHtml(r.company_name || "") + '</td>';
@@ -876,6 +885,10 @@
           t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + fmtJPY(r.base_amount) + '</td>';
           t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + fmtJPY(r.company_amount) + '</td>';
           t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + fmtJPY(r.distributor_amount) + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + (r.api_chars || 0).toLocaleString("ja-JP") + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right">' + (r.cache_hit_rate_pct || 0) + '%</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right text-rose-700">' + fmtJPY(r.estimated_api_cost_jpy || 0) + '</td>';
+          t += '<td class="border-b border-gray-100 px-2 py-1 text-right ' + marginColor + '">' + fmtJPY(r.actual_margin_jpy || 0) + ' (' + mp + '%)</td>';
           t += '</tr>';
         });
         t += '</tbody></table>';
@@ -889,13 +902,15 @@
         var lines = [];
         lines.push('期間,' + d.period_start + ' 〜 ' + d.period_end);
         lines.push('');
-        lines.push(['workspace_id', 'workspace_name', 'company_name', 'branch_name', 'distributor_name', 'monthly_price_jpy', 'commission_rate_pct', 'days_active', 'period_days', 'base_amount', 'company_amount', 'distributor_amount'].join(','));
+        lines.push(['workspace_id', 'workspace_name', 'company_name', 'branch_name', 'distributor_name', 'monthly_price_jpy', 'commission_rate_pct', 'days_active', 'period_days', 'base_amount', 'company_amount', 'distributor_amount', 'api_chars', 'cached_chars', 'cache_hit_rate_pct', 'estimated_api_cost_jpy', 'actual_margin_jpy', 'actual_margin_pct'].join(','));
         (d.rows || []).forEach(function (r) {
           var row = [
             r.workspace_id, r.workspace_name, r.company_name || "", r.branch_name || "",
             r.distributor_name, r.monthly_price_jpy, r.commission_rate_pct,
             r.days_active_in_period, r.period_days,
             r.base_amount, r.company_amount, r.distributor_amount,
+            r.api_chars || 0, r.cached_chars || 0, r.cache_hit_rate_pct || 0,
+            r.estimated_api_cost_jpy || 0, r.actual_margin_jpy || 0, r.actual_margin_pct || 0,
           ].map(function (v) {
             var s = String(v == null ? "" : v);
             if (s.indexOf(",") >= 0 || s.indexOf('"') >= 0 || s.indexOf("\n") >= 0) {
@@ -906,7 +921,7 @@
           lines.push(row.join(','));
         });
         lines.push('');
-        lines.push('合計,,,,,,,,, ' + d.grand_total_base + ',' + d.grand_total_company + ',' + d.grand_total_distributor);
+        lines.push('合計,,,,,,,,, ' + d.grand_total_base + ',' + d.grand_total_company + ',' + d.grand_total_distributor + ',,,,' + (d.grand_total_api_cost || 0) + ',' + (d.grand_total_actual_margin || 0));
         var blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
         var url = URL.createObjectURL(blob);
         var a = document.createElement("a");
