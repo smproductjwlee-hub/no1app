@@ -4,12 +4,26 @@
 
 ## 파일 목록
 
-| 파일 | 용도 |
-|---|---|
-| `SAAS_PROPOSAL_JP.md` | 메인 제안서 (3티어 가격 + 비교 + 시나리오 + 보안). Google Docs / Word에 붙여넣기용 |
-| `SAAS_PRICING_JP.xlsx` | **Excel 견적서·ROI 시뮬레이터** (5 시트, 수식 자동계산) |
-| `_build_xlsx.py` | 위 Excel을 재생성하는 Python 스크립트 (가격 변경 시 사용) |
-| `README.md` | (이 파일) 사용 안내 |
+| 파일 | 브랜드 / 가격 | 용도 |
+|---|---|---|
+| `SAAS_PROPOSAL_JP.md` | WorkBridge Japan / 旧가격 | 일반판 제안서 (Markdown) |
+| `PROPOSAL_LINGUASYNC_JP.md` | **LinguaSync / 新가격 + MVP費 ¥5M** | 고객사 전용 제안서 (Markdown) ⭐ |
+| `SAAS_PRICING_JP.xlsx` | WorkBridge Japan / 旧가격 | Excel 견적기 (5 시트) |
+| `PRICING_LINGUASYNC_JP.xlsx` | **LinguaSync / 新가격 + MVP費 ¥5M** | Excel 견적기 ⭐ |
+| `_build_xlsx.py` | (둘 다 한 번에 재생성) | Excel 빌드 스크립트 (CONFIGS 딕셔너리) |
+| `README.md` | (이 파일) | 사용 안내 |
+
+### 두 브랜드 차이 한눈에
+
+| 항목 | SAAS_PRICING_JP.xlsx | PRICING_LINGUASYNC_JP.xlsx |
+|---|---|---|
+| 표지 서비스명 | WorkBridge Japan | LinguaSync |
+| Starter 월액 | ¥12,800 | **¥15,800** |
+| Business 월액 | ¥9,800 | **¥12,800** |
+| Enterprise 월액 | ¥6,800〜 | **¥9,800〜** |
+| 초기 비용 모델 | 플랜별 ¥150K/¥300K/¥0~2M | **MVP 開発費 ¥5,000,000 一律** |
+| 5년 TCO 50점포 | ¥27.2M | **¥40.4M** |
+| 자체 개발 대비 비율 | 1/3 〜 1/8 | 1/2 〜 1/5~6 |
 
 ---
 
