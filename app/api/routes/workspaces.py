@@ -155,6 +155,13 @@ class BillingRow(BaseModel):
     base_amount: int
     distributor_amount: int
     company_amount: int
+    # Phase 1.5 オプション A: API 使用量とマージン
+    api_chars: int = 0
+    cached_chars: int = 0
+    cache_hit_rate_pct: int = 0
+    estimated_api_cost_jpy: int = 0
+    actual_margin_jpy: int = 0  # company_amount - estimated_api_cost
+    actual_margin_pct: int = 0  # actual_margin / monthly_price_jpy * 100
 
 
 class BillingReportOut(BaseModel):
@@ -166,6 +173,9 @@ class BillingReportOut(BaseModel):
     grand_total_base: int
     grand_total_distributor: int
     grand_total_company: int
+    # Phase 1.5 オプション A
+    grand_total_api_cost: int = 0
+    grand_total_actual_margin: int = 0
 
 
 def _require_admin_for_workspace(admin_token: str, workspace_id: str) -> None:
@@ -756,12 +766,17 @@ async def billing_report(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="super admin only")
     period_start, period_end, period_days = _month_period(year, month)
     all_ws = await run_db(workspaces.list_all)
+    # 全ワークスペースの当月使用量を一括取得 (1 query)
+    from app.services import translation_usage as _usage
+    usage_map = await run_db(_usage.get_usage_map_for_month, year, month)
 
     rows: list[BillingRow] = []
     totals_by_distributor: dict[str, dict[str, int]] = {}
     grand_base = 0
     grand_dist = 0
     grand_co = 0
+    grand_api_cost = 0
+    grand_actual_margin = 0
     for ws in all_ws:
         # 課金開始日が未設定なら created_at を使う
         bstart = ws.billing_start_at if ws.billing_start_at else ws.created_at
@@ -781,6 +796,16 @@ async def billing_report(
         co_amt = base_amt - dist_amt
         dist_label = ws.distributor_name or "(直販)"
 
+        # API 使用量 (当月)
+        u = usage_map.get(ws.id, {"api_chars": 0, "cached_chars": 0, "api_calls": 0, "cache_hits": 0})
+        api_chars = int(u.get("api_chars", 0))
+        cached_chars = int(u.get("cached_chars", 0))
+        total_chars = api_chars + cached_chars
+        cache_hit_rate = int(round(cached_chars * 100 / total_chars)) if total_chars > 0 else 0
+        api_cost = _usage.estimate_jpy_cost(api_chars)
+        actual_margin = co_amt - api_cost
+        actual_margin_pct = int(round(actual_margin * 100 / ws.monthly_price_jpy)) if ws.monthly_price_jpy > 0 else 0
+
         rows.append(
             BillingRow(
                 workspace_id=ws.id,
@@ -797,6 +822,12 @@ async def billing_report(
                 base_amount=base_amt,
                 distributor_amount=dist_amt,
                 company_amount=co_amt,
+                api_chars=api_chars,
+                cached_chars=cached_chars,
+                cache_hit_rate_pct=cache_hit_rate,
+                estimated_api_cost_jpy=api_cost,
+                actual_margin_jpy=actual_margin,
+                actual_margin_pct=actual_margin_pct,
             )
         )
         bucket = totals_by_distributor.setdefault(
@@ -809,6 +840,8 @@ async def billing_report(
         grand_base += base_amt
         grand_dist += dist_amt
         grand_co += co_amt
+        grand_api_cost += api_cost
+        grand_actual_margin += actual_margin
 
     from datetime import datetime as _dt, timezone as _tz
     return BillingReportOut(
@@ -820,6 +853,8 @@ async def billing_report(
         grand_total_base=grand_base,
         grand_total_distributor=grand_dist,
         grand_total_company=grand_co,
+        grand_total_api_cost=grand_api_cost,
+        grand_total_actual_margin=grand_actual_margin,
     )
 
 
