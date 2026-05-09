@@ -392,7 +392,7 @@
 | 別紙 | 内容 | ファイル |
 |---|---|---|
 | A | セキュリティポリシー | `SECURITY.md` |
-| B | データ処理委託契約書 (DPA) | `DPA_LINGUASYNC_JP.md` (別途作成) |
+| B | データ処理委託契約書 (DPA) | `DPA_LINGUASYNC_JP.md` |
 | C | 価格表・見積シミュレーター | `PRICING_LINGUASYNC_JP.xlsx` |
 | D | 提案書 | `PROPOSAL_LINGUASYNC_JP.md` |
 | E | スタッフ CSV テンプレート | `staff_template.csv` (D6) |
