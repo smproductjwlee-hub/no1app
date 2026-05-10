@@ -14,6 +14,7 @@
 | `NDA_LINGUASYNC_JP.md` | **LinguaSync 비밀유지계약서 (양면 NDA)** | 검토단계 정보보호 (16장 / 가장 먼저 체결) ⭐ |
 | `SOW_LINGUASYNC_JP.md` | **LinguaSync 작업범위서 (Statement of Work)** | 계약 본문 초안 (20장) ⭐ |
 | `DPA_LINGUASYNC_JP.md` | **LinguaSync 개인정보 처리 위탁계약서** | 개인정보·GDPR/APPI 준거 (16장 + 별지 3) ⭐ |
+| `DISTRIBUTOR_AGREEMENT_POPO_JP.md` | **PoPo 사 판매대리점 계약서** | 비독점·테리토리 / 25% 커미션 / 고객 소유권 = 본인 (16장 + 별지 2) ⭐ |
 | `_build_xlsx.py` | (둘 다 한 번에 재생성) | Excel 빌드 스크립트 (CONFIGS 딕셔너리) |
 | `README.md` | (이 파일) | 사용 안내 |
 
@@ -205,6 +206,25 @@ Google Docs에서 **「ファイル」 → 「ダウンロード」 → 「PDF (
 4. SOW_LINGUASYNC_JP.md           ← 계약 본문 (서명용)
 5. DPA_LINGUASYNC_JP.md           ← 개인정보 처리 위탁 (서명용)
 ```
+
+### 두 가지 영업 트랙 (직판 vs 대리점)
+
+```
+[ 트랙 1: C社 등 직판 ]
+  EXEC → NDA → PROPOSAL → SECURITY → SOW + DPA  (본인 직접)
+
+[ 트랙 2: PoPo 경유 D·E·F社 ]
+  DISTRIBUTOR_AGREEMENT_POPO_JP.md  (PoPo 와 1회 체결)
+              ↓
+  PoPo 가 영업 → 리드 등록 → 본인이 D社·E社 와 직접
+  EXEC → NDA → PROPOSAL → SECURITY → SOW + DPA
+              ↓
+  본인이 D社·E社 에게 직접 청구
+              ↓
+  분기말 → PoPo 에게 25% 커미션 지급
+```
+
+→ **고객 소유권은 본인**, **PoPo 는 영업 채널**. PoPo가 그만둬도 D·E社는 계속 본인 운영.
 
 ### Executive Summary 활용 시나리오
 
