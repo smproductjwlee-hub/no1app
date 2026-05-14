@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LinguaSync — 販売代理店ポータル</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body, button, input, select, textarea {
+      font-family: "Meiryo UI", "Meiryo", "Hiragino Kaku Gothic ProN", sans-serif;
+    }
+    .hidden { display: none !important; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
+      color: #0f172a;
+    }
+    .card {
+      background: white;
+      border-radius: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.04);
+      padding: 1.25rem;
+    }
+    .badge-active { background: #dcfce7; color: #14532d; }
+    .badge-suspended { background: #fee2e2; color: #7f1d1d; }
+    .plan-starter { background: #fef3c7; color: #78350f; }
+    .plan-business { background: #dbeafe; color: #1e3a8a; }
+    .plan-enterprise { background: #ede9fe; color: #4c1d95; }
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(15,23,42,0.5);
+      display: flex; align-items: center; justify-content: center; z-index: 50;
+    }
+    .modal {
+      background: white; border-radius: 1rem; padding: 1.5rem;
+      max-width: 32rem; width: calc(100% - 2rem); max-height: 90vh; overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <noscript>
+    <p style="padding:1rem;text-align:center;background:#fef2f2;color:#991b1b">
+      この画面には JavaScript が必要です。
+    </p>
+  </noscript>
+
+  <!-- ====================================================================== -->
+  <!-- 1. ログイン画面 -->
+  <!-- ====================================================================== -->
+  <div id="login-shell" class="max-w-md mx-auto px-4 py-10">
+    <p class="text-center text-xs font-semibold uppercase tracking-wide text-indigo-600">LinguaSync</p>
+    <h1 class="text-center text-xl font-bold mt-1 mb-6">販売代理店ポータル</h1>
+
+    <div class="card space-y-4">
+      <p class="text-sm text-gray-600">登録された代理店アカウントでログインしてください。</p>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">代理店メール (ログインID)</label>
+        <input id="login-email" type="email" autocomplete="username"
+               class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base"
+               placeholder="popo-admin@popo.co.jp" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">パスワード</label>
+        <input id="login-pw" type="password" autocomplete="current-password"
+               class="w-full rounded-xl border border-gray-300 px-3 py-3 text-base" />
+      </div>
+      <p id="login-err" class="text-sm text-rose-600 hidden"></p>
+      <button id="login-btn" type="button"
+              class="w-full py-3 rounded-xl bg-indigo-700 text-white font-semibold hover:bg-indigo-800 transition">
+        ログイン
+      </button>
+      <p class="text-[11px] text-gray-500 leading-relaxed">
+        ※ アカウントは LinguaSync 運営事務局が発行します。お困りの場合は本社サポートまでご連絡ください。
+      </p>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 2. 大리店 대시보드 -->
+  <!-- ====================================================================== -->
+  <div id="dashboard-shell" class="hidden max-w-5xl mx-auto px-4 py-6 space-y-5">
+
+    <!-- ヘッダー -->
+    <header class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-600">LinguaSync 販売代理店</p>
+        <h1 class="text-xl font-bold text-gray-900" id="dist-name">—</h1>
+        <p class="text-xs text-gray-500" id="dist-meta">—</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="btn-logout"
+                class="px-3 py-2 rounded-lg bg-white border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
+          ログアウト
+        </button>
+      </div>
+    </header>
+
+    <!-- 本社情報カード -->
+    <section class="card">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div class="flex-1 min-w-[12rem]">
+          <h2 class="text-sm font-semibold text-gray-700 mb-2">代理店情報</h2>
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-sm">
+            <dt class="text-gray-500">会社名</dt><dd id="info-name" class="font-medium">—</dd>
+            <dt class="text-gray-500">スラッグ</dt><dd id="info-slug" class="font-mono text-indigo-700">—</dd>
+            <dt class="text-gray-500">担当者</dt><dd id="info-person">—</dd>
+            <dt class="text-gray-500">電話</dt><dd id="info-phone">—</dd>
+            <dt class="text-gray-500">メール</dt><dd id="info-email">—</dd>
+            <dt class="text-gray-500">ステータス</dt>
+            <dd><span id="info-status" class="inline-block px-2 py-0.5 rounded text-xs font-semibold badge-active">—</span></dd>
+          </dl>
+        </div>
+        <button id="btn-edit-contact"
+                class="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 text-sm font-medium hover:bg-indigo-100">
+          編集
+        </button>
+      </div>
+      <div class="mt-3 pt-3 border-t border-gray-100">
+        <h3 class="text-xs font-semibold text-gray-600 mb-1.5">運営からの卸価格 (税抜・店舗あたり / 月)</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div class="bg-amber-50 rounded p-2"><span class="block text-amber-800 font-medium">Starter</span><span id="ws-starter" class="block font-mono text-lg">—</span></div>
+          <div class="bg-blue-50 rounded p-2"><span class="block text-blue-800 font-medium">Business</span><span id="ws-business" class="block font-mono text-lg">—</span></div>
+          <div class="bg-violet-50 rounded p-2"><span class="block text-violet-800 font-medium">Enterprise</span><span id="ws-enterprise" class="block font-mono text-lg">—</span></div>
+          <div class="bg-gray-50 rounded p-2"><span class="block text-gray-700 font-medium">MVP 初期費</span><span id="ws-mvp" class="block font-mono text-lg">—</span></div>
+        </div>
+        <p class="text-[11px] text-gray-500 mt-2">
+          ※ 上記は代理店が運営事務局に支払う卸価格です。エンドユーザーへの販売価格は代理店が自由に決定できます。
+        </p>
+      </div>
+    </section>
+
+    <!-- 산하 워크스페이스 일람 -->
+    <section class="card">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 class="text-sm font-semibold text-gray-700">担当エンドユーザー (<span id="ws-count">0</span>)</h2>
+        <button id="btn-add-ws"
+                class="px-3 py-1.5 rounded-lg bg-indigo-700 text-white text-sm font-semibold hover:bg-indigo-800">
+          ＋ 新規エンドユーザー追加
+        </button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm" id="ws-table">
+          <thead>
+            <tr class="text-left text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
+              <th class="py-2 pr-2">スラッグ</th>
+              <th class="py-2 pr-2">会社名・店舗名</th>
+              <th class="py-2 pr-2">プラン</th>
+              <th class="py-2 pr-2">小売価格 (Ent)</th>
+              <th class="py-2 pr-2">URL</th>
+              <th class="py-2 pr-2 text-right">操作</th>
+            </tr>
+          </thead>
+          <tbody id="ws-tbody"></tbody>
+        </table>
+        <p id="ws-empty" class="hidden text-center text-sm text-gray-500 py-8">
+          まだエンドユーザーが登録されていません。<br />「＋ 新規エンドユーザー追加」 から開始してください。
+        </p>
+      </div>
+    </section>
+
+    <p class="text-center text-[11px] text-gray-400 py-4">
+      LinguaSync 販売代理店ポータル — お困りの場合は本社サポート (partners@linguasync.example) までご連絡ください。
+    </p>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 모달 1: 연락처 편집 -->
+  <!-- ====================================================================== -->
+  <div id="modal-contact" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3 class="text-lg font-semibold mb-3">代理店情報の編集</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600">会社名</label>
+          <input id="ec-name" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600">担当者名</label>
+          <input id="ec-person" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600">電話 (エンドユーザーが緊急時に連絡する番号)</label>
+          <input id="ec-phone" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600">メール</label>
+          <input id="ec-email" type="email" class="w-full rounded-lg border border-gray-300 px-3 py-2" />
+        </div>
+        <p class="text-[11px] text-gray-500 leading-relaxed">
+          ※ 担当者名・電話・メールは、エンドユーザーの管理画面左上に「お困りの際は」として表示されます。
+        </p>
+        <p id="ec-err" class="text-sm text-rose-600 hidden"></p>
+      </div>
+      <div class="flex gap-2 justify-end mt-4">
+        <button class="px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100" data-close-modal="modal-contact">キャンセル</button>
+        <button id="ec-save" class="px-4 py-2 rounded-lg bg-indigo-700 text-white font-semibold hover:bg-indigo-800">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- 모달 2: 신규 워크스페이스 추가 -->
+  <!-- ====================================================================== -->
+  <div id="modal-add-ws" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3 class="text-lg font-semibold mb-3">新規エンドユーザー追加</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600">会社名・店舗名 <span class="text-rose-600">*</span></label>
+          <input id="aw-name" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2"
+                 placeholder="ABCラーメン関町店" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600">正式社名 (任意)</label>
+          <input id="aw-company" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2"
+                 placeholder="株式会社ABCラーメン" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600">スラッグ (URL の一部) <span class="text-rose-600">*</span></label>
+          <input id="aw-slug" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono"
+                 placeholder="abcramen" maxlength="20" />
+          <p class="text-[11px] text-gray-500 mt-1">英小文字・数字・ハイフン、3〜20文字。例: <code>abcramen</code></p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600">プラン <span class="text-rose-600">*</span></label>
+          <select id="aw-plan" class="w-full rounded-lg border border-gray-300 px-3 py-2">
+            <option value="starter">Starter (スタッフ最大10名)</option>
+            <option value="business">Business (スタッフ最大30名)</option>
+            <option value="enterprise" selected>Enterprise (スタッフ無制限)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600">店長ログインパスワード <span class="text-rose-600">*</span></label>
+          <input id="aw-pw" type="text" class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono"
+                 placeholder="AbcTest2026!" />
+          <p class="text-[11px] text-gray-500 mt-1">店長に直接お伝えください (メール発信なし)。</p>
+        </div>
+        <details class="bg-gray-50 rounded-lg p-3 text-sm">
+          <summary class="cursor-pointer font-medium text-gray-700">小売価格・ブランディング (任意)</summary>
+          <div class="space-y-2 mt-2">
+            <div>
+              <label class="block text-xs text-gray-600">小売価格 / 店舗・月 (税抜)</label>
+              <div class="grid grid-cols-3 gap-2 mt-1">
+                <input id="aw-rs" type="number" min="0" class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm" placeholder="Starter" />
+                <input id="aw-rb" type="number" min="0" class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm" placeholder="Business" />
+                <input id="aw-re" type="number" min="0" class="rounded-lg border border-gray-300 px-2 py-1.5 text-sm" placeholder="Enterprise" />
+              </div>
+              <p class="text-[11px] text-gray-500 mt-1">これは代理店の営業秘密です。運営事務局には共有されません。</p>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-600">ロゴ URL (任意)</label>
+              <input id="aw-logo" type="text" class="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm font-mono"
+                     placeholder="/static/logos/abcramen.png" />
+            </div>
+          </div>
+        </details>
+        <p id="aw-err" class="text-sm text-rose-600 hidden"></p>
+      </div>
+      <div class="flex gap-2 justify-end mt-4">
+        <button class="px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100" data-close-modal="modal-add-ws">キャンセル</button>
+        <button id="aw-save" class="px-4 py-2 rounded-lg bg-indigo-700 text-white font-semibold hover:bg-indigo-800">追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- スクリプト -->
+  <!-- ====================================================================== -->
+  <script>
+    "use strict";
+
+    const $ = (id) => document.getElementById(id);
+    const TOKEN_KEY = "ls_distributor_token";
+
+    // ====== セッション・トークン管理 ======
+    const auth = {
+      get token() { return localStorage.getItem(TOKEN_KEY) || ""; },
+      set token(v) {
+        if (v) localStorage.setItem(TOKEN_KEY, v);
+        else localStorage.removeItem(TOKEN_KEY);
+      },
+    };
+
+    async function api(path, opts = {}) {
+      const token = auth.token;
+      const url = path.includes("?") ? `${path}&token=${encodeURIComponent(token)}` : `${path}?token=${encodeURIComponent(token)}`;
+      const init = {
+        method: opts.method || "GET",
+        headers: { "Content-Type": "application/json" },
+      };
+      if (opts.body !== undefined) init.body = JSON.stringify(opts.body);
+      const r = await fetch(url, init);
+      if (!r.ok) {
+        const detail = await r.json().catch(() => ({}));
+        const err = new Error(detail.detail || `HTTP ${r.status}`);
+        err.status = r.status;
+        err.detail = detail.detail;
+        throw err;
+      }
+      return r.json();
+    }
+
+    function showError(elId, msg) {
+      const el = $(elId);
+      el.textContent = msg || "";
+      el.classList.toggle("hidden", !msg);
+    }
+
+    function openModal(id) { $(id).classList.remove("hidden"); }
+    function closeModal(id) { $(id).classList.add("hidden"); }
+    document.querySelectorAll("[data-close-modal]").forEach((b) => {
+      b.addEventListener("click", () => closeModal(b.getAttribute("data-close-modal")));
+    });
+
+    // ====== ログイン ======
+    async function doLogin() {
+      showError("login-err", "");
+      const email = $("login-email").value.trim();
+      const pw = $("login-pw").value;
+      if (!email || !pw) {
+        showError("login-err", "メール・パスワードを入力してください");
+        return;
+      }
+      try {
+        const r = await fetch("/api/v1/auth/portal-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: "distributor_admin",
+            username: email,
+            password: pw,
+          }),
+        });
+        const j = await r.json();
+        if (!r.ok) {
+          showError("login-err", j.detail || "ログインに失敗しました");
+          return;
+        }
+        auth.token = j.access_token;
+        await enterDashboard();
+      } catch (e) {
+        showError("login-err", String(e.message || e));
+      }
+    }
+    $("login-btn").addEventListener("click", doLogin);
+    $("login-pw").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+
+    // ====== ログアウト ======
+    $("btn-logout").addEventListener("click", () => {
+      auth.token = "";
+      $("dashboard-shell").classList.add("hidden");
+      $("login-shell").classList.remove("hidden");
+      $("login-email").value = "";
+      $("login-pw").value = "";
+    });
+
+    // ====== ダッシュボード進入 ======
+    async function enterDashboard() {
+      try {
+        const me = await api("/api/v1/distributors/me/self");
+        renderInfo(me);
+        await reloadWorkspaces();
+        $("login-shell").classList.add("hidden");
+        $("dashboard-shell").classList.remove("hidden");
+      } catch (e) {
+        if (e.status === 401 || e.status === 403) {
+          auth.token = "";
+          $("dashboard-shell").classList.add("hidden");
+          $("login-shell").classList.remove("hidden");
+          showError("login-err", "セッションが切れました。ログインしてください。");
+        } else {
+          alert("読み込みに失敗: " + (e.detail || e.message));
+        }
+      }
+    }
+
+    function jpy(n) {
+      if (n === null || n === undefined) return "—";
+      return "¥" + Number(n).toLocaleString("ja-JP");
+    }
+
+    function renderInfo(d) {
+      $("dist-name").textContent = d.name || "—";
+      $("dist-meta").textContent = `${d.contact_person || "—"} ・ ${d.contact_phone || "—"}`;
+      $("info-name").textContent = d.name || "—";
+      $("info-slug").textContent = d.slug || "—";
+      $("info-person").textContent = d.contact_person || "—";
+      $("info-phone").textContent = d.contact_phone || "—";
+      $("info-email").textContent = d.contact_email || "—";
+      const st = $("info-status");
+      st.textContent = d.status === "suspended" ? "停止中" : "稼働中";
+      st.className = "inline-block px-2 py-0.5 rounded text-xs font-semibold " +
+        (d.status === "suspended" ? "badge-suspended" : "badge-active");
+      $("ws-starter").textContent = jpy(d.wholesale_starter);
+      $("ws-business").textContent = jpy(d.wholesale_business);
+      $("ws-enterprise").textContent = jpy(d.wholesale_enterprise);
+      $("ws-mvp").textContent = jpy(d.wholesale_mvp_fee);
+
+      // 編集モーダル init
+      $("ec-name").value = d.name || "";
+      $("ec-person").value = d.contact_person || "";
+      $("ec-phone").value = d.contact_phone || "";
+      $("ec-email").value = d.contact_email || "";
+      window.__currentDist = d;
+    }
+
+    async function reloadWorkspaces() {
+      const rows = await api("/api/v1/distributors/me/workspaces");
+      $("ws-count").textContent = String(rows.length);
+      const tbody = $("ws-tbody");
+      tbody.innerHTML = "";
+      const empty = $("ws-empty");
+      if (rows.length === 0) {
+        empty.classList.remove("hidden");
+        $("ws-table").classList.add("hidden");
+        return;
+      }
+      empty.classList.add("hidden");
+      $("ws-table").classList.remove("hidden");
+      const distSlug = window.__currentDist?.slug || "";
+      for (const ws of rows) {
+        const tr = document.createElement("tr");
+        tr.className = "border-b border-gray-100 hover:bg-gray-50";
+        const planClass = ws.assigned_plan === "enterprise" ? "plan-enterprise"
+          : ws.assigned_plan === "business" ? "plan-business" : "plan-starter";
+        const url = `/${distSlug}/${ws.slug}`;
+        tr.innerHTML = `
+          <td class="py-2 pr-2 font-mono text-indigo-700">${ws.slug}</td>
+          <td class="py-2 pr-2">
+            <div class="font-medium">${escapeHtml(ws.name)}</div>
+            <div class="text-xs text-gray-500">${escapeHtml(ws.company_name || "")}</div>
+          </td>
+          <td class="py-2 pr-2">
+            <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold ${planClass}">${ws.assigned_plan}</span>
+          </td>
+          <td class="py-2 pr-2 font-mono">${ws.retail_price_enterprise !== null && ws.retail_price_enterprise !== undefined ? jpy(ws.retail_price_enterprise) : "—"}</td>
+          <td class="py-2 pr-2 text-xs">
+            <a href="${url}" target="_blank" class="text-indigo-700 hover:underline font-mono">${url}</a>
+          </td>
+          <td class="py-2 pr-2 text-right">
+            <span class="text-gray-400 text-xs">v2 で実装</span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    // ====== 編集モーダル ======
+    $("btn-edit-contact").addEventListener("click", () => openModal("modal-contact"));
+    $("ec-save").addEventListener("click", async () => {
+      showError("ec-err", "");
+      const d = window.__currentDist;
+      if (!d) return;
+      try {
+        const updated = await api(`/api/v1/distributors/${d.id}/contact`, {
+          method: "PATCH",
+          body: {
+            name: $("ec-name").value.trim(),
+            contact_person: $("ec-person").value.trim(),
+            contact_phone: $("ec-phone").value.trim(),
+            contact_email: $("ec-email").value.trim(),
+          },
+        });
+        renderInfo(updated);
+        closeModal("modal-contact");
+      } catch (e) {
+        showError("ec-err", e.detail || e.message);
+      }
+    });
+
+    // ====== 新規ワークスペース追加 ======
+    $("btn-add-ws").addEventListener("click", () => {
+      // フォームクリア
+      ["aw-name","aw-company","aw-slug","aw-pw","aw-rs","aw-rb","aw-re","aw-logo"].forEach(id => $(id).value = "");
+      $("aw-plan").value = "enterprise";
+      showError("aw-err", "");
+      openModal("modal-add-ws");
+    });
+
+    $("aw-save").addEventListener("click", async () => {
+      showError("aw-err", "");
+      const body = {
+        name: $("aw-name").value.trim(),
+        slug: $("aw-slug").value.trim().toLowerCase(),
+        owner_password: $("aw-pw").value,
+        company_name: $("aw-company").value.trim(),
+        assigned_plan: $("aw-plan").value,
+      };
+      const logo = $("aw-logo").value.trim();
+      if (logo) body.logo_url = logo;
+      const rs = $("aw-rs").value, rb = $("aw-rb").value, re = $("aw-re").value;
+      if (rs) body.retail_price_starter = Number(rs);
+      if (rb) body.retail_price_business = Number(rb);
+      if (re) body.retail_price_enterprise = Number(re);
+      if (!body.name || !body.slug || !body.owner_password) {
+        showError("aw-err", "名前・スラッグ・パスワードは必須です");
+        return;
+      }
+      if (body.owner_password.length < 4) {
+        showError("aw-err", "パスワードは4文字以上必要です");
+        return;
+      }
+      try {
+        const ws = await api("/api/v1/distributors/me/workspaces", { method: "POST", body });
+        await reloadWorkspaces();
+        closeModal("modal-add-ws");
+        const distSlug = window.__currentDist?.slug || "";
+        const url = `${location.origin}/${distSlug}/${ws.slug}`;
+        alert(
+          `新規エンドユーザーを追加しました。\n\n` +
+          `会社名: ${ws.name}\n` +
+          `スラッグ: ${ws.slug}\n` +
+          `URL: ${url}\n` +
+          `初期パスワード: ${body.owner_password}\n\n` +
+          `※ 上記情報を店長へ直接お伝えください。`
+        );
+      } catch (e) {
+        showError("aw-err", e.detail || e.message);
+      }
+    });
+
+    // ====== 起動時: トークンがあれば自動入場 ======
+    (async () => {
+      if (auth.token) {
+        await enterDashboard();
+      }
+    })();
+  </script>
+</body>
+</html>

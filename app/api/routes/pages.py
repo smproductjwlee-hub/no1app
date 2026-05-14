@@ -95,6 +95,10 @@ def _super_html() -> HTMLResponse:
     return HTMLResponse(content=_read_html("super.html"), headers=_NO_CACHE_HEADERS)
 
 
+def _distributor_html() -> HTMLResponse:
+    return HTMLResponse(content=_read_html("distributor.html"), headers=_NO_CACHE_HEADERS)
+
+
 # i18n JS は内容が変わるたびにブラウザが必ず再取得するよう no-cache を強制。
 # これらのファイルは小さく(数十KB)、毎回取りに行っても帯域・速度への影響は無視できる。
 _NO_CACHE_HEADERS = {
@@ -231,3 +235,14 @@ async def worker_page() -> HTMLResponse:
 @router.get("/worker/")
 async def worker_page_slash() -> HTMLResponse:
     return _worker_html()
+
+
+@router.get("/distributor")
+async def distributor_page() -> HTMLResponse:
+    """販売代理店ポータル (ログイン + 산하 워크스페이스 관리 SPA)."""
+    return _distributor_html()
+
+
+@router.get("/distributor/")
+async def distributor_page_slash() -> HTMLResponse:
+    return _distributor_html()

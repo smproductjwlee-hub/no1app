@@ -217,15 +217,15 @@ class WorkspaceStore:
                 raise RuntimeError("c-direct distributor not seeded; run init_db() first.")
             distributor_id = r[0] if not hasattr(r, "keys") else r["id"]
 
-        # slug 자동 생성
+        # slug 자동 생성 또는 명시적 사용
         ws_id = str(uuid.uuid4())
         if not slug:
+            # 미지정 → 자동 생성 + 충돌 시 -2, -3 suffix
             base = make_slug_from_name(company_name or name, fallback_id=ws_id)
             slug = _ensure_unique_workspace_slug(conn, distributor_id, base, ws_id)
         else:
-            # 이미 정해진 slug 도 정규화 (소문자·하이픈 외 제거)
+            # 명시 입력 → 정규화만 하고 그대로 시도. 충돌 시 IntegrityError 로 거부.
             slug = make_slug_from_name(slug, fallback_id=ws_id)
-            slug = _ensure_unique_workspace_slug(conn, distributor_id, slug, ws_id)
 
         now = time.time()
         mx_row = conn.execute("SELECT COALESCE(MAX(sort_order), -1.0) FROM workspaces").fetchone()
