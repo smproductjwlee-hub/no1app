@@ -192,6 +192,135 @@ def is_unique_violation(exc: BaseException) -> bool:
     return "unique" in msg or "duplicate" in msg
 
 
+# ============================================================
+# Phase 2.1 — Slug helpers + c-direct 시드 마이그레이션
+# ============================================================
+
+_SLUG_ALLOWED_RE = re.compile(r"[^a-z0-9\-]+")
+_SLUG_COLLAPSE_RE = re.compile(r"-+")
+
+
+def make_slug_from_name(name: str, fallback_id: str = "") -> str:
+    """워크스페이스 이름 → URL-safe slug.
+    - 영문 소문자·숫자·하이픈만 남김
+    - 길이 3-20
+    - 시작/끝은 영숫자
+    - 너무 짧으면 fallback_id 앞부분 사용
+    """
+    base = (name or "").lower()
+    # ASCII 가 아닌 문자는 모두 하이픈으로
+    base = _SLUG_ALLOWED_RE.sub("-", base)
+    base = _SLUG_COLLAPSE_RE.sub("-", base).strip("-")
+    if len(base) < 3:
+        if fallback_id:
+            base = "ws-" + re.sub(r"[^a-z0-9]", "", fallback_id.lower())[:6]
+            if len(base) < 3:
+                base = "ws-tmp"
+        else:
+            base = "ws-tmp"
+    if len(base) > 20:
+        base = base[:20].rstrip("-")
+        if len(base) < 3:
+            base = "ws-" + re.sub(r"[^a-z0-9]", "", fallback_id.lower())[:6] if fallback_id else "ws-tmp"
+    return base
+
+
+def _ensure_unique_workspace_slug(conn, distributor_id: str, base_slug: str, ws_id: str) -> str:
+    """같은 distributor 안에서 slug 가 유일하도록 보장. 충돌 시 -2, -3 등 suffix."""
+    slug = base_slug
+    suffix = 1
+    while True:
+        row = conn.execute(
+            "SELECT id FROM workspaces WHERE distributor_id = ? AND slug = ? AND id != ?",
+            (distributor_id, slug, ws_id),
+        ).fetchone()
+        if row is None:
+            return slug
+        suffix += 1
+        new_slug = f"{base_slug}-{suffix}"
+        # 길이 초과시 base 잘라서 재구성
+        if len(new_slug) > 20:
+            cut = 20 - len(f"-{suffix}")
+            new_slug = f"{base_slug[:cut].rstrip('-')}-{suffix}"
+        slug = new_slug
+
+
+def _seed_c_direct_and_migrate(conn) -> None:
+    """初回起動時に「c-direct」 distributor (직판 가상 대리점) を作成し、
+    既存ワークスペースで distributor_id が NULL のものを c-direct に紐づける。
+    slug が NULL のワークスペースは name から自動生成。
+    """
+    import uuid as _uuid
+
+    now = time.time()
+    # 1. c-direct distributor が存在するか
+    row = conn.execute("SELECT id FROM distributors WHERE slug = ?", ("c-direct",)).fetchone()
+    if row is None:
+        c_direct_id = str(_uuid.uuid4())
+        try:
+            conn.execute(
+                """
+                INSERT INTO distributors (
+                    id, slug, name, contact_person, contact_phone, contact_email,
+                    owner_email, owner_password_hash,
+                    wholesale_starter, wholesale_business, wholesale_enterprise, wholesale_mvp_fee,
+                    force_password_change_on_login, status, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    c_direct_id,
+                    "c-direct",
+                    "直販 (Direct Sales)",
+                    "",
+                    "",
+                    "",
+                    "",
+                    "",
+                    0,  # wholesale_starter (직판은 의미 없음)
+                    0,
+                    0,
+                    0,
+                    0,
+                    "active",
+                    now,
+                    now,
+                ),
+            )
+        except Exception:
+            # 동시 실행 등으로 이미 생성된 경우
+            row2 = conn.execute("SELECT id FROM distributors WHERE slug = ?", ("c-direct",)).fetchone()
+            if row2 is not None:
+                c_direct_id = row2[0] if not hasattr(row2, "keys") else row2["id"]
+    else:
+        c_direct_id = row[0] if not hasattr(row, "keys") else row["id"]
+
+    # 2. distributor_id NULL or '' のワークスペースを c-direct に紐づけ
+    conn.execute(
+        "UPDATE workspaces SET distributor_id = ? "
+        "WHERE distributor_id IS NULL OR distributor_id = ''",
+        (c_direct_id,),
+    )
+
+    # 3. slug NULL or '' のワークスペースに自動 slug を割当
+    rows = conn.execute(
+        "SELECT id, name, company_name FROM workspaces WHERE slug IS NULL OR slug = ''"
+    ).fetchall()
+    for r in rows:
+        ws_id = r[0] if not hasattr(r, "keys") else r["id"]
+        name = (r[1] if not hasattr(r, "keys") else r["name"]) or ""
+        company = (r[2] if not hasattr(r, "keys") else r["company_name"]) or ""
+        base = make_slug_from_name(company or name, fallback_id=ws_id)
+        slug = _ensure_unique_workspace_slug(conn, c_direct_id, base, ws_id)
+        conn.execute("UPDATE workspaces SET slug = ? WHERE id = ?", (slug, ws_id))
+
+    try:
+        conn.commit()
+    except Exception:
+        # PG では autocommit OFF だが、connect スコープ内で commit が必要なケースもある
+        pass
+
+
 def _build_pg_pool():
     import psycopg
     from psycopg_pool import ConnectionPool
@@ -237,6 +366,34 @@ def _init_db_pg() -> None:
     """
     pool = _get_pg_pool()
     with pool.connection() as conn:
+        # ============================================================
+        # Phase 2.1: distributors (販売代理店 / 3계층 멀티테넌시の中間層)
+        # ============================================================
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS distributors (
+                id TEXT PRIMARY KEY,
+                slug TEXT NOT NULL,
+                name TEXT NOT NULL,
+                contact_person TEXT NOT NULL DEFAULT '',
+                contact_phone TEXT NOT NULL DEFAULT '',
+                contact_email TEXT NOT NULL DEFAULT '',
+                owner_email TEXT NOT NULL DEFAULT '',
+                owner_password_hash TEXT NOT NULL DEFAULT '',
+                wholesale_starter INTEGER NOT NULL DEFAULT 8000,
+                wholesale_business INTEGER NOT NULL DEFAULT 6500,
+                wholesale_enterprise INTEGER NOT NULL DEFAULT 5000,
+                wholesale_mvp_fee INTEGER NOT NULL DEFAULT 5000000,
+                force_password_change_on_login INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at DOUBLE PRECISION NOT NULL,
+                updated_at DOUBLE PRECISION NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_distributors_slug ON distributors(slug)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_distributors_owner_email ON distributors(owner_email)")
+
         # workspaces（インクリメンタル ALTER 後の最終形）
         conn.execute(
             """
@@ -254,7 +411,17 @@ def _init_db_pg() -> None:
                 distributor_name TEXT NOT NULL DEFAULT '',
                 monthly_price_jpy INTEGER NOT NULL DEFAULT 0,
                 commission_rate_pct INTEGER NOT NULL DEFAULT 20,
-                billing_start_at DOUBLE PRECISION
+                billing_start_at DOUBLE PRECISION,
+                distributor_id TEXT,
+                slug TEXT,
+                logo_url TEXT,
+                primary_color TEXT,
+                owner_password_hash TEXT NOT NULL DEFAULT '',
+                force_password_change_on_login INTEGER NOT NULL DEFAULT 0,
+                retail_price_starter INTEGER,
+                retail_price_business INTEGER,
+                retail_price_enterprise INTEGER,
+                assigned_plan TEXT NOT NULL DEFAULT 'starter'
             )
             """
         )
@@ -264,6 +431,17 @@ def _init_db_pg() -> None:
             ("monthly_price_jpy", "ADD COLUMN IF NOT EXISTS monthly_price_jpy INTEGER NOT NULL DEFAULT 0"),
             ("commission_rate_pct", "ADD COLUMN IF NOT EXISTS commission_rate_pct INTEGER NOT NULL DEFAULT 20"),
             ("billing_start_at", "ADD COLUMN IF NOT EXISTS billing_start_at DOUBLE PRECISION"),
+            # Phase 2.1: 3계층 멀티테넌시 + 도매·소매 가격
+            ("distributor_id", "ADD COLUMN IF NOT EXISTS distributor_id TEXT"),
+            ("slug", "ADD COLUMN IF NOT EXISTS slug TEXT"),
+            ("logo_url", "ADD COLUMN IF NOT EXISTS logo_url TEXT"),
+            ("primary_color", "ADD COLUMN IF NOT EXISTS primary_color TEXT"),
+            ("owner_password_hash", "ADD COLUMN IF NOT EXISTS owner_password_hash TEXT NOT NULL DEFAULT ''"),
+            ("force_password_change_on_login", "ADD COLUMN IF NOT EXISTS force_password_change_on_login INTEGER NOT NULL DEFAULT 0"),
+            ("retail_price_starter", "ADD COLUMN IF NOT EXISTS retail_price_starter INTEGER"),
+            ("retail_price_business", "ADD COLUMN IF NOT EXISTS retail_price_business INTEGER"),
+            ("retail_price_enterprise", "ADD COLUMN IF NOT EXISTS retail_price_enterprise INTEGER"),
+            ("assigned_plan", "ADD COLUMN IF NOT EXISTS assigned_plan TEXT NOT NULL DEFAULT 'starter'"),
         ):
             try:
                 conn.execute(f"ALTER TABLE workspaces {ddl}")
@@ -482,6 +660,15 @@ def _init_db_pg() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_translation_usage_ym ON translation_usage(year_month, workspace_id)"
         )
+        # Phase 2.1: c-direct distributor 시드 + 기존 workspaces 마이그레이션
+        _seed_c_direct_and_migrate(conn)
+        # workspace의 (distributor_id, slug) 복합 유니크 인덱스 — 시드 후 생성
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ws_dist_slug ON workspaces(distributor_id, slug)"
+            )
+        except Exception:
+            pass
         # 古いデータの整理（60日以上前の指示・1日以上前の presence）
         cutoff = time.time() - 60 * 24 * 60 * 60
         conn.execute("DELETE FROM instruction_rounds WHERE created_at < %s", (cutoff,))
@@ -556,6 +743,33 @@ def _init_db_sqlite() -> None:
         # synchronous=NORMAL は WAL 推奨設定で、性能と耐久性のバランスがとれる。
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
+        # ============================================================
+        # Phase 2.1: distributors (販売代理店 / 3계층 멀티테넌시の中間層)
+        # ============================================================
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS distributors (
+                id TEXT PRIMARY KEY,
+                slug TEXT NOT NULL,
+                name TEXT NOT NULL,
+                contact_person TEXT NOT NULL DEFAULT '',
+                contact_phone TEXT NOT NULL DEFAULT '',
+                contact_email TEXT NOT NULL DEFAULT '',
+                owner_email TEXT NOT NULL DEFAULT '',
+                owner_password_hash TEXT NOT NULL DEFAULT '',
+                wholesale_starter INTEGER NOT NULL DEFAULT 8000,
+                wholesale_business INTEGER NOT NULL DEFAULT 6500,
+                wholesale_enterprise INTEGER NOT NULL DEFAULT 5000,
+                wholesale_mvp_fee INTEGER NOT NULL DEFAULT 5000000,
+                force_password_change_on_login INTEGER NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at REAL NOT NULL,
+                updated_at REAL NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_distributors_slug ON distributors(slug)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_distributors_owner_email ON distributors(owner_email)")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS workspaces (
@@ -609,6 +823,31 @@ def _init_db_sqlite() -> None:
             conn.execute("ALTER TABLE workspaces ADD COLUMN commission_rate_pct INTEGER NOT NULL DEFAULT 20")
         if "billing_start_at" not in wcols4:
             conn.execute("ALTER TABLE workspaces ADD COLUMN billing_start_at REAL")
+        # Phase 2.1 — 3계층 멀티테넌시 + 도매·소매 가격
+        cur_w5 = conn.execute("PRAGMA table_info(workspaces)")
+        wcols5 = {row[1] for row in cur_w5.fetchall()}
+        if "distributor_id" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN distributor_id TEXT")
+        if "slug" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN slug TEXT")
+        if "logo_url" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN logo_url TEXT")
+        if "primary_color" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN primary_color TEXT")
+        if "owner_password_hash" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN owner_password_hash TEXT NOT NULL DEFAULT ''")
+        if "force_password_change_on_login" not in wcols5:
+            conn.execute(
+                "ALTER TABLE workspaces ADD COLUMN force_password_change_on_login INTEGER NOT NULL DEFAULT 0"
+            )
+        if "retail_price_starter" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN retail_price_starter INTEGER")
+        if "retail_price_business" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN retail_price_business INTEGER")
+        if "retail_price_enterprise" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN retail_price_enterprise INTEGER")
+        if "assigned_plan" not in wcols5:
+            conn.execute("ALTER TABLE workspaces ADD COLUMN assigned_plan TEXT NOT NULL DEFAULT 'starter'")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS workspace_staff_accounts (
@@ -786,6 +1025,16 @@ def _init_db_sqlite() -> None:
             "CREATE INDEX IF NOT EXISTS idx_translation_usage_ym ON translation_usage(year_month, workspace_id)"
         )
         conn.commit()
+        # Phase 2.1: c-direct 시드 + 기존 워크스페이스 매핑
+        _seed_c_direct_and_migrate(conn)
+        # (distributor_id, slug) 복합 유니크 인덱스 — 시드 후 생성
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ws_dist_slug ON workspaces(distributor_id, slug)"
+            )
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
         conn.execute("PRAGMA foreign_keys = ON")
         _cutoff = time.time() - 60 * 24 * 60 * 60
         conn.execute("DELETE FROM instruction_rounds WHERE created_at < ?", (_cutoff,))
