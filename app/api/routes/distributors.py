@@ -107,6 +107,20 @@ class DistributorWorkspaceRow(BaseModel):
     created_at: float
 
 
+class WorkspaceCreateByDistributorIn(BaseModel):
+    """대리점이 자기 산하에 신규 고객사 (워크스페이스) 추가."""
+    name: str = Field(..., min_length=1, max_length=200)
+    slug: str = Field(..., min_length=3, max_length=20)
+    owner_password: str = Field(..., min_length=4, max_length=200)
+    company_name: str = Field("", max_length=200)
+    logo_url: Optional[str] = Field(None, max_length=500)
+    primary_color: Optional[str] = Field(None, max_length=20)
+    retail_price_starter: Optional[int] = Field(None, ge=0)
+    retail_price_business: Optional[int] = Field(None, ge=0)
+    retail_price_enterprise: Optional[int] = Field(None, ge=0)
+    assigned_plan: str = Field("starter", pattern="^(starter|business|enterprise)$")
+
+
 # ============================================================
 # Helpers
 # ============================================================
@@ -214,6 +228,44 @@ async def list_my_workspaces(
     """대리점 관리자가 본인 산하 워크스페이스 일람."""
     rows = await run_db(workspaces.list_by_distributor, sess.distributor_id)
     return [_to_ws_row(ws) for ws in rows]
+
+
+@router.post("/me/workspaces", response_model=DistributorWorkspaceRow, status_code=status.HTTP_201_CREATED)
+async def create_my_workspace(
+    body: WorkspaceCreateByDistributorIn,
+    sess: Session = Depends(require_distributor_admin),
+) -> DistributorWorkspaceRow:
+    """대리점이 자기 산하에 신규 고객사 추가.
+
+    - slug 는 본 대리점 내 unique
+    - owner_password 는 즉시 hash 되어 저장 (메일 발송 없음, 테스트 환경)
+    - retail_price_* 는 영업 비밀 (운영자 super admin 도 안 봄)
+    """
+    slug = body.slug.strip().lower()
+    if not _SLUG_RE.match(slug):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="slug must be lowercase alphanumeric + hyphen, start/end with alphanumeric, 3-20 chars",
+        )
+    from app.services.distributors import hash_password
+    try:
+        ws = await run_db(
+            workspaces.create,
+            body.name,
+            distributor_id=sess.distributor_id,
+            slug=slug,
+            owner_password_hash=hash_password(body.owner_password),
+            company_name=body.company_name,
+            logo_url=body.logo_url,
+            primary_color=body.primary_color,
+            retail_price_starter=body.retail_price_starter,
+            retail_price_business=body.retail_price_business,
+            retail_price_enterprise=body.retail_price_enterprise,
+            assigned_plan=body.assigned_plan,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    return _to_ws_row(ws)
 
 
 @router.get("/{distributor_id}", response_model=DistributorOut)
