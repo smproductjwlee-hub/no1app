@@ -386,23 +386,30 @@
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 border-b border-gray-200 pb-2 sm:flex-row sm:items-end sm:justify-between">
-          <h2 class="text-base font-semibold text-gray-900 shrink-0">ワークスペース一覧</h2>
-          <div class="flex flex-1 flex-col gap-1 min-w-0 sm:max-w-xs sm:ml-auto">
-            <label for="ws-search" class="sr-only">検索</label>
-            <input
-              id="ws-search"
-              type="search"
-              autocomplete="off"
-              placeholder="名前・会社・IDで検索…"
-              class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-            />
+        <details id="ws-list-details" class="rounded-2xl bg-white border border-gray-200 shadow-sm overflow-hidden" open>
+          <summary class="cursor-pointer list-none px-4 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between text-sm font-semibold text-gray-900">
+            <span>ワークスペース一覧 (<span id="list-count">0</span>)</span>
+            <span class="text-gray-600/60 text-xs">▼</span>
+          </summary>
+          <div class="p-4 space-y-3">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <div class="flex flex-1 flex-col gap-1 min-w-0 sm:max-w-xs sm:ml-auto">
+                <label for="ws-search" class="sr-only">検索</label>
+                <input
+                  id="ws-search"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="名前・会社・IDで検索…"
+                  class="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <ul id="list" class="space-y-3 max-h-[calc(100vh-12rem)] overflow-y-auto pr-1"></ul>
+            <p id="empty" class="text-sm text-gray-500 hidden py-8 text-center border border-dashed border-gray-200 rounded-xl bg-white">
+              ワークスペースがありません。左のフォームから作成するか、既存の管理画面から作成されているか確認してください。
+            </p>
           </div>
-        </div>
-        <ul id="list" class="space-y-3 max-h-[calc(100vh-8rem)] overflow-y-auto pr-1"></ul>
-        <p id="empty" class="text-sm text-gray-500 hidden py-8 text-center border border-dashed border-gray-200 rounded-xl bg-white">
-          ワークスペースがありません。左のフォームから作成するか、既存の管理画面から作成されているか確認してください。
-        </p>
+        </details>
       </aside>
     </div>
   </div>
@@ -741,6 +748,9 @@
           })
           .then(function (rows) {
             workspaceRowsCache = rows || [];
+            // 헤더의 카운트 갱신 (collapsible summary 안의 표시)
+            var cntEl = document.getElementById("list-count");
+            if (cntEl) cntEl.textContent = String(workspaceRowsCache.length);
             if (!workspaceRowsCache.length) {
               list.innerHTML = "";
               empty.classList.remove("hidden");
