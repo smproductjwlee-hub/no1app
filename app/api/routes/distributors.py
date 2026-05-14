@@ -547,6 +547,81 @@ async def upload_workspace_logo(
     return LogoUploadResult(workspace_id=workspace_id, logo_url=new_url)
 
 
+# ============================================================
+# Phase 2.10 — 자동 플랜 업그레이드 이벤트 조회 (계약서 §5.5)
+# ============================================================
+
+
+class PlanUpgradeEvent(BaseModel):
+    id: str
+    workspace_id: str
+    workspace_slug: str
+    workspace_name: str
+    distributor_id: str
+    distributor_slug: str
+    distributor_name: str
+    year_month: str
+    from_plan: str
+    to_plan: str
+    triggered_api_chars: int
+    threshold: int
+    created_at: float
+
+
+def _enrich_upgrade_events(rows: list[dict]) -> list[PlanUpgradeEvent]:
+    """원시 이벤트 row 에 워크스페이스·대리점 이름 등 추가 정보 결합."""
+    out: list[PlanUpgradeEvent] = []
+    ws_cache: dict = {}
+    d_cache: dict = {}
+    for r in rows:
+        wid = r["workspace_id"]
+        if wid not in ws_cache:
+            ws_cache[wid] = workspaces.get(wid)
+        ws = ws_cache[wid]
+        did = r["distributor_id"] or (ws.distributor_id if ws else "")
+        if did and did not in d_cache:
+            d_cache[did] = distributors_store.get(did)
+        d = d_cache.get(did) if did else None
+        out.append(PlanUpgradeEvent(
+            id=r["id"],
+            workspace_id=wid,
+            workspace_slug=ws.slug if ws else "",
+            workspace_name=ws.name if ws else "(deleted)",
+            distributor_id=did or "",
+            distributor_slug=d.slug if d else "",
+            distributor_name=d.name if d else "",
+            year_month=r["year_month"],
+            from_plan=r["from_plan"],
+            to_plan=r["to_plan"],
+            triggered_api_chars=r["triggered_api_chars"],
+            threshold=r["threshold"],
+            created_at=r["created_at"],
+        ))
+    return out
+
+
+@router.get("/plan-upgrade-events", response_model=list[PlanUpgradeEvent])
+async def list_plan_upgrades_super(
+    limit: int = 50,
+    _sess: Session = Depends(require_super_admin),
+) -> list[PlanUpgradeEvent]:
+    """운영자: 모든 대리점·워크스페이스의 자동 플랜 업그레이드 이력."""
+    from app.services.translation_usage import list_upgrade_events
+    raw = await run_db(list_upgrade_events, limit, None)
+    return await run_db(_enrich_upgrade_events, raw)
+
+
+@router.get("/me/plan-upgrade-events", response_model=list[PlanUpgradeEvent])
+async def list_plan_upgrades_my(
+    limit: int = 50,
+    sess: Session = Depends(require_distributor_admin),
+) -> list[PlanUpgradeEvent]:
+    """대리점: 자기 산하 워크스페이스의 자동 플랜 업그레이드 이력."""
+    from app.services.translation_usage import list_upgrade_events
+    raw = await run_db(list_upgrade_events, limit, sess.distributor_id)
+    return await run_db(_enrich_upgrade_events, raw)
+
+
 @router.delete("/me/workspaces/{workspace_id}/logo")
 async def delete_workspace_logo(
     workspace_id: str,

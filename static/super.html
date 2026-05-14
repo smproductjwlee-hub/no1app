@@ -121,6 +121,40 @@
           </div>
         </div>
 
+        <!-- Phase 2.10: 自動プラン·アップグレード 이력 (계약서 §5.5) -->
+        <details class="rounded-2xl bg-white border border-rose-200 shadow-sm overflow-hidden">
+          <summary class="cursor-pointer list-none px-4 py-3 bg-rose-50/80 border-b border-rose-100 flex items-center justify-between text-sm font-semibold text-rose-900">
+            <span>自動プラン·アップグレード履歴 (<span id="upg-count">—</span>)</span>
+            <span class="text-rose-700/60 text-xs">▼</span>
+          </summary>
+          <div class="p-4 space-y-2">
+            <p class="text-[11px] text-gray-500 leading-snug">
+              ※ ワークスペースが当月 API 字数の上限を超過すると、自動的に上位プランに昇格します (契約書 §5.5)。
+              これは LinguaSync が API 過剰利用による損益悪化を防ぐ仕組みです。
+              代理店には 7日前まで通知 (現在は手動運用 — 自動通知は将来実装) 後、翌月から新卸価格を適用。
+            </p>
+            <div id="upg-empty" class="hidden text-center text-xs text-gray-500 py-4">
+              自動アップグレードが発生していません。
+            </div>
+            <div id="upg-rows" class="hidden overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="text-left text-[10px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                    <th class="py-2 pr-2">日時</th>
+                    <th class="py-2 pr-2">代理店</th>
+                    <th class="py-2 pr-2">ワークスペース</th>
+                    <th class="py-2 pr-2">YYYY-MM</th>
+                    <th class="py-2 pr-2">変更</th>
+                    <th class="py-2 pr-2 text-right">超過時 api_chars</th>
+                  </tr>
+                </thead>
+                <tbody id="upg-tbody"></tbody>
+              </table>
+            </div>
+            <button id="upg-reload-btn" type="button" class="text-xs text-indigo-700 hover:underline">再読み込み</button>
+          </div>
+        </details>
+
         <!-- Phase 2.7: 卸売 請求レポート (대리점별 청구) -->
         <details class="rounded-2xl bg-white border border-amber-200 shadow-sm overflow-hidden">
           <summary class="cursor-pointer list-none px-4 py-3 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between text-sm font-semibold text-amber-900">
@@ -1527,6 +1561,58 @@
         el.textContent = msg || "";
         el.className = "text-xs min-h-[1rem] " + (isError ? "text-rose-600" : "text-gray-600");
       }
+
+      // ====================================================================
+      // Phase 2.10 — 自動プラン·アップグレード 이력
+      // ====================================================================
+      async function loadUpgradeEvents() {
+        try {
+          var r = await fetch("/api/v1/distributors/plan-upgrade-events?limit=50&token=" + encodeURIComponent(tok));
+          if (!r.ok) {
+            document.getElementById("upg-count").textContent = "?";
+            return;
+          }
+          var arr = await r.json();
+          var tbody = document.getElementById("upg-tbody");
+          tbody.innerHTML = "";
+          document.getElementById("upg-count").textContent = String(arr.length);
+          if (arr.length === 0) {
+            document.getElementById("upg-empty").classList.remove("hidden");
+            document.getElementById("upg-rows").classList.add("hidden");
+            return;
+          }
+          document.getElementById("upg-empty").classList.add("hidden");
+          document.getElementById("upg-rows").classList.remove("hidden");
+          arr.forEach(function (ev) {
+            var when = new Date(ev.created_at * 1000);
+            var whenStr = when.toLocaleString("ja-JP", { hour12: false });
+            var fromBadge =
+              '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800">' +
+              ev.from_plan + '</span>';
+            var toBadge =
+              '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-violet-100 text-violet-800">' +
+              ev.to_plan + '</span>';
+            var tr = document.createElement("tr");
+            tr.className = "border-b border-gray-100 hover:bg-gray-50";
+            tr.innerHTML =
+              '<td class="py-2 pr-2 text-[10px] text-gray-600 whitespace-nowrap">' + whenStr + '</td>' +
+              '<td class="py-2 pr-2">' + escapeHtml(ev.distributor_name || "(直販)") +
+                ' <span class="text-[10px] text-gray-500 font-mono">/' + escapeHtml(ev.distributor_slug) + '</span></td>' +
+              '<td class="py-2 pr-2">' + escapeHtml(ev.workspace_name) +
+                ' <span class="text-[10px] text-gray-500 font-mono">/' + escapeHtml(ev.workspace_slug) + '</span></td>' +
+              '<td class="py-2 pr-2 font-mono text-[10px]">' + escapeHtml(ev.year_month) + '</td>' +
+              '<td class="py-2 pr-2 whitespace-nowrap">' + fromBadge + ' → ' + toBadge + '</td>' +
+              '<td class="py-2 pr-2 text-right font-mono">' + Number(ev.triggered_api_chars).toLocaleString() +
+                ' <span class="text-[10px] text-gray-400">(上限 ' + Number(ev.threshold).toLocaleString() + ')</span></td>';
+            tbody.appendChild(tr);
+          });
+        } catch (e) {
+          console.error("upgrade events load failed", e);
+        }
+      }
+
+      document.getElementById("upg-reload-btn").addEventListener("click", loadUpgradeEvents);
+      loadUpgradeEvents();
 
       document.getElementById("wholesale-fetch-btn").addEventListener("click", async function () {
         var year = Number(document.getElementById("wholesale-year").value) || now.getFullYear();

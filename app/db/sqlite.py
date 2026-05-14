@@ -660,6 +660,25 @@ def _init_db_pg() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_translation_usage_ym ON translation_usage(year_month, workspace_id)"
         )
+        # Phase 2.10 — 自動プラン업그레이드 이력 (계약서 §5.5)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plan_upgrade_events (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                distributor_id TEXT NOT NULL DEFAULT '',
+                year_month TEXT NOT NULL,
+                from_plan TEXT NOT NULL,
+                to_plan TEXT NOT NULL,
+                triggered_api_chars BIGINT NOT NULL,
+                threshold BIGINT NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pue_created ON plan_upgrade_events(created_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pue_workspace ON plan_upgrade_events(workspace_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pue_distributor ON plan_upgrade_events(distributor_id, created_at DESC)")
         # Phase 2.1: c-direct distributor 시드 + 기존 workspaces 마이그레이션
         _seed_c_direct_and_migrate(conn)
         # workspace의 (distributor_id, slug) 복합 유니크 인덱스 — 시드 후 생성
@@ -1024,6 +1043,25 @@ def _init_db_sqlite() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_translation_usage_ym ON translation_usage(year_month, workspace_id)"
         )
+        # Phase 2.10 — 自動プラン업그레이드 이력 (계약서 §5.5)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plan_upgrade_events (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                distributor_id TEXT NOT NULL DEFAULT '',
+                year_month TEXT NOT NULL,
+                from_plan TEXT NOT NULL,
+                to_plan TEXT NOT NULL,
+                triggered_api_chars INTEGER NOT NULL,
+                threshold INTEGER NOT NULL,
+                created_at REAL NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pue_created ON plan_upgrade_events(created_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pue_workspace ON plan_upgrade_events(workspace_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pue_distributor ON plan_upgrade_events(distributor_id, created_at DESC)")
         conn.commit()
         # Phase 2.1: c-direct 시드 + 기존 워크스페이스 매핑
         _seed_c_direct_and_migrate(conn)
