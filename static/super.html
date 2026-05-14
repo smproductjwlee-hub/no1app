@@ -178,7 +178,7 @@
 
             <div id="wholesale-summary" class="hidden grid grid-cols-1 sm:grid-cols-4 gap-2">
               <div class="bg-gray-50 rounded-lg p-3">
-                <p class="text-[10px] text-gray-500 uppercase">월액 도매 합계</p>
+                <p class="text-[10px] text-gray-500 uppercase">月額卸売合計</p>
                 <p id="ws-sum-monthly" class="text-lg font-mono font-bold text-gray-900">—</p>
               </div>
               <div class="bg-amber-50 rounded-lg p-3">
@@ -190,7 +190,7 @@
                 <p id="ws-sum-total" class="text-xl font-mono font-bold text-emerald-900">—</p>
               </div>
               <div class="bg-slate-50 rounded-lg p-3">
-                <p class="text-[10px] text-slate-500 uppercase">合計 워크스페이스</p>
+                <p class="text-[10px] text-slate-500 uppercase">合計ワークスペース</p>
                 <p id="ws-sum-ws" class="text-lg font-mono font-bold text-slate-900">—</p>
               </div>
             </div>
@@ -201,8 +201,8 @@
                   <tr class="text-left text-[10px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
                     <th class="py-2 pr-2">代理店</th>
                     <th class="py-2 pr-2 text-right">St / Bus / Ent</th>
-                    <th class="py-2 pr-2 text-right">월액 도매</th>
-                    <th class="py-2 pr-2 text-right">MVP 신규</th>
+                    <th class="py-2 pr-2 text-right">月額卸売</th>
+                    <th class="py-2 pr-2 text-right">MVP 新規</th>
                     <th class="py-2 pr-2 text-right font-bold">合計請求</th>
                   </tr>
                 </thead>
@@ -238,7 +238,7 @@
                     <th class="py-2 pr-2">会社名・担当者</th>
                     <th class="py-2 pr-2">卸 St / Bus / Ent</th>
                     <th class="py-2 pr-2">MVP費</th>
-                    <th class="py-2 pr-2 text-center">산하 ws</th>
+                    <th class="py-2 pr-2 text-center">傘下 ws</th>
                     <th class="py-2 pr-2">状態</th>
                     <th class="py-2 pr-2 text-right">操作</th>
                   </tr>
@@ -374,7 +374,7 @@
                 <legend class="text-xs font-semibold px-1 text-rose-800">状態と削除 (危険操作)</legend>
                 <div class="flex flex-wrap gap-2 mt-1">
                   <button type="button" id="de-toggle-status" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700">状態切替</button>
-                  <button type="button" id="de-delete" class="px-3 py-1.5 rounded-lg bg-rose-700 text-white text-xs font-semibold hover:bg-rose-800">完全削除 (산하 ws 도 모두 삭제)</button>
+                  <button type="button" id="de-delete" class="px-3 py-1.5 rounded-lg bg-rose-700 text-white text-xs font-semibold hover:bg-rose-800">完全削除 (傘下 ws もすべて削除)</button>
                 </div>
               </fieldset>
             </div>
@@ -1408,7 +1408,7 @@
             return;
           }
           document.getElementById("modal-dist-new").classList.add("hidden");
-          showOk("代理店 「" + body.name + "」 を登録しました。ログイン URL: /distributor / 初期PW: " + body.owner_password);
+          showOk("代理店 「" + body.name + "」 を登録しました。ログイン URL: /distributor / 初期パスワード: " + body.owner_password);
           await loadDistributors();
         } catch (e) {
           errEl.textContent = String(e.message || e);
@@ -1523,8 +1523,8 @@
         var d = distRowsCache.find(function (x) { return x.id === editingDistId; });
         if (!d) return;
         var answer = prompt(
-          "代理店 「" + d.name + "」 と산하 すべてのエンドユーザー (워크스페이스) を完全に削除します。\n\n" +
-          "이 작업은 取り消せません。\n削除する場合 「DELETE」 とタイプしてください:"
+          "代理店 「" + d.name + "」 と傘下のすべてのエンドユーザー (ワークスペース) を完全に削除します。\n\n" +
+          "この操作は取り消せません。\n削除する場合 「DELETE」 とタイプしてください:"
         );
         if (answer !== "DELETE") return;
         try {
@@ -1538,7 +1538,7 @@
             return;
           }
           var result = await r.json();
-          deSetStatus("削除完了: 워크스페이스 " + result.workspaces_deleted + "개 + 파일 " + result.files_deleted + " 件", true);
+          deSetStatus("削除完了: ワークスペース " + result.workspaces_deleted + " 件 + ファイル " + result.files_deleted + " 件", true);
           document.getElementById("modal-dist-edit").classList.add("hidden");
           await loadDistributors();
           loadList(); // 워크스페이스 일람도 갱신
