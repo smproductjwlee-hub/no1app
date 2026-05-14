@@ -1003,6 +1003,13 @@ async def add_workspace_glossary_term(
         if code in ("duplicate_sheet", "duplicate_workspace", "duplicate_expression_workspace"):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=code) from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=code) from exc
+    except Exception as exc:
+        import traceback as _tb
+        _tb.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"{type(exc).__name__}: {exc}",
+        ) from exc
 
 
 @router.post("/{workspace_id}/expression-terms", status_code=status.HTTP_201_CREATED)
@@ -1030,3 +1037,12 @@ async def add_workspace_expression_term(
         if code in ("duplicate_sheet", "duplicate_workspace", "duplicate_glossary_workspace"):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=code) from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=code) from exc
+    except Exception as exc:
+        # 진단용: 예상치 못한 예외를 500 이 아닌 상세 메시지로 클라이언트에 노출.
+        # (이대로 두면 점장이 「登録に失敗しました」 만 보고 무엇이 잘못됐는지 모름)
+        import traceback as _tb
+        _tb.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"{type(exc).__name__}: {exc}",
+        ) from exc
