@@ -99,9 +99,9 @@ window.__WB_ADMIN_I18N__ = {
     pc_words_title: "用語・単語の登録（PC）",
     pc_words_p:
       "Google の編集に加え、「用語」「表現」追加から店舗専用データをSQLiteに保存できます（シート本体は変更しません）。「シナリオ・用語」で API を確認できます。",
-    wg_section_title: "現場スタッフ向け用語の追加",
+    wg_section_title: "① メニュー名・商品名・専門用語の登録",
     wg_help:
-      "分野（Google シートのタブ）を選び、日本語の単語・意味・説明を登録します。シート上に同じ語がある、またはこの現場で既に登録した語は登録できません。スタッフの用語一覧と学習欄に表示されます。",
+      "新しいメニュー名や商品名、業務専門用語を登録します。分野（Google シートのタブ）を選び、日本語の単語・意味・説明を入力してください。シート上に同じ語がある、またはこの現場で既に登録した語は登録できません。スタッフの用語一覧と学習欄に表示されます。",
     wg_field: "分野（シート）",
     wg_word: "単語・表現（日本語）",
     wg_meaning: "意味（日本語）",
@@ -114,9 +114,9 @@ window.__WB_ADMIN_I18N__ = {
     wg_need_fields: "単語と意味を入力してください。",
     wg_pick_field: "分野（シート）を選んでください。",
     cur_sheet_sub: "スプレッドシートのタブ（横スクロール）",
-    wg_expr_section_title: "現場スタッフ向け表現の追加",
+    wg_expr_section_title: "② 店舗の決まり文句・言い回しの登録",
     wg_expr_help:
-      "用語シートと同じ分野タブを選び、店舗だけの決まり文句・よく使う言い回しを登録します（サーバー内DBのみ・Googleシートは変更しません）。用語登録と重複する見出しは登録できません。",
+      "店舗だけで使う決まり文句や、よく使う言い回しを登録します（例:「いつもの」「お持ち帰り対応」など）。① のメニュー名・専門用語ではなく、状況や応対で使う「フレーズ」を登録する場所です。用語シートと同じ分野タブを選んでください。",
     wg_expr_phrase: "表現・フレーズ（日本語）",
     wg_expr_submit: "登録（表現）",
     wg_expr_ok: "表現を登録しました。",
@@ -322,7 +322,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_words_title: "Term registration (PC)",
     pc_words_p:
       "Edit Google Sheets and use “Terms” / “Phrases” above for workspace-only rows in SQLite (sheet data unchanged). Preview via “Scenarios · terms”.",
-    wg_section_title: "Add terms for staff",
+    wg_section_title: "① Add menu items, product names, technical terms",
     wg_help:
       "Pick a field (sheet tab), then enter Japanese word, meaning, and notes. Duplicates against the sheet or already added for this site are rejected. Staff see entries in the glossary list and study section.",
     wg_field: "Field (sheet tab)",
@@ -337,7 +337,7 @@ window.__WB_ADMIN_I18N__ = {
     wg_need_fields: "Enter word and meaning.",
     wg_pick_field: "Select a field (sheet tab).",
     cur_sheet_sub: "Spreadsheet tabs (horizontal scroll)",
-    wg_expr_section_title: "Add phrases for staff",
+    wg_expr_section_title: "② Add shop catchphrases and common expressions",
     wg_expr_help:
       "Pick the same glossary tab and save shop-only phrases locally (SQLite). Google Sheets stay read-only. Duplicates against saved terms/phrases are blocked.",
     wg_expr_phrase: "Phrase (Japanese)",
@@ -546,7 +546,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_words_title: "용어·단어 등록(PC)",
     pc_words_p:
       "스프레드시트 편집과 함께 위의 「용어」「표현」 추가로 이 현장 전용 데이터를 SQLite에 저장할 수 있습니다(시트 원본은 변경하지 않습니다). 아래 시나리오·용어에서 API를 확인합니다.",
-    wg_section_title: "현장 스태프용 용어 추가",
+    wg_section_title: "① 메뉴명·상품명·전문용어 등록",
     wg_help:
       "분야(시트 탭)를 고른 뒤 일본어 단어·뜻·설명을 입력합니다. 시트에 같은 단어가 있거나 이 현장에서 이미 등록한 단어는 등록되지 않습니다. 스태프 용어 목록·학습 영역에 표시됩니다.",
     wg_field: "분야(시트)",
@@ -561,7 +561,7 @@ window.__WB_ADMIN_I18N__ = {
     wg_need_fields: "단어와 뜻을 입력하세요.",
     wg_pick_field: "분야(시트)를 선택하세요.",
     cur_sheet_sub: "스프레드시트 탭(가로 스크롤)",
-    wg_expr_section_title: "현장 스태프용 표현 추가",
+    wg_expr_section_title: "② 점포 관용구·자주 쓰는 표현 등록",
     wg_expr_help:
       "용어와 같은 시트 탭을 고른 뒤 가게 전용 자주 쓰는 말을 등록합니다(서버 DB만, Google 시트는 변경 없음). 용어·표현과 겹치면 등록할 수 없습니다.",
     wg_expr_phrase: "표현·구문(일본어)",
@@ -767,7 +767,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_words_title: "术语·词汇登记（PC）",
     pc_words_p:
       "除编辑 Google 表格外，可在上方「术语」「表达」添加处将本现场专用数据保存至 SQLite（不修改表格本身）。下方「场景·术语」可查看 API。",
-    wg_section_title: "为现场员工添加术语",
+    wg_section_title: "① 添加菜单名、商品名、专业术语",
     wg_help:
       "先选择领域（工作表标签），再填写日语词汇、释义与说明。若表中已有相同词或本现场已登记，则无法重复添加。员工在术语列表与学习区可见。",
     wg_field: "领域（工作表）",
@@ -782,7 +782,7 @@ window.__WB_ADMIN_I18N__ = {
     wg_need_fields: "请填写词汇与释义。",
     wg_pick_field: "请选择领域（工作表）。",
     cur_sheet_sub: "电子表格标签（横向滚动）",
-    wg_expr_section_title: "为现场员工添加表达",
+    wg_expr_section_title: "② 添加店铺惯用语·常用表达",
     wg_expr_help:
       "选择与术语表相同的工作表，并登记本店专用常用语（仅保存到服务器数据库，不修改 Google 表）。与已登记术语/表达重复的标题不能保存。",
     wg_expr_phrase: "表达／短语（日语）",
@@ -990,7 +990,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_words_title: "Đăng ký thuật ngữ (PC)",
     pc_words_p:
       "Chỉnh Google Sheets và dùng « Thuật ngữ » / « Diễn đạt » phía trên để lưu dữ liệu riêng hiện trường vào SQLite (không đổi sheet). Xem API ở « Kịch bản · thuật ngữ ».",
-    wg_section_title: "Thêm thuật ngữ cho nhân viên hiện trường",
+    wg_section_title: "① Thêm tên món, tên sản phẩm, thuật ngữ chuyên môn",
     wg_help:
       "Chọn lĩnh vực (tab sheet), nhập từ・nghĩa・ghi chú tiếng Nhật. Không đăng ký được nếu đã có trên sheet hoặc đã thêm cho không gian làm việc này.",
     wg_field: "Lĩnh vực (sheet)",
@@ -1005,7 +1005,7 @@ window.__WB_ADMIN_I18N__ = {
     wg_need_fields: "Nhập từ và nghĩa.",
     wg_pick_field: "Chọn lĩnh vực (sheet).",
     cur_sheet_sub: "Tab bảng tính (cuộn ngang)",
-    wg_expr_section_title: "Thêm diễn đạt cho nhân viên",
+    wg_expr_section_title: "② Thêm câu thông dụng·cách diễn đạt của cửa hàng",
     wg_expr_help:
       "Chọn cùng tab với thuật ngữ và lưu các cách nói riêng của cửa hàng vào máy chủ (không đổi Google Sheet). Trùng với thuật ngữ đã lưu sẽ không được.",
     wg_expr_phrase: "Diễn đạt・cụm từ (JP)",
@@ -1214,7 +1214,7 @@ window.__WB_ADMIN_I18N__ = {
     pc_words_title: "Pendaftaran istilah (PC)",
     pc_words_p:
       "Edit Google Sheets dan gunakan « Istilah » / « Ungkapan » di atas untuk menyimpan data khusus lokasi di SQLite (sheet tidak diubah). Pratinjau API di « Skenario · istilah ».",
-    wg_section_title: "Tambah istilah untuk staf lapangan",
+    wg_section_title: "① Tambah nama menu, nama produk, istilah teknis",
     wg_help:
       "Pilih bidang (tab sheet), lalu isi kata・arti・catatan bahasa Jepang. Tidak bisa jika sudah ada di sheet atau sudah didaftarkan untuk workspace ini.",
     wg_field: "Bidang (sheet)",
@@ -1229,7 +1229,7 @@ window.__WB_ADMIN_I18N__ = {
     wg_need_fields: "Isi kata dan arti.",
     wg_pick_field: "Pilih bidang (sheet).",
     cur_sheet_sub: "Tab spreadsheet (geser mendatar)",
-    wg_expr_section_title: "Tambahkan ungkapan untuk staf",
+    wg_expr_section_title: "② Tambahkan ungkapan umum·frasa khas toko",
     wg_expr_help:
       "Pilih tab sama seperti istilah dan simpan ungkapan khas toko di server (Google Sheet tidak diubah). Tidak bisa jika bentuknya sama dengan istilah/unggapan yang sudah ada.",
     wg_expr_phrase: "Ungkapan (Jp)",
