@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from pathlib import Path
@@ -8,6 +9,23 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 
 router = APIRouter(tags=["pages"])
+
+
+# Phase 2.5 — URL 슬러그 라우팅 정규식 (3계층 멀티테넌시)
+# 영문 소문자·숫자·하이픈, 시작/끝은 영숫자, 3-20자
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]{1,18}[a-z0-9]$")
+
+# 슬러그로 사용할 수 없는 예약어 (정적 라우트와 충돌 회피)
+_RESERVED_SLUGS = {
+    "admin", "worker", "super", "login", "distributor", "enter", "api",
+    "static", "health", "ws", "favicon", "_super", "robots.txt",
+}
+
+
+def _is_valid_slug(s: str) -> bool:
+    if not s or s in _RESERVED_SLUGS:
+        return False
+    return bool(_SLUG_RE.match(s))
 
 
 @router.get("/")
@@ -97,6 +115,27 @@ def _super_html() -> HTMLResponse:
 
 def _distributor_html() -> HTMLResponse:
     return HTMLResponse(content=_read_html("distributor.html"), headers=_NO_CACHE_HEADERS)
+
+
+def _inject_slug_ctx(html: str, dist_slug: str, cust_slug: str) -> str:
+    """HTML 의 <head> 직후에 `window.__WB_SLUGS__` 를 주입.
+
+    페이지 (login.html / admin.html / worker.html) 의 JS 가 이 변수를 읽고
+    슬러그 기반 로그인 / 좌상단 표시를 활성화한다.
+    """
+    payload = {"dist": dist_slug, "cust": cust_slug}
+    script = (
+        '<script>window.__WB_SLUGS__ = '
+        + json.dumps(payload, ensure_ascii=False)
+        + ';</script>'
+    )
+    # <head> 직후에 주입 (i18n.js 보다 먼저 실행되어야 함)
+    return html.replace("</head>", script + "</head>", 1)
+
+
+def _html_with_slugs(name: str, dist_slug: str, cust_slug: str) -> HTMLResponse:
+    raw = _read_html(name)
+    return HTMLResponse(content=_inject_slug_ctx(raw, dist_slug, cust_slug), headers=_NO_CACHE_HEADERS)
 
 
 # i18n JS は内容が変わるたびにブラウザが必ず再取得するよう no-cache を強制。
@@ -246,3 +285,54 @@ async def distributor_page() -> HTMLResponse:
 @router.get("/distributor/")
 async def distributor_page_slash() -> HTMLResponse:
     return _distributor_html()
+
+
+# ============================================================
+# Phase 2.5 — URL 슬러그 라우팅 (3계층 멀티테넌시)
+# ============================================================
+# 라우트 매치 순서: 정적 라우트 (/admin, /login 등) → 동적 path-param
+# 따라서 _RESERVED_SLUGS 의 슬러그는 정적 라우트가 우선 매치되므로 안전하다.
+# 슬러그 형식 검증으로 잘못된 URL 은 명시적 404 를 반환.
+
+
+@router.get("/{dist_slug}/{cust_slug}/admin")
+async def slug_admin_page(dist_slug: str, cust_slug: str) -> HTMLResponse:
+    """`/popo/abcramen/admin` → 점주 페이지 (admin.html + 슬러그 컨텍스트 주입)."""
+    if not _is_valid_slug(dist_slug) or not _is_valid_slug(cust_slug):
+        raise HTTPException(status_code=404, detail="Not Found")
+    return _html_with_slugs("admin.html", dist_slug, cust_slug)
+
+
+@router.get("/{dist_slug}/{cust_slug}/staff")
+async def slug_staff_page(dist_slug: str, cust_slug: str) -> HTMLResponse:
+    """`/popo/abcramen/staff` → 스탭 페이지 (worker.html + 슬러그 컨텍스트 주입)."""
+    if not _is_valid_slug(dist_slug) or not _is_valid_slug(cust_slug):
+        raise HTTPException(status_code=404, detail="Not Found")
+    return _html_with_slugs("worker.html", dist_slug, cust_slug)
+
+
+@router.get("/{dist_slug}/{cust_slug}")
+async def slug_login_page(dist_slug: str, cust_slug: str) -> HTMLResponse:
+    """`/popo/abcramen` → 로그인 페이지 (login.html + 슬러그 prefill).
+
+    URL 만 알아도 점주·스탭 어느 쪽으로 진입할지 선택하면 슬러그가 자동으로
+    `portal-login` 요청에 포함된다.
+    """
+    if not _is_valid_slug(dist_slug) or not _is_valid_slug(cust_slug):
+        raise HTTPException(status_code=404, detail="Not Found")
+    return _html_with_slugs("login.html", dist_slug, cust_slug)
+
+
+@router.get("/{dist_slug}/{cust_slug}/admin/")
+async def slug_admin_page_slash(dist_slug: str, cust_slug: str) -> HTMLResponse:
+    return await slug_admin_page(dist_slug, cust_slug)
+
+
+@router.get("/{dist_slug}/{cust_slug}/staff/")
+async def slug_staff_page_slash(dist_slug: str, cust_slug: str) -> HTMLResponse:
+    return await slug_staff_page(dist_slug, cust_slug)
+
+
+@router.get("/{dist_slug}/{cust_slug}/")
+async def slug_login_page_slash(dist_slug: str, cust_slug: str) -> HTMLResponse:
+    return await slug_login_page(dist_slug, cust_slug)
