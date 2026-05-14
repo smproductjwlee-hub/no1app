@@ -19,6 +19,7 @@ from app.services.instruction_history import (
     record_reply,
     worker_can_submit_reply,
 )
+from app.services.distributors import distributors as distributors_store, verify_password as verify_distributor_password
 from app.services.staff_avatar_files import save_square_jpeg
 from app.services.worker_glossary_saves import worker_glossary_saves
 from app.services.workspace_glossary_terms import workspace_glossary_terms
@@ -35,11 +36,17 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 class PortalLoginRequest(BaseModel):
-    role: Literal["admin", "worker", "super_admin"]
+    role: Literal["admin", "worker", "super_admin", "distributor_admin"]
     username: str = Field("", max_length=200)
     password: str = Field(..., min_length=1, max_length=200)
     # 現場スタッフは個人アカウント必須（共有パスワード方式は廃止）
     worker_account_login: Optional[str] = Field(None, max_length=100)
+    # Phase 2.3 — URL 슬러그 기반 로그인 (3계층 라우팅)
+    # admin: distributor_slug + workspace_slug 로 워크스페이스 식별
+    # worker: 동일 + worker_account_login
+    # distributor_admin: distributor_slug 만 (또는 username = owner_email)
+    distributor_slug: Optional[str] = Field(None, max_length=20)
+    workspace_slug: Optional[str] = Field(None, max_length=20)
 
 
 class PortalLoginOut(BaseModel):
@@ -74,13 +81,31 @@ def _resolve_workspace(username: str):
     return workspaces.find_by_name(raw)
 
 
+def _resolve_by_login_input(body: PortalLoginRequest):
+    """Phase 2.3 통합 워크스페이스 해석.
+
+    우선순위:
+      1. distributor_slug + workspace_slug (3계층 URL 라우팅 — 권장)
+      2. username (UUID / 워크스페이스명 — legacy, c-direct 스코프)
+    """
+    ds = (body.distributor_slug or "").strip().lower()
+    ws_slug = (body.workspace_slug or "").strip().lower()
+    if ds and ws_slug:
+        return workspaces.find_by_slugs(ds, ws_slug)
+    return _resolve_workspace(body.username)
+
+
 @router.post("/portal-login", response_model=PortalLoginOut)
 async def portal_login(
     body: PortalLoginRequest,
     settings: Settings = Depends(get_settings),
 ) -> PortalLoginOut:
-    """ログイン画面用: 管理者 / スタッフ / 総運営スーパー管理者。"""
+    """ログイン画面用: 管理者 / スタッフ / 総運営スーパー管理者 / 大리점관리자。"""
     ttl = settings.session_token_ttl_seconds
+
+    # ============================================================
+    # 1. Super Admin (변경 없음)
+    # ============================================================
     if body.role == "super_admin":
         if body.password != settings.super_admin_password:
             raise HTTPException(
@@ -101,11 +126,94 @@ async def portal_login(
             expires_in_seconds=ttl,
         )
 
+    # ============================================================
+    # 2. Distributor Admin (신규 — Phase 2.3)
+    # ============================================================
+    if body.role == "distributor_admin":
+        # username = owner_email (또는 distributor_slug 도 받아들임)
+        login_id = body.username.strip()
+        if not login_id and body.distributor_slug:
+            # 슬러그로도 식별 가능 (간단 테스트용)
+            d = await run_db(distributors_store.get_by_slug, body.distributor_slug.strip().lower())
+        else:
+            d = await run_db(distributors_store.get_by_owner_email, login_id)
+        if d is None or not d.is_active():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
+        if not verify_distributor_password(body.password, d.owner_password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials",
+            )
+        # c-direct 는 가상 대리점이므로 로그인 불가 (super_admin 만 관리)
+        if d.slug == "c-direct":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="The c-direct distributor cannot be used for login",
+            )
+        sess = sessions.create(
+            workspace_id="",  # 대리점 관리자는 워크스페이스 미보유
+            role=Role.DISTRIBUTOR_ADMIN,
+            user_label=(d.contact_person or d.name),
+            ttl_seconds=ttl,
+            distributor_id=d.id,
+        )
+        return PortalLoginOut(
+            access_token=sess.token,
+            role=sess.role,
+            workspace_id=None,
+            workspace_name=d.name,
+            expires_in_seconds=ttl,
+        )
+
+    # ============================================================
+    # 3. Workspace Admin (점주) — 슬러그 우선 + 기존 PW fallback
+    # ============================================================
     if body.role == "admin":
+        ws = await run_db(_resolve_by_login_input, body)
+        # 슬러그 기반 로그인: 워크스페이스의 owner_password_hash 와 검증
+        ds = (body.distributor_slug or "").strip().lower()
+        ws_slug = (body.workspace_slug or "").strip().lower()
+        if ds and ws_slug:
+            if ws is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Workspace not found",
+                )
+            # 워크스페이스 owner_password_hash 가 있으면 그걸로 검증
+            if ws.owner_password_hash:
+                if not verify_distributor_password(body.password, ws.owner_password_hash):
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid credentials",
+                    )
+            else:
+                # legacy: PW 미설정 워크스페이스는 글로벌 PW 로 진입 가능 (테스트 호환)
+                if body.password != settings.portal_admin_password:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid credentials",
+                    )
+            sess = sessions.create(
+                ws.id, Role.ADMIN, "admin",
+                ttl_seconds=ttl,
+                distributor_id=ws.distributor_id,
+            )
+            return PortalLoginOut(
+                access_token=sess.token,
+                role=sess.role,
+                workspace_id=ws.id,
+                workspace_name=ws.name,
+                expires_in_seconds=ttl,
+            )
+
+        # Legacy 경로: username (워크스페이스명) + 글로벌 portal_admin_password
         if not body.username.strip():
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="username (workspace name) required",
+                detail="username (workspace name) or slug required",
             )
         if body.password != settings.portal_admin_password:
             raise HTTPException(
@@ -113,10 +221,13 @@ async def portal_login(
                 detail="Invalid credentials",
             )
         name = body.username.strip() or "default"
-        ws = await run_db(workspaces.find_by_name, name)
         if ws is None:
             ws = await run_db(workspaces.create, name)
-        sess = sessions.create(ws.id, Role.ADMIN, "admin", ttl_seconds=ttl)
+        sess = sessions.create(
+            ws.id, Role.ADMIN, "admin",
+            ttl_seconds=ttl,
+            distributor_id=ws.distributor_id,
+        )
         return PortalLoginOut(
             access_token=sess.token,
             role=sess.role,
@@ -125,12 +236,10 @@ async def portal_login(
             expires_in_seconds=ttl,
         )
 
-    if not body.username.strip():
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="username required",
-        )
-    ws = await run_db(_resolve_workspace, body.username)
+    # ============================================================
+    # 4. Worker (스탭) — 슬러그 또는 username 으로 워크스페이스 식별
+    # ============================================================
+    ws = await run_db(_resolve_by_login_input, body)
     if ws is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -155,6 +264,7 @@ async def portal_login(
         label,
         ttl_seconds=ttl,
         staff_account_id=acc.id,
+        distributor_id=ws.distributor_id,
     )
     return PortalLoginOut(
         access_token=sess.token,
@@ -168,22 +278,62 @@ async def portal_login(
 
 @router.get("/session")
 async def session_info(token: str = Query(..., min_length=8)) -> dict:
-    """Bearer 相当: クエリ token でセッション概要（QR 用 workspace_id など）。"""
+    """Bearer 相当: クエリ token でセッション概要。
+
+    Phase 2.3 — admin/worker 응답에 좌상단 표시용 메타 (distributor 연락처·
+    워크스페이스 로고) 를 동봉.
+    """
     sess = sessions.get(token)
     if sess is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session")
+
+    # Super Admin
     if sess.role == Role.SUPER_ADMIN:
         return {
             "workspace_id": None,
             "workspace_name": None,
             "role": sess.role.value,
         }
+
+    # Distributor Admin (워크스페이스 미보유)
+    if sess.role == Role.DISTRIBUTOR_ADMIN:
+        d = await run_db(distributors_store.get, sess.distributor_id) if sess.distributor_id else None
+        return {
+            "workspace_id": None,
+            "workspace_name": d.name if d else None,
+            "role": sess.role.value,
+            "distributor_id": sess.distributor_id or None,
+            "distributor_slug": d.slug if d else None,
+            "distributor_name": d.name if d else None,
+        }
+
+    # Admin / Worker
     ws = await run_db(workspaces.get, sess.workspace_id)
     out: dict = {
         "workspace_id": sess.workspace_id,
         "workspace_name": ws.name if ws else None,
         "role": sess.role.value,
     }
+    if ws is not None:
+        out["workspace_slug"] = ws.slug or None
+        out["logo_url"] = ws.logo_url or None
+        out["primary_color"] = ws.primary_color or None
+        out["assigned_plan"] = ws.assigned_plan or "starter"
+        # 좌상단 「お困りの際は」 표시용 대리점 연락처
+        if ws.distributor_id:
+            d = await run_db(distributors_store.get, ws.distributor_id)
+            if d is not None and d.slug != "c-direct":
+                out["distributor"] = {
+                    "id": d.id,
+                    "slug": d.slug,
+                    "name": d.name,
+                    "contact_person": d.contact_person,
+                    "contact_phone": d.contact_phone,
+                    "contact_email": d.contact_email,
+                }
+            else:
+                # c-direct (직판) 는 대리점 정보를 노출하지 않음
+                out["distributor"] = None
     if sess.role == Role.WORKER:
         out["worker_display_label"] = sess.user_label or ""
         out["has_staff_account"] = bool(sess.staff_account_id)
