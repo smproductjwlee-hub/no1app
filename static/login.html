@@ -121,6 +121,8 @@
       var role = "";
       var params = new URLSearchParams(location.search);
       var preset = params.get("role");
+      // Phase 2.5: 슬러그 컨텍스트가 있으면 (대리점 산하 고객사 URL 접속) 자동 prefill 모드
+      var slugCtx = window.__WB_SLUGS__ || null;
       var stepRole = document.getElementById("step-role");
       var stepForm = document.getElementById("step-form");
       var usernameWrap = document.getElementById("username-wrap");
@@ -213,6 +215,11 @@
           workerStaffWrap.classList.add("hidden");
           usernameWrap.classList.remove("hidden");
           usernameLabel.className = "block text-xs font-medium text-gray-600";
+          // 슬러그 모드: username 필드 숨김 (서버가 슬러그 페어로 식별)
+          if (slugCtx) {
+            usernameWrap.classList.add("hidden");
+            username.value = slugCtx.cust;
+          }
         } else if (r === "super_admin") {
           if (formTitle) formTitle.textContent = loginT("form_super");
           passwordHint.textContent = "";
@@ -228,6 +235,11 @@
           workerStaffWrap.classList.remove("hidden");
           usernameWrap.classList.remove("hidden");
           workerAccountLogin.value = "";
+          // 슬러그 모드: username 숨기고 staff_id + password 만 입력
+          if (slugCtx) {
+            usernameWrap.classList.add("hidden");
+            username.value = slugCtx.cust;
+          }
         }
         applyLoginLocale();
       }
@@ -283,6 +295,8 @@
         loginErr.classList.add("hidden");
         var u = (username.value || "").trim();
         var p = password.value || "";
+        // 슬러그 모드 (대리점 산하 URL 접속) — 슬러그 페어가 워크스페이스 식별 책임을 짐
+        var inSlugMode = !!slugCtx && (role === "admin" || role === "worker");
         if (role === "super_admin") {
           if (!p) {
             loginErr.textContent = loginT("err_pw_only");
@@ -291,8 +305,13 @@
           }
         } else if (role === "worker") {
           var wal = (workerAccountLogin.value || "").trim();
-          if (!u || !p) {
+          if (!inSlugMode && (!u || !p)) {
             loginErr.textContent = loginT("err_ws_pw");
+            loginErr.classList.remove("hidden");
+            return;
+          }
+          if (inSlugMode && !p) {
+            loginErr.textContent = loginT("err_pw_only");
             loginErr.classList.remove("hidden");
             return;
           }
@@ -301,16 +320,24 @@
             loginErr.classList.remove("hidden");
             return;
           }
-        } else if (!u || !p) {
+        } else if (!inSlugMode && (!u || !p)) {
           loginErr.textContent = loginT("err_id_pw");
+          loginErr.classList.remove("hidden");
+          return;
+        } else if (inSlugMode && !p) {
+          loginErr.textContent = loginT("err_pw_only");
           loginErr.classList.remove("hidden");
           return;
         }
         var body = {
           role: role,
-          username: role === "super_admin" ? "" : u,
+          username: role === "super_admin" ? "" : (inSlugMode ? "" : u),
           password: p,
         };
+        if (inSlugMode) {
+          body.distributor_slug = slugCtx.dist;
+          body.workspace_slug = slugCtx.cust;
+        }
         if (role === "worker") {
           var wid = (workerAccountLogin.value || "").trim();
           if (wid) body.worker_account_login = wid;
@@ -341,7 +368,7 @@
               sessionStorage.setItem("wb_workspace_id", data.workspace_id);
               if (data.workspace_name) sessionStorage.setItem("wb_workspace_name", data.workspace_name);
               sessionStorage.removeItem("wb_super_assumed");
-              location.href = "/admin";
+              location.href = slugCtx ? ("/" + slugCtx.dist + "/" + slugCtx.cust + "/admin") : "/admin";
             } else {
               try {
                 localStorage.setItem("workbridge_worker_locale", loginUiLocale);
@@ -350,7 +377,7 @@
               sessionStorage.setItem("wb_worker_token", data.access_token);
               sessionStorage.setItem("wb_worker_label", data.worker_display_label || "");
               sessionStorage.setItem("wb_workspace_id", data.workspace_id || "");
-              location.href = "/worker";
+              location.href = slugCtx ? ("/" + slugCtx.dist + "/" + slugCtx.cust + "/staff") : "/worker";
             }
           })
           .catch(function (e) {

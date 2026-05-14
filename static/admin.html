@@ -83,6 +83,15 @@
     <div id="super-banner" class="hidden rounded-xl bg-slate-800 text-white text-sm px-4 py-3 border border-slate-600" data-i18n="super_banner">
       総運営として、この顧客の管理者画面を閲覧中です。ログアウトでワークスペース一覧に戻ります。
     </div>
+    <!-- Phase 2.5: 좌상단 브랜딩 + 대리점 연락처 (슬러그 라우팅 시 표시) -->
+    <div id="branding-bar" class="hidden rounded-xl bg-white border border-gray-200 px-3 py-2 flex items-center gap-3 shadow-sm">
+      <img id="branding-logo" alt="" class="h-12 w-12 rounded-lg object-cover hidden" />
+      <div id="branding-no-logo" class="hidden h-12 w-12 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xl font-bold">L</div>
+      <div class="min-w-0 flex-1">
+        <p id="branding-ws-name" class="text-sm font-semibold text-gray-900 truncate"></p>
+        <p id="branding-support" class="text-[11px] text-gray-500 leading-tight truncate"></p>
+      </div>
+    </div>
     <header class="flex items-start justify-between gap-3">
       <div class="flex items-start gap-3 min-w-0 flex-1">
         <div id="header-admin-avatar" class="shrink-0 w-12 h-12" aria-hidden="true"></div>
@@ -1293,6 +1302,54 @@
           if (gatePEl) gatePEl.innerHTML = gatePHtmlSaved;
           gate.classList.add("hidden");
           app.classList.remove("hidden");
+          // Phase 2.5: 좌상단 브랜딩 + 대리점 연락처 표시
+          try {
+            var bbar = document.getElementById("branding-bar");
+            var blogo = document.getElementById("branding-logo");
+            var bnologo = document.getElementById("branding-no-logo");
+            var bname = document.getElementById("branding-ws-name");
+            var bsupp = document.getElementById("branding-support");
+            var dist = d.distributor || null;
+            var wsName = d.workspace_name || "";
+            var logo = d.logo_url || "";
+            // 브랜딩 바를 표시할지 결정:
+            //   - 대리점 연락처가 있거나, 또는
+            //   - 로고가 있는 경우
+            // c-direct (직판) 의 경우 distributor 는 null 이므로 자동 비표시
+            if (dist || logo) {
+              if (logo) {
+                blogo.src = logo;
+                blogo.classList.remove("hidden");
+                bnologo.classList.add("hidden");
+                blogo.onerror = function () {
+                  blogo.classList.add("hidden");
+                  // 회사명 첫 글자로 대체
+                  var c = (wsName || "L").trim().charAt(0).toUpperCase();
+                  bnologo.textContent = c || "L";
+                  bnologo.classList.remove("hidden");
+                };
+              } else {
+                blogo.classList.add("hidden");
+                var c0 = (wsName || "L").trim().charAt(0).toUpperCase();
+                bnologo.textContent = c0 || "L";
+                bnologo.classList.remove("hidden");
+              }
+              bname.textContent = wsName || "";
+              if (dist) {
+                var parts = [];
+                if (dist.contact_person) parts.push(dist.contact_person);
+                if (dist.contact_phone) parts.push(dist.contact_phone);
+                if (dist.contact_email) parts.push(dist.contact_email);
+                var prefix = dist.name ? (dist.name + " — ") : "";
+                bsupp.textContent = parts.length > 0
+                  ? ("お困りの際は: " + prefix + parts.join(" / "))
+                  : (prefix.replace(/ — $/, ""));
+              } else {
+                bsupp.textContent = "";
+              }
+              bbar.classList.remove("hidden");
+            }
+          } catch (_bbe) {}
           loadOrgLocale();
           fetch("/api/v1/meta/locale-config")
             .then(function (r) {
