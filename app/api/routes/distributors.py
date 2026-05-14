@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, EmailStr, Field
 
 from app.api.deps import (
@@ -20,6 +20,10 @@ from app.api.deps import (
     run_db,
 )
 from app.services.distributors import distributors as distributors_store
+from app.services.staff_avatar_files import (
+    delete_workspace_logo_file,
+    save_workspace_logo_jpeg,
+)
 from app.services.stores import Session, workspaces
 
 
@@ -496,6 +500,66 @@ async def my_billing_report(
     if data is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="distributor not found")
     return DistMarginReport(year=y, month=m, **data)
+
+
+# ============================================================
+# Phase 2.8 — 워크스페이스 로고 업로드 (대리점이 산하 ws 브랜딩)
+# ============================================================
+
+
+class LogoUploadResult(BaseModel):
+    workspace_id: str
+    logo_url: str
+
+
+def _verify_workspace_ownership(sess: Session, workspace_id: str):
+    """대리점 admin 이 자기 산하 워크스페이스에 대한 접근권 보유 확인."""
+    ws = workspaces.get(workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workspace not found")
+    if ws.distributor_id != sess.distributor_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    return ws
+
+
+@router.post("/me/workspaces/{workspace_id}/logo", response_model=LogoUploadResult)
+async def upload_workspace_logo(
+    workspace_id: str,
+    file: UploadFile = File(...),
+    sess: Session = Depends(require_distributor_admin),
+) -> LogoUploadResult:
+    """대리점이 자기 산하 워크스페이스의 로고 이미지를 업로드.
+
+    - 정사각형 중앙 크롭 + 256x256 JPEG 으로 정규화
+    - workspaces.logo_url 갱신 (캐시 무효화용 ?t=timestamp 동봉)
+    """
+    await run_db(_verify_workspace_ownership, sess, workspace_id)
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="empty file")
+    try:
+        ts = await run_db(save_workspace_logo_jpeg, workspace_id, content)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
+    # 캐시 무효화를 위해 timestamp 쿼리 동봉
+    new_url = f"/static/uploads/workspace-logos/{workspace_id}.jpg?t={int(ts)}"
+    await run_db(workspaces.set_logo_url, workspace_id, new_url)
+    return LogoUploadResult(workspace_id=workspace_id, logo_url=new_url)
+
+
+@router.delete("/me/workspaces/{workspace_id}/logo")
+async def delete_workspace_logo(
+    workspace_id: str,
+    sess: Session = Depends(require_distributor_admin),
+) -> dict:
+    """대리점이 자기 산하 워크스페이스의 로고를 제거.
+
+    파일 삭제 + workspaces.logo_url = NULL.
+    """
+    await run_db(_verify_workspace_ownership, sess, workspace_id)
+    await run_db(delete_workspace_logo_file, workspace_id)
+    await run_db(workspaces.set_logo_url, workspace_id, None)
+    return {"ok": True, "workspace_id": workspace_id}
 
 
 @router.get("/{distributor_id}", response_model=DistributorOut)

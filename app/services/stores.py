@@ -446,6 +446,18 @@ class WorkspaceStore:
         r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
         return _row_to_workspace(r) if r else None
 
+    def set_logo_url(self, workspace_id: str, logo_url: Optional[str]) -> Optional[Workspace]:
+        """Phase 2.8: 워크스페이스 로고 URL 갱신. None / 빈 문자열은 클리어."""
+        url = (logo_url or "").strip() or None
+        conn = get_connection()
+        conn.execute(
+            "UPDATE workspaces SET logo_url = ? WHERE id = ?",
+            (url, workspace_id),
+        )
+        conn.commit()
+        r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
+        return _row_to_workspace(r) if r else None
+
     def set_admin_avatar_updated_at(self, workspace_id: str, ts: float) -> Optional[Workspace]:
         conn = get_connection()
         conn.execute(

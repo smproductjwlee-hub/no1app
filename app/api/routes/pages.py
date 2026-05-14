@@ -213,6 +213,19 @@ async def admin_avatar_jpeg_file(workspace_id: str) -> FileResponse:
     return FileResponse(path, media_type="image/jpeg", headers=_AVATAR_CACHE_HEADERS)
 
 
+@router.get("/static/uploads/workspace-logos/{workspace_id}.jpg")
+async def workspace_logo_jpeg_file(workspace_id: str) -> FileResponse:
+    """Phase 2.8: 워크스페이스 로고 (대리점이 산하 고객사 브랜딩에 업로드)."""
+    try:
+        uuid.UUID(workspace_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail="not found") from e
+    path = _STATIC / "uploads" / "workspace-logos" / f"{workspace_id}.jpg"
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="not found")
+    return FileResponse(path, media_type="image/jpeg", headers=_AVATAR_CACHE_HEADERS)
+
+
 @router.get("/static/uploads/instruction-images/{workspace_id}/{filename}")
 async def instruction_image_file(workspace_id: str, filename: str) -> FileResponse:
     """管理者が送信した指示用画像。"""
