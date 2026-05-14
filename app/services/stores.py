@@ -458,6 +458,23 @@ class WorkspaceStore:
         r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
         return _row_to_workspace(r) if r else None
 
+    def set_owner_password_hash(
+        self,
+        workspace_id: str,
+        new_hash: str,
+    ) -> Optional[Workspace]:
+        """Phase 2.9: 점장 PW 해시 갱신. 대리점이 산하 점장 PW 재발급 시 사용."""
+        if not new_hash:
+            raise ValueError("owner_password_hash must not be empty")
+        conn = get_connection()
+        conn.execute(
+            "UPDATE workspaces SET owner_password_hash = ? WHERE id = ?",
+            (new_hash, workspace_id),
+        )
+        conn.commit()
+        r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (workspace_id,)).fetchone()
+        return _row_to_workspace(r) if r else None
+
     def set_admin_avatar_updated_at(self, workspace_id: str, ts: float) -> Optional[Workspace]:
         conn = get_connection()
         conn.execute(

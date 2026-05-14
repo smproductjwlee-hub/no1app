@@ -253,6 +253,49 @@
   </div>
 
   <!-- ====================================================================== -->
+  <!-- 모달 4: 점장 PW 재발급 (Phase 2.9) -->
+  <!-- ====================================================================== -->
+  <div id="modal-pw" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3 class="text-lg font-semibold mb-1">店長パスワードの再発行</h3>
+      <p id="pw-ws-name" class="text-xs text-gray-500 mb-3">—</p>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-900 leading-relaxed mb-3">
+        ⚠ 店長が現在のパスワードを忘れた場合に新しいパスワードを発行します。<br />
+        ⚠ 新しいパスワードは画面に表示され、店長に直接お伝えください (メール発信なし)。<br />
+        ⚠ 既存のログインセッションは即時失効しません (トークン有効期限まで継続)。
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">新しいパスワード <span class="text-rose-600">*</span></label>
+          <input id="pw-new" type="text" autocomplete="off" maxlength="200"
+                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                 placeholder="NewAbc2026!" />
+          <button id="pw-generate" type="button" class="mt-2 text-xs text-indigo-700 underline">ランダム生成</button>
+        </div>
+
+        <p id="pw-err" class="text-sm text-rose-600 hidden"></p>
+
+        <!-- 발급 완료 후 표시 영역 -->
+        <div id="pw-result" class="hidden bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-2">
+          <p class="text-sm font-semibold text-emerald-900">発行完了。以下を店長にお伝えください:</p>
+          <div class="text-xs font-mono bg-white border border-emerald-200 rounded p-2 break-all">
+            <div>URL: <span id="pw-result-url" class="text-indigo-700">—</span></div>
+            <div>新パスワード: <span id="pw-result-pw" class="text-rose-700 font-bold">—</span></div>
+          </div>
+          <button id="pw-copy" type="button" class="text-xs text-emerald-700 underline">URL とパスワードをコピー</button>
+        </div>
+      </div>
+
+      <div class="flex gap-2 justify-end mt-4">
+        <button class="px-3 py-2 rounded-lg text-gray-600 hover:bg-gray-100" data-close-modal="modal-pw">閉じる</button>
+        <button id="pw-reset" class="px-4 py-2 rounded-lg bg-amber-700 text-white font-semibold hover:bg-amber-800">パスワード再発行</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
   <!-- 모달 3: 로고 업로드 (Phase 2.8) -->
   <!-- ====================================================================== -->
   <div id="modal-logo" class="modal-backdrop hidden">
@@ -599,10 +642,14 @@
           <td class="py-2 pr-2 text-xs">
             <a href="${url}" target="_blank" class="text-indigo-700 hover:underline font-mono">${url}</a>
           </td>
-          <td class="py-2 pr-2 text-right">
+          <td class="py-2 pr-2 text-right whitespace-nowrap">
             <button type="button" data-logo-btn="${ws.id}" data-logo-name="${escapeHtml(ws.name)}" data-logo-url="${escapeHtml(ws.logo_url || "")}"
                     class="px-2 py-1 rounded bg-indigo-50 text-indigo-700 text-[10px] font-semibold hover:bg-indigo-100">
               ロゴ
+            </button>
+            <button type="button" data-pw-btn="${ws.id}" data-pw-name="${escapeHtml(ws.name)}" data-pw-slug="${escapeHtml(ws.slug || "")}"
+                    class="ml-1 px-2 py-1 rounded bg-amber-50 text-amber-800 text-[10px] font-semibold hover:bg-amber-100">
+              PW再発行
             </button>
           </td>
         `;
@@ -615,6 +662,16 @@
             btn.getAttribute("data-logo-btn"),
             btn.getAttribute("data-logo-name"),
             btn.getAttribute("data-logo-url"),
+          );
+        });
+      });
+      // PW 재발급 버튼
+      tbody.querySelectorAll("[data-pw-btn]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          openPwModal(
+            btn.getAttribute("data-pw-btn"),
+            btn.getAttribute("data-pw-name"),
+            btn.getAttribute("data-pw-slug"),
           );
         });
       });
@@ -783,6 +840,75 @@
         await reloadWorkspaces();
       } catch (e) {
         showError("logo-err", String(e.message || e));
+      }
+    });
+
+    // ====== PW 재발급 모달 ======
+    let pwCtx = { wsId: null, name: "", slug: "" };
+
+    function openPwModal(wsId, name, slug) {
+      pwCtx = { wsId, name, slug };
+      $("pw-ws-name").textContent = `${name} (/${window.__currentDist?.slug || ""}/${slug})`;
+      $("pw-new").value = "";
+      $("pw-err").classList.add("hidden");
+      $("pw-result").classList.add("hidden");
+      $("pw-reset").disabled = false;
+      $("pw-reset").classList.remove("opacity-50");
+      openModal("modal-pw");
+    }
+
+    function randomPassword(len = 12) {
+      // 영문 대소문자 + 숫자 + 일부 기호. 혼동 글자 (0/O, 1/l/I) 제외.
+      const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#%&*+";
+      let out = "";
+      const arr = new Uint32Array(len);
+      crypto.getRandomValues(arr);
+      for (let i = 0; i < len; i++) out += chars[arr[i] % chars.length];
+      return out;
+    }
+
+    $("pw-generate").addEventListener("click", () => {
+      $("pw-new").value = randomPassword(12);
+      $("pw-err").classList.add("hidden");
+    });
+
+    $("pw-reset").addEventListener("click", async () => {
+      $("pw-err").classList.add("hidden");
+      $("pw-result").classList.add("hidden");
+      const newPw = $("pw-new").value;
+      if (!newPw || newPw.length < 4) {
+        showError("pw-err", "パスワードは4文字以上で指定してください");
+        return;
+      }
+      if (!confirm(`店長パスワードを再発行します。\n対象: ${pwCtx.name}\n\n続行しますか?`)) return;
+      try {
+        const data = await api(
+          `/api/v1/distributors/me/workspaces/${pwCtx.wsId}/password`,
+          { method: "PATCH", body: { new_password: newPw } },
+        );
+        const distSlug = window.__currentDist?.slug || "";
+        const url = `${location.origin}/${distSlug}/${data.workspace_slug}`;
+        $("pw-result-url").textContent = url;
+        $("pw-result-pw").textContent = data.new_password;
+        $("pw-result").classList.remove("hidden");
+        $("pw-reset").disabled = true;
+        $("pw-reset").classList.add("opacity-50");
+        window.__lastPwCopy = `URL: ${url}\n新パスワード: ${data.new_password}\n(店長: ${pwCtx.name})`;
+      } catch (e) {
+        showError("pw-err", e.detail || e.message);
+      }
+    });
+
+    $("pw-copy").addEventListener("click", async () => {
+      if (!window.__lastPwCopy) return;
+      try {
+        await navigator.clipboard.writeText(window.__lastPwCopy);
+        const btn = $("pw-copy");
+        const orig = btn.textContent;
+        btn.textContent = "コピーしました ✓";
+        setTimeout(() => { btn.textContent = orig; }, 2000);
+      } catch (e) {
+        alert(window.__lastPwCopy);
       }
     });
 
