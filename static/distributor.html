@@ -183,6 +183,18 @@
       <p id="margin-status" class="text-[11px] text-gray-500 mt-2"></p>
     </section>
 
+    <!-- Phase 2.10: 자동 플랜 업그레이드 알림 -->
+    <section id="upg-card" class="hidden rounded-2xl border border-rose-200 bg-rose-50/40 p-4 shadow-sm">
+      <h2 class="text-sm font-semibold text-rose-900 mb-2">
+        ⚠ 自動プラン·アップグレード (<span id="upg-count">0</span>件)
+      </h2>
+      <p class="text-[11px] text-rose-700/80 leading-snug mb-2">
+        API 字数が上限超過したため、自動的に上位プランに昇格しました。
+        翌月から新しい卸価格が適用されます (契約書 §5.5)。
+      </p>
+      <ul id="upg-list" class="text-xs space-y-1 text-rose-900 font-mono"></ul>
+    </section>
+
     <!-- 산하 워크스페이스 일람 -->
     <section class="card">
       <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -501,6 +513,8 @@
         // 마진 리포트 자동 로드 (현재 월)
         initMarginPanel();
         reloadMargin().catch(() => {});
+        // 자동 플랜 업그레이드 알림
+        reloadUpgradeEvents().catch(() => {});
       } catch (e) {
         if (e.status === 401 || e.status === 403) {
           auth.token = "";
@@ -756,6 +770,31 @@
         showError("aw-err", e.detail || e.message);
       }
     });
+
+    // ====== 자동 플랜 업그레이드 알림 (Phase 2.10) ======
+    async function reloadUpgradeEvents() {
+      try {
+        const arr = await api("/api/v1/distributors/me/plan-upgrade-events?limit=20");
+        const card = $("upg-card");
+        const list = $("upg-list");
+        const cnt = $("upg-count");
+        cnt.textContent = String(arr.length);
+        list.innerHTML = "";
+        if (arr.length === 0) {
+          card.classList.add("hidden");
+          return;
+        }
+        card.classList.remove("hidden");
+        arr.forEach(ev => {
+          const when = new Date(ev.created_at * 1000).toLocaleString("ja-JP", { hour12: false });
+          const li = document.createElement("li");
+          li.textContent = `[${when}] ${ev.workspace_name} (/${ev.workspace_slug}) — ${ev.from_plan} → ${ev.to_plan} (api ${Number(ev.triggered_api_chars).toLocaleString()} / 上限 ${Number(ev.threshold).toLocaleString()})`;
+          list.appendChild(li);
+        });
+      } catch (e) {
+        // silent
+      }
+    }
 
     // ====== 로고 업로드 모달 ======
     let logoCtx = { wsId: null, name: "", url: "" };
