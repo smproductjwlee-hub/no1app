@@ -10,7 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.routes import auth, curriculum, health, i18n, meta, pages, workspaces
+from app.api.routes import (
+    auth,
+    curriculum,
+    distributors as distributors_route,
+    health,
+    i18n,
+    meta,
+    pages,
+    workspaces,
+)
 from app.core.config import get_settings
 from app.db.sqlite import init_db
 from app.ws import comm
@@ -60,6 +69,7 @@ def create_app() -> FastAPI:
     application.include_router(pages.router)
     application.include_router(workspaces.router, prefix="/api/v1")
     application.include_router(auth.router, prefix="/api/v1")
+    application.include_router(distributors_route.router, prefix="/api/v1")
     application.include_router(curriculum.router, prefix="/api/v1")
     application.include_router(meta.router, prefix="/api/v1")
     application.include_router(i18n.router, prefix="/api/v1")

@@ -53,3 +53,43 @@ async def require_admin(sess: Session = Depends(get_current_session)) -> Session
     if sess.role != Role.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin role required")
     return sess
+
+
+# ============================================================
+# Phase 2.3 — 3계층 멀티테넌시용 권한 dependencies
+# ============================================================
+
+
+async def require_super_admin(sess: Session = Depends(get_current_session)) -> Session:
+    if sess.role != Role.SUPER_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Super admin required")
+    return sess
+
+
+async def require_distributor_admin(sess: Session = Depends(get_current_session)) -> Session:
+    """대리점 관리자만 통과. distributor_id 가 비어 있으면 403."""
+    if sess.role != Role.DISTRIBUTOR_ADMIN:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Distributor admin required")
+    if not sess.distributor_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Distributor not assigned")
+    return sess
+
+
+async def require_super_or_distributor_admin(sess: Session = Depends(get_current_session)) -> Session:
+    """슈퍼·대리점 어느 쪽이든 통과 (목록 조회 등 공유 엔드포인트용)."""
+    if sess.role not in (Role.SUPER_ADMIN, Role.DISTRIBUTOR_ADMIN):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin or distributor required")
+    return sess
+
+
+def can_access_workspace(sess: Session, workspace_distributor_id: str) -> bool:
+    """워크스페이스에 대한 접근 권한 판정.
+    - super_admin: 항상 가능
+    - distributor_admin: 자기 산하 워크스페이스만
+    - admin/worker: 자기 워크스페이스만 (sess.workspace_id 로 별도 검증 필요)
+    """
+    if sess.role == Role.SUPER_ADMIN:
+        return True
+    if sess.role == Role.DISTRIBUTOR_ADMIN:
+        return bool(sess.distributor_id and sess.distributor_id == workspace_distributor_id)
+    return False
