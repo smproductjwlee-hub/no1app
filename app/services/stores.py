@@ -8,9 +8,9 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
-from app.db.sqlite import get_connection
+from app.db.sqlite import get_connection, is_unique_violation, make_slug_from_name
 from app.services.staff_avatar_files import delete_admin_file
 
 
@@ -22,6 +22,8 @@ class Role(str, Enum):
     ADMIN = "admin"
     WORKER = "worker"
     SUPER_ADMIN = "super_admin"
+    # Phase 2.x — 3계층 멀티테넌시の中間層: 대리점 관리자
+    DISTRIBUTOR_ADMIN = "distributor_admin"
 
 
 @dataclass
@@ -39,11 +41,22 @@ class Workspace:
     admin_ui_locale: str = "ja"
     admin_avatar_color_index: int = 0
     admin_avatar_updated_at: Optional[float] = None
-    # Phase 1.5: 請求 / 代理店分配
-    distributor_name: str = ""        # 代理店名 (例: "PoPo"). 空なら直販
-    monthly_price_jpy: int = 0         # 当該ワークスペースの月額利用料 (税抜)
-    commission_rate_pct: int = 20      # 代理店の手数料率 (0-100). 0は直販
+    # Phase 1.5: 請求 / 代理店分配 (旧 — Phase 2.x で distributor_id / 도매·소매가로 이행 중)
+    distributor_name: str = ""        # legacy: 代理店名 (例: "PoPo"). 空なら直販
+    monthly_price_jpy: int = 0         # legacy: 月額利用料 (Phase 2.x で retail_price_* に이행)
+    commission_rate_pct: int = 20      # legacy: 手数料率 (Phase 2.x 도매 모델에서 미사용)
     billing_start_at: Optional[float] = None  # 課金開始日(UNIX秒). 月割り計算で使う
+    # Phase 2.x: 3계층 멀티테넌시 + 도매·소매가
+    distributor_id: str = ""           # 소속 대리점 ID (c-direct = 직판)
+    slug: str = ""                     # URL 슬러그 (distributor_id 내 unique)
+    logo_url: Optional[str] = None     # 좌상단 표시용 로고 URL
+    primary_color: Optional[str] = None  # 옵션: 테마 색
+    owner_password_hash: str = ""      # 점주 로그인용 (대리점이 발급)
+    force_password_change_on_login: bool = False
+    retail_price_starter: Optional[int] = None    # 대리점이 정한 소매가 (영업 비밀)
+    retail_price_business: Optional[int] = None
+    retail_price_enterprise: Optional[int] = None
+    assigned_plan: str = "starter"     # starter / business / enterprise — API 초과시 자동 업그레이드
 
 
 @dataclass
@@ -55,6 +68,11 @@ class Session:
     expires_at: float
     # 個人アカウントログイン時のみ（グループ送信・一覧用）
     staff_account_id: Optional[str] = None
+    # Phase 2.x: 3계층 멀티테넌시 — 소속 대리점 ID
+    # super_admin → "" (모든 대리점에 권한)
+    # distributor_admin → 자기 대리점 id (워크스페이스 미보유)
+    # admin/worker → 워크스페이스의 distributor_id (격리 검증용)
+    distributor_id: str = ""
 
 
 def _row_to_workspace(row: sqlite3.Row) -> Workspace:
@@ -102,6 +120,40 @@ def _row_to_workspace(row: sqlite3.Row) -> Workspace:
             bstart = float(row["billing_start_at"])
         except (TypeError, ValueError):
             bstart = None
+    # Phase 2.x: 3계층 멀티테넌시 + 도매·소매가
+    dist_id = ""
+    if "distributor_id" in keys and row["distributor_id"]:
+        dist_id = str(row["distributor_id"]).strip()
+    slug = ""
+    if "slug" in keys and row["slug"]:
+        slug = str(row["slug"]).strip()
+    logo_url = None
+    if "logo_url" in keys and row["logo_url"]:
+        logo_url = str(row["logo_url"]).strip() or None
+    primary_color = None
+    if "primary_color" in keys and row["primary_color"]:
+        primary_color = str(row["primary_color"]).strip() or None
+    owner_ph = ""
+    if "owner_password_hash" in keys and row["owner_password_hash"]:
+        owner_ph = str(row["owner_password_hash"])
+    force_pw = False
+    if "force_password_change_on_login" in keys and row["force_password_change_on_login"] is not None:
+        try:
+            force_pw = bool(int(row["force_password_change_on_login"]))
+        except (TypeError, ValueError):
+            force_pw = False
+    def _ri(key):  # 안전한 int (NULL OK)
+        if key in keys and row[key] is not None:
+            try:
+                return int(row[key])
+            except (TypeError, ValueError):
+                return None
+        return None
+    plan = "starter"
+    if "assigned_plan" in keys and row["assigned_plan"]:
+        v = str(row["assigned_plan"]).strip().lower()
+        if v in ("starter", "business", "enterprise"):
+            plan = v
     return Workspace(
         id=row["id"],
         name=row["name"],
@@ -117,13 +169,64 @@ def _row_to_workspace(row: sqlite3.Row) -> Workspace:
         monthly_price_jpy=mprice,
         commission_rate_pct=crate,
         billing_start_at=bstart,
+        distributor_id=dist_id,
+        slug=slug,
+        logo_url=logo_url,
+        primary_color=primary_color,
+        owner_password_hash=owner_ph,
+        force_password_change_on_login=force_pw,
+        retail_price_starter=_ri("retail_price_starter"),
+        retail_price_business=_ri("retail_price_business"),
+        retail_price_enterprise=_ri("retail_price_enterprise"),
+        assigned_plan=plan,
     )
 
 
 class WorkspaceStore:
-    def create(self, name: str) -> Workspace:
+    def create(
+        self,
+        name: str,
+        *,
+        distributor_id: Optional[str] = None,
+        slug: Optional[str] = None,
+        owner_password_hash: str = "",
+        logo_url: Optional[str] = None,
+        primary_color: Optional[str] = None,
+        retail_price_starter: Optional[int] = None,
+        retail_price_business: Optional[int] = None,
+        retail_price_enterprise: Optional[int] = None,
+        assigned_plan: str = "starter",
+        force_password_change_on_login: bool = False,
+        company_name: str = "",
+    ) -> Workspace:
+        """워크스페이스 생성.
+
+        - distributor_id 가 None 이면 'c-direct' (직판) 의 id 를 자동 lookup
+        - slug 가 None 이면 name/company_name 에서 자동 생성, 충돌 시 -2, -3 suffix
+        - (distributor_id, slug) 복합 유니크 인덱스로 보호됨
+        """
+        from app.db.sqlite import _ensure_unique_workspace_slug  # type: ignore
+
         conn = get_connection()
+        # distributor_id 미지정시 c-direct 매핑
+        if not distributor_id:
+            r = conn.execute(
+                "SELECT id FROM distributors WHERE slug = ?", ("c-direct",)
+            ).fetchone()
+            if r is None:
+                raise RuntimeError("c-direct distributor not seeded; run init_db() first.")
+            distributor_id = r[0] if not hasattr(r, "keys") else r["id"]
+
+        # slug 자동 생성
         ws_id = str(uuid.uuid4())
+        if not slug:
+            base = make_slug_from_name(company_name or name, fallback_id=ws_id)
+            slug = _ensure_unique_workspace_slug(conn, distributor_id, base, ws_id)
+        else:
+            # 이미 정해진 slug 도 정규화 (소문자·하이픈 외 제거)
+            slug = make_slug_from_name(slug, fallback_id=ws_id)
+            slug = _ensure_unique_workspace_slug(conn, distributor_id, slug, ws_id)
+
         now = time.time()
         mx_row = conn.execute("SELECT COALESCE(MAX(sort_order), -1.0) FROM workspaces").fetchone()
         try:
@@ -131,14 +234,35 @@ class WorkspaceStore:
         except (TypeError, ValueError):
             mx = -1.0
         sort_next = mx + 1.0
-        conn.execute(
-            """
-            INSERT INTO workspaces (id, name, created_at, company_name, branch_name, department_name, admin_ui_locale, sort_order)
-            VALUES (?, ?, ?, '', '', '', 'ja', ?)
-            """,
-            (ws_id, name, now, sort_next),
-        )
-        conn.commit()
+        assigned = (assigned_plan or "starter").strip().lower()
+        if assigned not in ("starter", "business", "enterprise"):
+            assigned = "starter"
+        try:
+            conn.execute(
+                """
+                INSERT INTO workspaces (
+                    id, name, created_at, company_name, branch_name, department_name,
+                    admin_ui_locale, sort_order,
+                    distributor_id, slug, logo_url, primary_color,
+                    owner_password_hash, force_password_change_on_login,
+                    retail_price_starter, retail_price_business, retail_price_enterprise,
+                    assigned_plan
+                )
+                VALUES (?, ?, ?, ?, '', '', 'ja', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    ws_id, name, now, company_name or "", sort_next,
+                    distributor_id, slug, logo_url, primary_color,
+                    owner_password_hash, 1 if force_password_change_on_login else 0,
+                    retail_price_starter, retail_price_business, retail_price_enterprise,
+                    assigned,
+                ),
+            )
+            conn.commit()
+        except Exception as exc:
+            if is_unique_violation(exc):
+                raise ValueError(f"workspace slug '{slug}' already exists for this distributor") from exc
+            raise
         r = conn.execute("SELECT * FROM workspaces WHERE id = ?", (ws_id,)).fetchone()
         assert r is not None
         return _row_to_workspace(r)
@@ -149,16 +273,65 @@ class WorkspaceStore:
         return _row_to_workspace(row) if row else None
 
     def find_by_name(self, name: str) -> Optional[Workspace]:
-        """大文字小文字を区別せず名前一致で検索（MVP）。"""
+        """大文字小文字を区別せず名前一致で検索（legacy MVP）。
+
+        Phase 2.x: 同名ワークスペースが複数 distributor にまたがり得るため、
+        本メソッドは「c-direct (直販) スコープ内」 でのみ検索する。
+        slug ベースの find_by_slugs() を新規利用には推奨。
+        """
         key = name.strip().lower()
         if not key:
             return None
         conn = get_connection()
+        cd = conn.execute(
+            "SELECT id FROM distributors WHERE slug = ?", ("c-direct",)
+        ).fetchone()
+        if cd is None:
+            # c-direct 미생성 (init 전) 시 legacy 동작 fallback
+            row = conn.execute(
+                "SELECT * FROM workspaces WHERE lower(trim(name)) = ? LIMIT 1",
+                (key,),
+            ).fetchone()
+            return _row_to_workspace(row) if row else None
+        c_direct_id = cd[0] if not hasattr(cd, "keys") else cd["id"]
         row = conn.execute(
-            "SELECT * FROM workspaces WHERE lower(trim(name)) = ? LIMIT 1",
-            (key,),
+            "SELECT * FROM workspaces WHERE lower(trim(name)) = ? AND distributor_id = ? LIMIT 1",
+            (key, c_direct_id),
         ).fetchone()
         return _row_to_workspace(row) if row else None
+
+    def find_by_slugs(self, distributor_slug: str, workspace_slug: str) -> Optional[Workspace]:
+        """URL 라우팅용: (대리점 슬러그, 워크스페이스 슬러그) → Workspace.
+
+        예: find_by_slugs("popo", "abcramen") → ABCラーメン의 Workspace
+        """
+        ds = (distributor_slug or "").strip().lower()
+        ws = (workspace_slug or "").strip().lower()
+        if not ds or not ws:
+            return None
+        conn = get_connection()
+        row = conn.execute(
+            """
+            SELECT w.* FROM workspaces w
+            JOIN distributors d ON d.id = w.distributor_id
+            WHERE d.slug = ? AND w.slug = ?
+            LIMIT 1
+            """,
+            (ds, ws),
+        ).fetchone()
+        return _row_to_workspace(row) if row else None
+
+    def list_by_distributor(self, distributor_id: str) -> list[Workspace]:
+        """대리점이 자기 산하 워크스페이스만 보는 용도."""
+        if not distributor_id:
+            return []
+        conn = get_connection()
+        rows = conn.execute(
+            "SELECT * FROM workspaces WHERE distributor_id = ? "
+            "ORDER BY sort_order ASC, created_at ASC",
+            (distributor_id,),
+        ).fetchall()
+        return [_row_to_workspace(r) for r in rows]
 
     def list_all(self) -> list[Workspace]:
         conn = get_connection()
@@ -447,6 +620,7 @@ class SessionStore:
         user_label: Optional[str],
         ttl_seconds: int,
         staff_account_id: Optional[str] = None,
+        distributor_id: Optional[str] = None,
     ) -> Session:
         from jose import jwt
 
@@ -457,6 +631,7 @@ class SessionStore:
             "role": role.value,
             "lab": user_label or "",
             "sai": staff_account_id or "",
+            "did": distributor_id or "",  # Phase 2.x: 소속 대리점 ID
             "iat": int(now),
             "exp": int(exp),
         }
@@ -468,6 +643,7 @@ class SessionStore:
             user_label=user_label,
             expires_at=exp,
             staff_account_id=staff_account_id,
+            distributor_id=distributor_id or "",
         )
 
     def get(self, token: str) -> Optional[Session]:
@@ -486,6 +662,8 @@ class SessionStore:
         sub = claims.get("sub", "") or ""
         lab = claims.get("lab") or None
         sai = claims.get("sai") or None
+        # Phase 2.x: did 클레임 (구 토큰엔 없어도 호환 — "" 로 처리)
+        did = claims.get("did") or ""
         try:
             exp = float(claims.get("exp", 0))
         except (TypeError, ValueError):
@@ -497,6 +675,7 @@ class SessionStore:
             user_label=lab,
             expires_at=exp,
             staff_account_id=sai,
+            distributor_id=did,
         )
 
 
