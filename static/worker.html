@@ -811,6 +811,13 @@
 
           sessionStorage.removeItem("wb_workspace_id");
 
+          // Phase 2.13 (A3): 슬러그 모드 → 브랜드 URL 로 복귀
+          var slugs = window.__WB_SLUGS__;
+          if (slugs && slugs.dist && slugs.cust) {
+            location.href = "/" + slugs.dist + "/" + slugs.cust;
+            return;
+          }
+
           location.href = "/login?role=worker";
 
         });

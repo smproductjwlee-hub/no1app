@@ -95,6 +95,26 @@ def _resolve_by_login_input(body: PortalLoginRequest):
     return _resolve_workspace(body.username)
 
 
+def _assert_workspace_login_allowed(ws) -> None:
+    """Phase 2.14 (A4): 워크스페이스 점장·스탭 로그인 허용 여부 검증.
+
+    대리점 (distributor) 이 suspended 상태이면 산하 모든 워크스페이스 로그인 차단.
+    c-direct (직판) 산하는 검증 생략.
+    """
+    if ws is None or not ws.distributor_id:
+        return
+    d = distributors_store.get(ws.distributor_id)
+    if d is None:
+        return
+    if d.slug == "c-direct":
+        return
+    if d.status == "suspended":
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail=f"This workspace is temporarily suspended. Please contact {d.name} ({d.contact_email or d.contact_phone or 'your distributor'}) for assistance.",
+        )
+
+
 @router.post("/portal-login", response_model=PortalLoginOut)
 async def portal_login(
     body: PortalLoginRequest,
@@ -182,6 +202,8 @@ async def portal_login(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Workspace not found",
                 )
+            # Phase 2.14 (A4): 대리점 일시정지 검증
+            await run_db(_assert_workspace_login_allowed, ws)
             # 워크스페이스 owner_password_hash 가 있으면 그걸로 검증
             if ws.owner_password_hash:
                 if not verify_distributor_password(body.password, ws.owner_password_hash):
@@ -245,6 +267,8 @@ async def portal_login(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Workspace not found",
         )
+    # Phase 2.14 (A4): 대리점 일시정지 검증
+    await run_db(_assert_workspace_login_allowed, ws)
     acc_login = (body.worker_account_login or "").strip()
     if not acc_login:
         raise HTTPException(
@@ -393,6 +417,52 @@ async def worker_change_password(
     if not await run_db(staff_accounts.verify_password, body.current_password, acc.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid current password")
     await run_db(staff_accounts.update, acc.id, sess.workspace_id, plain_password=body.new_password)
+    return {"ok": True}
+
+
+# Phase 2.12 (A2): 점장 본인 PW 변경 — 슬러그 모드 워크스페이스에 한정
+class AdminPasswordChangeIn(BaseModel):
+    current_password: str = Field(..., min_length=1, max_length=200)
+    new_password: str = Field(..., min_length=4, max_length=200)
+
+
+@router.post("/admin-password")
+async def admin_change_password(
+    body: AdminPasswordChangeIn,
+    token: str = Query(..., min_length=8),
+) -> dict[str, bool]:
+    """点장 본인이 자기 워크스페이스 PW 를 변경.
+
+    조건:
+    - admin role 세션
+    - 워크스페이스의 owner_password_hash 가 설정되어 있어야 함 (슬러그 모드)
+    - legacy (글로벌 PORTAL_ADMIN_PASSWORD) 모드는 거부 → 대리점이 먼저
+      슬러그 모드로 전환해야 함 (PW 재발급 통해)
+    """
+    from app.services.distributors import (
+        hash_password as _hash_pw,
+        verify_password as _verify_pw,
+    )
+
+    sess = sessions.get(token)
+    if sess is None or sess.role != Role.ADMIN:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="admin only")
+    ws = await run_db(workspaces.get, sess.workspace_id)
+    if ws is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="workspace not found")
+    if not ws.owner_password_hash:
+        # legacy: 글로벌 PW 사용 중. 점장이 직접 변경 불가.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="このワークスペースはまだ個別パスワードが設定されていません。代理店または運営事務局にお問い合わせください。",
+        )
+    if not _verify_pw(body.current_password, ws.owner_password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="現在のパスワードが正しくありません",
+        )
+    new_hash = _hash_pw(body.new_password)
+    await run_db(workspaces.set_owner_password_hash, sess.workspace_id, new_hash)
     return {"ok": True}
 
 
