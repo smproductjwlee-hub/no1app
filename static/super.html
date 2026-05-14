@@ -121,6 +121,65 @@
           </div>
         </div>
 
+        <!-- Phase 2.7: 卸売 請求レポート (대리점별 청구) -->
+        <details class="rounded-2xl bg-white border border-amber-200 shadow-sm overflow-hidden">
+          <summary class="cursor-pointer list-none px-4 py-3 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between text-sm font-semibold text-amber-900">
+            <span>卸売 請求レポート (代理店別合計)</span>
+            <span class="text-amber-700/60 text-xs">▼</span>
+          </summary>
+          <div class="p-4 space-y-3">
+            <div class="flex flex-wrap gap-2 items-end">
+              <label class="block text-xs text-gray-600">年
+                <input id="wholesale-year" type="number" min="2024" max="2099" class="mt-1 w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+              </label>
+              <label class="block text-xs text-gray-600">月
+                <input id="wholesale-month" type="number" min="1" max="12" class="mt-1 w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+              </label>
+              <button type="button" id="wholesale-fetch-btn" class="px-4 py-1.5 rounded-lg bg-amber-700 text-white text-sm font-medium hover:bg-amber-600">取得</button>
+            </div>
+            <p class="text-[11px] text-gray-500 leading-snug">
+              ※ 各代理店に毎月請求する金額です。月額卸売 + 当月新規ワークスペースの MVP 開発費。
+              代理店がエンドユーザーに販売した小売価格は本社からは見えません (代理店の営業秘密)。
+            </p>
+
+            <div id="wholesale-summary" class="hidden grid grid-cols-1 sm:grid-cols-4 gap-2">
+              <div class="bg-gray-50 rounded-lg p-3">
+                <p class="text-[10px] text-gray-500 uppercase">월액 도매 합계</p>
+                <p id="ws-sum-monthly" class="text-lg font-mono font-bold text-gray-900">—</p>
+              </div>
+              <div class="bg-amber-50 rounded-lg p-3">
+                <p class="text-[10px] text-amber-700 uppercase">MVP 当月分</p>
+                <p id="ws-sum-mvp" class="text-lg font-mono font-bold text-amber-900">—</p>
+              </div>
+              <div class="bg-emerald-50 rounded-lg p-3">
+                <p class="text-[10px] text-emerald-700 uppercase">合計請求</p>
+                <p id="ws-sum-total" class="text-xl font-mono font-bold text-emerald-900">—</p>
+              </div>
+              <div class="bg-slate-50 rounded-lg p-3">
+                <p class="text-[10px] text-slate-500 uppercase">合計 워크스페이스</p>
+                <p id="ws-sum-ws" class="text-lg font-mono font-bold text-slate-900">—</p>
+              </div>
+            </div>
+
+            <div id="wholesale-rows" class="hidden overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="text-left text-[10px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                    <th class="py-2 pr-2">代理店</th>
+                    <th class="py-2 pr-2 text-right">St / Bus / Ent</th>
+                    <th class="py-2 pr-2 text-right">월액 도매</th>
+                    <th class="py-2 pr-2 text-right">MVP 신규</th>
+                    <th class="py-2 pr-2 text-right font-bold">合計請求</th>
+                  </tr>
+                </thead>
+                <tbody id="wholesale-tbody"></tbody>
+              </table>
+            </div>
+
+            <p id="wholesale-status" class="text-xs min-h-[1rem] text-gray-600"></p>
+          </div>
+        </details>
+
         <!-- Phase 2.6: 販売代理店 管理 -->
         <details class="rounded-2xl bg-white border border-indigo-200 shadow-sm overflow-hidden">
           <summary class="cursor-pointer list-none px-4 py-3 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between text-sm font-semibold text-indigo-900">
@@ -1453,6 +1512,80 @@
       });
 
       loadDistributors();
+
+      // ====================================================================
+      // Phase 2.7 — 卸売 請求レポート (대리점별 청구)
+      // ====================================================================
+      (function () {
+        var now = new Date();
+        document.getElementById("wholesale-year").value = now.getFullYear();
+        document.getElementById("wholesale-month").value = now.getMonth() + 1;
+      })();
+
+      function setWholesaleStatus(msg, isError) {
+        var el = document.getElementById("wholesale-status");
+        el.textContent = msg || "";
+        el.className = "text-xs min-h-[1rem] " + (isError ? "text-rose-600" : "text-gray-600");
+      }
+
+      document.getElementById("wholesale-fetch-btn").addEventListener("click", async function () {
+        var year = Number(document.getElementById("wholesale-year").value) || now.getFullYear();
+        var month = Number(document.getElementById("wholesale-month").value) || (now.getMonth() + 1);
+        setWholesaleStatus("読込中...");
+        try {
+          var r = await fetch(
+            "/api/v1/distributors/billing-report?year=" + year + "&month=" + month +
+            "&token=" + encodeURIComponent(tok)
+          );
+          if (!r.ok) {
+            var j = await r.json().catch(function () { return {}; });
+            setWholesaleStatus(j.detail || "取得失敗: " + r.status, true);
+            return;
+          }
+          var data = await r.json();
+
+          // 合計
+          var t = data.totals || {};
+          document.getElementById("ws-sum-monthly").textContent = jpy(t.monthly_wholesale);
+          document.getElementById("ws-sum-mvp").textContent = jpy(t.mvp);
+          document.getElementById("ws-sum-total").textContent = jpy(t.grand_total);
+          document.getElementById("ws-sum-ws").textContent = String(t.ws_count || 0);
+          document.getElementById("wholesale-summary").classList.remove("hidden");
+
+          // 행 렌더
+          var tbody = document.getElementById("wholesale-tbody");
+          tbody.innerHTML = "";
+          (data.rows || []).forEach(function (row) {
+            var tr = document.createElement("tr");
+            tr.className = "border-b border-gray-100 hover:bg-gray-50";
+            tr.innerHTML =
+              '<td class="py-2 pr-2">' +
+                '<div class="font-medium">' + escapeHtml(row.distributor_name) + '</div>' +
+                '<div class="text-[10px] text-gray-500 font-mono">/' + escapeHtml(row.distributor_slug) + '</div>' +
+              '</td>' +
+              '<td class="py-2 pr-2 text-right font-mono text-[10px]">' +
+                row.ws_starter + ' / ' + row.ws_business + ' / ' + row.ws_enterprise +
+                ' <span class="text-gray-400">(計' + row.ws_count + ')</span>' +
+              '</td>' +
+              '<td class="py-2 pr-2 text-right font-mono">' + jpy(row.monthly_wholesale_total) + '</td>' +
+              '<td class="py-2 pr-2 text-right font-mono">' +
+                (row.mvp_count_this_month > 0
+                  ? jpy(row.mvp_total) + ' <span class="text-[10px] text-amber-700">(' + row.mvp_count_this_month + '社)</span>'
+                  : '<span class="text-gray-400">—</span>') +
+              '</td>' +
+              '<td class="py-2 pr-2 text-right font-mono font-bold text-emerald-900">' + jpy(row.grand_total) + '</td>';
+            tbody.appendChild(tr);
+          });
+          document.getElementById("wholesale-rows").classList.toggle("hidden", (data.rows || []).length === 0);
+          setWholesaleStatus(
+            (data.rows || []).length === 0
+              ? "登録された代理店がありません"
+              : data.year + "年" + data.month + "月分: " + (data.rows.length) + "社の請求情報"
+          );
+        } catch (e) {
+          setWholesaleStatus(String(e.message || e), true);
+        }
+      });
     })();
   </script>
 </body>
