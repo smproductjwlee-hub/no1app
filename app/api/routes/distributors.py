@@ -122,6 +122,59 @@ class WorkspaceCreateByDistributorIn(BaseModel):
 
 
 # ============================================================
+# Billing Report — 도매 모델 기반
+# ============================================================
+
+
+class SuperBillingDistRow(BaseModel):
+    """운영자 (super_admin) 용: 대리점별 청구 합계."""
+    distributor_id: str
+    distributor_slug: str
+    distributor_name: str
+    contact_person: str
+    contact_email: str
+    ws_count: int                       # 산하 워크스페이스 총 수
+    ws_starter: int
+    ws_business: int
+    ws_enterprise: int
+    monthly_wholesale_total: int        # Σ(ws 도매가) — 매월 청구
+    mvp_count_this_month: int            # 이번달 신규 가입 워크스페이스 수
+    mvp_total: int                       # mvp_count × MVP 도매가
+    grand_total: int                     # monthly + mvp
+
+
+class SuperBillingReport(BaseModel):
+    year: int
+    month: int
+    rows: list[SuperBillingDistRow]
+    totals: dict[str, int]               # {"monthly_wholesale": N, "mvp": N, "grand_total": N, "ws_count": N}
+
+
+class DistMarginRow(BaseModel):
+    """대리점 본인 화면용: 워크스페이스별 마진."""
+    ws_id: str
+    slug: str
+    name: str
+    company_name: str
+    plan: str
+    wholesale: int                       # 본인이 운영자에게 지불하는 도매가
+    retail: int                           # 본인이 엔드유저에게 청구한 소매가
+    margin: int                           # retail - wholesale
+    margin_pct: int                       # (margin / retail) × 100. retail 0 이면 0
+    created_at: float
+
+
+class DistMarginReport(BaseModel):
+    year: int
+    month: int
+    distributor_id: str
+    distributor_slug: str
+    distributor_name: str
+    rows: list[DistMarginRow]
+    totals: dict[str, int]               # {"revenue": Σretail, "cost": Σwholesale, "margin": Σmargin, "ws_count": N}
+
+
+# ============================================================
 # Helpers
 # ============================================================
 
@@ -266,6 +319,183 @@ async def create_my_workspace(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)) from e
     return _to_ws_row(ws)
+
+
+# ============================================================
+# Billing Report endpoints
+# ============================================================
+
+
+def _is_in_year_month(ts: float, year: int, month: int) -> bool:
+    """UNIX 秒 → 해당 연·월에 속하는지. 로컬 타임존 기준."""
+    import datetime as _dt
+    if not ts:
+        return False
+    try:
+        d = _dt.datetime.fromtimestamp(float(ts))
+    except (TypeError, ValueError, OSError):
+        return False
+    return d.year == year and d.month == month
+
+
+def _resolve_year_month(year: Optional[int], month: Optional[int]) -> tuple[int, int]:
+    """미지정 시 현재 연·월 사용."""
+    import datetime as _dt
+    now = _dt.datetime.now()
+    return (year or now.year, month or now.month)
+
+
+def _wholesale_for_plan(d, plan: str) -> int:
+    if plan == "enterprise":
+        return d.wholesale_enterprise
+    if plan == "business":
+        return d.wholesale_business
+    return d.wholesale_starter
+
+
+def _retail_for_plan(ws, plan: str) -> int:
+    if plan == "enterprise":
+        return ws.retail_price_enterprise or 0
+    if plan == "business":
+        return ws.retail_price_business or 0
+    return ws.retail_price_starter or 0
+
+
+def _compute_super_billing(year: int, month: int):
+    """운영자가 각 대리점에 청구할 합계 계산.
+
+    - 매월 도매 합계: Σ(워크스페이스 도매가) per 대리점
+    - 이번달 MVP 합계: 이번달 created_at 의 워크스페이스 수 × 대리점 MVP 도매가
+    - c-direct (직판) 는 제외
+    """
+    distributors_list = distributors_store.list_all()
+    rows: list[dict] = []
+    sum_monthly = 0
+    sum_mvp = 0
+    sum_ws_count = 0
+    for d in distributors_list:
+        if d.slug == "c-direct":
+            continue
+        ws_list = workspaces.list_by_distributor(d.id)
+        monthly_total = 0
+        st = bu = en = 0
+        mvp_count = 0
+        for ws in ws_list:
+            plan = (ws.assigned_plan or "starter").lower()
+            if plan == "enterprise":
+                en += 1
+            elif plan == "business":
+                bu += 1
+            else:
+                st += 1
+            monthly_total += _wholesale_for_plan(d, plan)
+            if _is_in_year_month(ws.created_at, year, month):
+                mvp_count += 1
+        mvp_total = mvp_count * (d.wholesale_mvp_fee or 0)
+        grand = monthly_total + mvp_total
+        rows.append({
+            "distributor_id": d.id,
+            "distributor_slug": d.slug,
+            "distributor_name": d.name,
+            "contact_person": d.contact_person,
+            "contact_email": d.contact_email,
+            "ws_count": len(ws_list),
+            "ws_starter": st,
+            "ws_business": bu,
+            "ws_enterprise": en,
+            "monthly_wholesale_total": int(monthly_total),
+            "mvp_count_this_month": mvp_count,
+            "mvp_total": int(mvp_total),
+            "grand_total": int(grand),
+        })
+        sum_monthly += monthly_total
+        sum_mvp += mvp_total
+        sum_ws_count += len(ws_list)
+    return {
+        "rows": rows,
+        "totals": {
+            "monthly_wholesale": int(sum_monthly),
+            "mvp": int(sum_mvp),
+            "grand_total": int(sum_monthly + sum_mvp),
+            "ws_count": int(sum_ws_count),
+        },
+    }
+
+
+def _compute_my_margin(distributor_id: str, year: int, month: int):
+    """대리점 본인 화면용 — 산하 ws별 매출·비용·마진."""
+    d = distributors_store.get(distributor_id)
+    if d is None:
+        return None
+    ws_list = workspaces.list_by_distributor(distributor_id)
+    rows: list[dict] = []
+    revenue = cost = margin = 0
+    for ws in ws_list:
+        plan = (ws.assigned_plan or "starter").lower()
+        whp = _wholesale_for_plan(d, plan)
+        rtp = _retail_for_plan(ws, plan)
+        m = max(rtp - whp, 0) if rtp > 0 else 0
+        pct = int(round((m / rtp) * 100)) if rtp > 0 else 0
+        rows.append({
+            "ws_id": ws.id,
+            "slug": ws.slug or "",
+            "name": ws.name,
+            "company_name": ws.company_name or "",
+            "plan": plan,
+            "wholesale": int(whp),
+            "retail": int(rtp),
+            "margin": int(m),
+            "margin_pct": pct,
+            "created_at": ws.created_at,
+        })
+        revenue += rtp
+        cost += whp
+        margin += m
+    return {
+        "distributor_id": d.id,
+        "distributor_slug": d.slug,
+        "distributor_name": d.name,
+        "rows": rows,
+        "totals": {
+            "revenue": int(revenue),
+            "cost": int(cost),
+            "margin": int(margin),
+            "ws_count": len(ws_list),
+        },
+    }
+
+
+@router.get("/billing-report", response_model=SuperBillingReport)
+async def super_billing_report(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    _sess: Session = Depends(require_super_admin),
+) -> SuperBillingReport:
+    """운영자 (super_admin) 용 — 대리점별 청구 합계.
+
+    응답: 각 대리점에 청구할 금액 (도매 ws 합계 + 이번달 MVP).
+    """
+    y, m = _resolve_year_month(year, month)
+    data = await run_db(_compute_super_billing, y, m)
+    return SuperBillingReport(year=y, month=m, rows=data["rows"], totals=data["totals"])
+
+
+@router.get("/me/billing-report", response_model=DistMarginReport)
+async def my_billing_report(
+    year: Optional[int] = None,
+    month: Optional[int] = None,
+    sess: Session = Depends(require_distributor_admin),
+) -> DistMarginReport:
+    """대리점 본인 용 — 자기 산하 ws 별 매출·비용·마진.
+
+    응답: 자기 영업 활동의 실시간 수익성 모니터링용.
+    소매가는 자기 영업 비밀이므로 본인만 봄.
+    """
+    y, m = _resolve_year_month(year, month)
+    data = await run_db(_compute_my_margin, sess.distributor_id, y, m)
+    if data is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="distributor not found")
+    return DistMarginReport(year=y, month=m, **data)
 
 
 @router.get("/{distributor_id}", response_model=DistributorOut)

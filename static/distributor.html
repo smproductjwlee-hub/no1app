@@ -129,6 +129,60 @@
       </div>
     </section>
 
+    <!-- Phase 2.7: 自社マージン (이번달) -->
+    <section class="card">
+      <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 class="text-sm font-semibold text-gray-700">今月の収支</h2>
+        <div class="flex gap-2 items-end">
+          <label class="text-[11px] text-gray-500">年
+            <input id="margin-year" type="number" min="2024" max="2099"
+                   class="w-20 ml-1 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+          </label>
+          <label class="text-[11px] text-gray-500">月
+            <input id="margin-month" type="number" min="1" max="12"
+                   class="w-14 ml-1 rounded-md border border-gray-300 px-2 py-1 text-xs" />
+          </label>
+          <button id="margin-fetch-btn" class="px-3 py-1 rounded-md bg-indigo-700 text-white text-xs font-semibold hover:bg-indigo-800">
+            取得
+          </button>
+        </div>
+      </div>
+      <div id="margin-summary" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div class="bg-emerald-50 rounded-lg p-3">
+          <p class="text-[10px] text-emerald-700 uppercase">売上 (エンドユーザー回収)</p>
+          <p id="m-revenue" class="text-lg font-mono font-bold text-emerald-900">—</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-3">
+          <p class="text-[10px] text-gray-500 uppercase">本社へ支払う卸価格</p>
+          <p id="m-cost" class="text-lg font-mono font-bold text-gray-700">—</p>
+        </div>
+        <div class="bg-indigo-50 rounded-lg p-3">
+          <p class="text-[10px] text-indigo-700 uppercase">マージン</p>
+          <p id="m-margin" class="text-xl font-mono font-bold text-indigo-900">—</p>
+        </div>
+      </div>
+      <div id="margin-empty" class="hidden text-sm text-gray-500 text-center py-4">
+        小売価格が未設定のため、マージン計算ができません。<br />
+        エンドユーザー追加時に、もしくは個別に小売価格を入力してください。
+      </div>
+      <div id="margin-rows" class="hidden overflow-x-auto mt-3">
+        <table class="w-full text-xs">
+          <thead>
+            <tr class="text-left text-[10px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
+              <th class="py-2 pr-2">スラッグ・会社名</th>
+              <th class="py-2 pr-2">プラン</th>
+              <th class="py-2 pr-2 text-right">小売 (回収)</th>
+              <th class="py-2 pr-2 text-right">卸 (支払)</th>
+              <th class="py-2 pr-2 text-right">マージン</th>
+              <th class="py-2 pr-2 text-right">%</th>
+            </tr>
+          </thead>
+          <tbody id="margin-tbody"></tbody>
+        </table>
+      </div>
+      <p id="margin-status" class="text-[11px] text-gray-500 mt-2"></p>
+    </section>
+
     <!-- 산하 워크스페이스 일람 -->
     <section class="card">
       <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -362,6 +416,9 @@
         await reloadWorkspaces();
         $("login-shell").classList.add("hidden");
         $("dashboard-shell").classList.remove("hidden");
+        // 마진 리포트 자동 로드 (현재 월)
+        initMarginPanel();
+        reloadMargin().catch(() => {});
       } catch (e) {
         if (e.status === 401 || e.status === 403) {
           auth.token = "";
@@ -373,6 +430,72 @@
         }
       }
     }
+
+    function initMarginPanel() {
+      const now = new Date();
+      $("margin-year").value = now.getFullYear();
+      $("margin-month").value = now.getMonth() + 1;
+    }
+
+    async function reloadMargin() {
+      const y = Number($("margin-year").value) || new Date().getFullYear();
+      const m = Number($("margin-month").value) || new Date().getMonth() + 1;
+      $("margin-status").textContent = "読込中...";
+      try {
+        const data = await api(`/api/v1/distributors/me/billing-report?year=${y}&month=${m}`);
+        const t = data.totals || {};
+        $("m-revenue").textContent = jpy(t.revenue);
+        $("m-cost").textContent = jpy(t.cost);
+        $("m-margin").textContent = jpy(t.margin);
+        $("margin-summary").classList.remove("hidden");
+
+        const tbody = $("margin-tbody");
+        tbody.innerHTML = "";
+        const rows = data.rows || [];
+        const anyRetail = rows.some(r => (r.retail || 0) > 0);
+        if (rows.length > 0 && anyRetail) {
+          rows.forEach(r => {
+            const tr = document.createElement("tr");
+            tr.className = "border-b border-gray-100 hover:bg-gray-50";
+            const planClass = r.plan === "enterprise" ? "plan-enterprise"
+              : r.plan === "business" ? "plan-business" : "plan-starter";
+            const mClass = r.margin > 0 ? "text-emerald-700 font-semibold"
+              : r.margin < 0 ? "text-rose-700 font-semibold" : "text-gray-500";
+            const pctBadge = r.retail > 0
+              ? `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] ${r.margin_pct >= 30 ? "bg-emerald-100 text-emerald-800" : r.margin_pct >= 10 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"}">${r.margin_pct}%</span>`
+              : '<span class="text-gray-400">—</span>';
+            tr.innerHTML = `
+              <td class="py-2 pr-2">
+                <div class="font-medium">${escapeHtml(r.name)}</div>
+                <div class="text-[10px] text-gray-500 font-mono">/${escapeHtml(r.slug)}</div>
+              </td>
+              <td class="py-2 pr-2"><span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold ${planClass}">${r.plan}</span></td>
+              <td class="py-2 pr-2 text-right font-mono">${r.retail > 0 ? jpy(r.retail) : '<span class="text-gray-400">未設定</span>'}</td>
+              <td class="py-2 pr-2 text-right font-mono text-gray-600">${jpy(r.wholesale)}</td>
+              <td class="py-2 pr-2 text-right font-mono ${mClass}">${jpy(r.margin)}</td>
+              <td class="py-2 pr-2 text-right">${pctBadge}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+          $("margin-rows").classList.remove("hidden");
+          $("margin-empty").classList.add("hidden");
+          $("margin-status").textContent = `${data.year}年${data.month}月: 산하 ${t.ws_count}社`;
+        } else {
+          $("margin-rows").classList.add("hidden");
+          $("margin-empty").classList.remove("hidden");
+          $("margin-status").textContent = "";
+        }
+      } catch (e) {
+        $("margin-status").textContent = "取得失敗: " + (e.detail || e.message);
+      }
+    }
+
+    document.addEventListener("click", function (ev) {
+      const t = ev.target;
+      if (t && t.id === "margin-fetch-btn") {
+        reloadMargin();
+      }
+    });
 
     function jpy(n) {
       if (n === null || n === undefined) return "—";
