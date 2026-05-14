@@ -562,6 +562,52 @@ async def delete_workspace_logo(
     return {"ok": True, "workspace_id": workspace_id}
 
 
+# ============================================================
+# Phase 2.9 — 점장 PW 재발급 (대리점이 산하 점장의 PW 를 직접 리셋)
+# ============================================================
+
+
+class WorkspacePasswordResetIn(BaseModel):
+    new_password: str = Field(..., min_length=4, max_length=200)
+
+
+class WorkspacePasswordResetResult(BaseModel):
+    ok: bool
+    workspace_id: str
+    workspace_slug: str
+    workspace_name: str
+    new_password: str  # 평문 반환 (대리점이 점장에게 직접 전달)
+
+
+@router.patch(
+    "/me/workspaces/{workspace_id}/password",
+    response_model=WorkspacePasswordResetResult,
+)
+async def reset_workspace_password(
+    workspace_id: str,
+    body: WorkspacePasswordResetIn,
+    sess: Session = Depends(require_distributor_admin),
+) -> WorkspacePasswordResetResult:
+    """대리점이 자기 산하 점장의 PW 를 재발급.
+
+    - 점장이 PW 를 잊었을 때 대리점이 즉시 새 PW 발급 (테스트 단계는 이메일 없음)
+    - 새 PW 는 응답에 평문으로 동봉되어 대리점이 점장에게 직접 전달
+    - 기존 점장 JWT 세션은 만료 전까지 유효 (revocation list 미도입). 보안이 중요하면
+      app.session_token_ttl_seconds 를 짧게 설정.
+    """
+    ws = await run_db(_verify_workspace_ownership, sess, workspace_id)
+    from app.services.distributors import hash_password
+    new_hash = hash_password(body.new_password)
+    await run_db(workspaces.set_owner_password_hash, workspace_id, new_hash)
+    return WorkspacePasswordResetResult(
+        ok=True,
+        workspace_id=ws.id,
+        workspace_slug=ws.slug or "",
+        workspace_name=ws.name,
+        new_password=body.new_password,
+    )
+
+
 @router.get("/{distributor_id}", response_model=DistributorOut)
 async def get_distributor(
     distributor_id: str,
