@@ -393,12 +393,50 @@ def _init_db_pg() -> None:
                 force_password_change_on_login INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL DEFAULT 'active',
                 created_at DOUBLE PRECISION NOT NULL,
-                updated_at DOUBLE PRECISION NOT NULL
+                updated_at DOUBLE PRECISION NOT NULL,
+                lemon_customer_id TEXT,
+                lemon_subscription_id TEXT,
+                subscription_status TEXT NOT NULL DEFAULT 'none',
+                subscription_renews_at DOUBLE PRECISION,
+                payment_failure_count INTEGER NOT NULL DEFAULT 0,
+                last_payment_at DOUBLE PRECISION,
+                last_payment_amount_cents INTEGER
             )
             """
         )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_distributors_slug ON distributors(slug)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_distributors_owner_email ON distributors(owner_email)")
+        # Phase 3.1 — 既存 PG DB に Lemon Squeezy 컬럼들 idempotent ALTER
+        for col, ddl in (
+            ("lemon_customer_id", "ADD COLUMN IF NOT EXISTS lemon_customer_id TEXT"),
+            ("lemon_subscription_id", "ADD COLUMN IF NOT EXISTS lemon_subscription_id TEXT"),
+            ("subscription_status", "ADD COLUMN IF NOT EXISTS subscription_status TEXT NOT NULL DEFAULT 'none'"),
+            ("subscription_renews_at", "ADD COLUMN IF NOT EXISTS subscription_renews_at DOUBLE PRECISION"),
+            ("payment_failure_count", "ADD COLUMN IF NOT EXISTS payment_failure_count INTEGER NOT NULL DEFAULT 0"),
+            ("last_payment_at", "ADD COLUMN IF NOT EXISTS last_payment_at DOUBLE PRECISION"),
+            ("last_payment_amount_cents", "ADD COLUMN IF NOT EXISTS last_payment_amount_cents INTEGER"),
+        ):
+            try:
+                conn.execute(f"ALTER TABLE distributors {ddl}")
+            except Exception:
+                pass
+        # Phase 3.1 — billing_events: webhook 이력 + idempotency
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS billing_events (
+                id TEXT PRIMARY KEY,
+                distributor_id TEXT,
+                event_type TEXT NOT NULL,
+                idempotency_key TEXT,
+                payload_json TEXT NOT NULL,
+                amount_cents INTEGER,
+                currency TEXT,
+                created_at DOUBLE PRECISION NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_billing_events_dist ON billing_events(distributor_id, created_at DESC)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_events_idem ON billing_events(idempotency_key) WHERE idempotency_key IS NOT NULL")
 
         # workspaces（インクリメンタル ALTER 後の最終形）
         conn.execute(
@@ -811,6 +849,43 @@ def _init_db_sqlite() -> None:
         )
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_distributors_slug ON distributors(slug)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_distributors_owner_email ON distributors(owner_email)")
+        # Phase 3.1 — Lemon Squeezy 컬럼 ALTER (멱등)
+        _cur_d = conn.execute("PRAGMA table_info(distributors)")
+        _dcols = {r[1] for r in _cur_d.fetchall()}
+        for col, ddl in (
+            ("lemon_customer_id", "ALTER TABLE distributors ADD COLUMN lemon_customer_id TEXT"),
+            ("lemon_subscription_id", "ALTER TABLE distributors ADD COLUMN lemon_subscription_id TEXT"),
+            ("subscription_status", "ALTER TABLE distributors ADD COLUMN subscription_status TEXT NOT NULL DEFAULT 'none'"),
+            ("subscription_renews_at", "ALTER TABLE distributors ADD COLUMN subscription_renews_at REAL"),
+            ("payment_failure_count", "ALTER TABLE distributors ADD COLUMN payment_failure_count INTEGER NOT NULL DEFAULT 0"),
+            ("last_payment_at", "ALTER TABLE distributors ADD COLUMN last_payment_at REAL"),
+            ("last_payment_amount_cents", "ALTER TABLE distributors ADD COLUMN last_payment_amount_cents INTEGER"),
+        ):
+            if col not in _dcols:
+                try:
+                    conn.execute(ddl)
+                except Exception:
+                    pass
+        # Phase 3.1 — billing_events
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS billing_events (
+                id TEXT PRIMARY KEY,
+                distributor_id TEXT,
+                event_type TEXT NOT NULL,
+                idempotency_key TEXT,
+                payload_json TEXT NOT NULL,
+                amount_cents INTEGER,
+                currency TEXT,
+                created_at REAL NOT NULL
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_billing_events_dist ON billing_events(distributor_id, created_at DESC)")
+        try:
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_billing_events_idem ON billing_events(idempotency_key)")
+        except Exception:
+            pass
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS workspaces (
