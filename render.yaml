@@ -11,6 +11,10 @@ services:
       mountPath: /app/data
       sizeGB: 1
     envVars:
+      # ⚠ Native Python BuildPack 으로 빠질 경우의 안전망. Docker 모드면 무시됨.
+      # psycopg + Python 3.14 의 finalization 호환성 문제로 부팅 실패하므로 3.12 강제.
+      - key: PYTHON_VERSION
+        value: 3.12.7
       - key: DATABASE_URL
         value: sqlite:////app/data/workbridge.db
       - key: PORTAL_ADMIN_PASSWORD
