@@ -25,7 +25,9 @@ import hashlib
 import hmac
 from typing import Any, Optional
 
-import httpx
+# httpx 는 lazy import — Lemon Squeezy 기능을 안 쓰는 production 환경에서
+# httpx 미설치로 인한 부팅 실패를 방지. 실제 HTTP 호출 시점에 ImportError 면
+# LemonSqueezyError 로 변환되어 클라이언트에 명확한 503 반환.
 
 from app.core.config import get_settings
 
@@ -112,6 +114,15 @@ class LemonSqueezyClient:
         params: Optional[dict[str, Any]] = None,
         json: Optional[dict[str, Any]] = None,
     ) -> dict[str, Any]:
+        # Lazy import — httpx 미설치 환경에서도 모듈 로드 자체는 성공해야 함.
+        try:
+            import httpx  # type: ignore
+        except ImportError as e:
+            raise LemonSqueezyError(
+                "httpx is not installed on this server. "
+                "Install it (`pip install httpx`) or wait for the next deploy."
+            ) from e
+
         url = f"{self.BASE_URL}{path}"
         try:
             with httpx.Client(timeout=self.timeout) as c:
