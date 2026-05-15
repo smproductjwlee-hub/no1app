@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # Session token TTL (seconds)
     session_token_ttl_seconds: int = 86400
 
+    # 指示・応答履歴の保管期間 (日). 教材作成・分析のため店長↔スタッフのやりとりを
+    # 一定期間残す。最低 6 ヶ月 (180 日) を推奨. .env で延長可能 (例: 365 = 1年).
+    instruction_retention_days: int = 180
+
     # ポータルログイン（MVP: .env で本番用に変更）。スタッフは個人アカウント必須。
     portal_admin_password: str = "admin"
     # 運営会社スーパー管理者（全顧客ワークスペース閲覧用）

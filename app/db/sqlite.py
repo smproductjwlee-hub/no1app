@@ -694,8 +694,13 @@ def _init_db_pg() -> None:
             )
         except Exception:
             pass
-        # 古いデータの整理（60日以上前の指示・1日以上前の presence）
-        cutoff = time.time() - 60 * 24 * 60 * 60
+        # 古いデータの整理: 指示·応答履歴は教材作成のため最低 6 ヶ月保管 (env で調整可能).
+        # presence は誰がオンラインかの一時情報なので 1 日で十分.
+        try:
+            _retention_days = max(int(get_settings().instruction_retention_days), 30)
+        except Exception:
+            _retention_days = 180
+        cutoff = time.time() - _retention_days * 24 * 60 * 60
         try:
             conn.execute("DELETE FROM instruction_rounds WHERE created_at < %s", (cutoff,))
         except Exception:
@@ -1091,7 +1096,12 @@ def _init_db_sqlite() -> None:
         except sqlite3.OperationalError:
             pass
         conn.execute("PRAGMA foreign_keys = ON")
-        _cutoff = time.time() - 60 * 24 * 60 * 60
+        # 指示·応答履歴は教材作成のため最低 6 ヶ月保管 (env: instruction_retention_days)
+        try:
+            _retention_days = max(int(get_settings().instruction_retention_days), 30)
+        except Exception:
+            _retention_days = 180
+        _cutoff = time.time() - _retention_days * 24 * 60 * 60
         conn.execute("DELETE FROM instruction_rounds WHERE created_at < ?", (_cutoff,))
         conn.execute("DELETE FROM ws_presence WHERE last_seen_at < ?", (time.time() - 60 * 60 * 24,))
         conn.commit()
