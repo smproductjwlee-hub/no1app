@@ -30,6 +30,21 @@ class Settings(BaseSettings):
     # 一定期間残す。最低 6 ヶ月 (180 日) を推奨. .env で延長可能 (例: 365 = 1年).
     instruction_retention_days: int = 180
 
+    # ============================================================
+    # Phase 3 — Lemon Squeezy 결제 연동 (Subscription 모델)
+    # ============================================================
+    # 모두 빈 값이면 결제 기능 비활성화 (현재 운영 / 테스트는 영향 없음).
+    # 본인은 Lemon Squeezy 대시보드에서 API key + Store ID + Variant ID 4종 + Webhook secret 발급
+    # 후 .env (로컬) 와 Render Environment (production) 양쪽에 설정.
+    lemon_api_key: str = ""
+    lemon_store_id: str = ""
+    lemon_variant_starter: str = ""      # Variant ID: 「Starter Store ¥8,000/月」
+    lemon_variant_business: str = ""     # 「Business Store ¥6,500/月」
+    lemon_variant_enterprise: str = ""   # 「Enterprise Store ¥5,000/月」
+    lemon_variant_mvp_fee: str = ""      # 「MVP 開発費 ¥5,000,000 one-time」
+    lemon_webhook_secret: str = ""       # Webhook 서명 검증 (HMAC-SHA256)
+    lemon_test_mode: bool = True         # Lemon Squeezy 의 test mode 사용 여부 (default 안전)
+
     # ポータルログイン（MVP: .env で本番用に変更）。スタッフは個人アカウント必須。
     portal_admin_password: str = "admin"
     # 運営会社スーパー管理者（全顧客ワークスペース閲覧用）
