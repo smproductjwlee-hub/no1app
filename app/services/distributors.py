@@ -49,9 +49,21 @@ class Distributor:
     status: str = "active"  # active / suspended
     created_at: float = 0.0
     updated_at: float = 0.0
+    # Phase 3.2 — Lemon Squeezy subscription lifecycle
+    lemon_customer_id: Optional[str] = None
+    lemon_subscription_id: Optional[str] = None
+    subscription_status: str = "none"  # none / pending / on_trial / active / past_due / paused / cancelled / expired
+    subscription_renews_at: Optional[float] = None  # 다음 결제 예정일 (UNIX sec)
+    payment_failure_count: int = 0
+    last_payment_at: Optional[float] = None
+    last_payment_amount_cents: Optional[int] = None
 
     def is_active(self) -> bool:
         return self.status == "active"
+
+    def is_paying(self) -> bool:
+        """현재 정상 결제 흐름 안에 있는지 (운영 청구 책임 대상)."""
+        return self.subscription_status in ("active", "on_trial")
 
 
 # ============================================================
@@ -79,6 +91,38 @@ def _row(row) -> Distributor:
         except (TypeError, ValueError):
             return default
 
+    def _gs(name: str) -> Optional[str]:
+        """NULL/빈 값 → None, 그 외 → str."""
+        if keys is None or name not in keys:
+            return None
+        v = row[name]
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s or None
+
+    def _gf(name: str) -> Optional[float]:
+        if keys is None or name not in keys:
+            return None
+        v = row[name]
+        if v is None:
+            return None
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    def _gi_opt(name: str) -> Optional[int]:
+        if keys is None or name not in keys:
+            return None
+        v = row[name]
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return None
+
     return Distributor(
         id=str(_g("id", "")),
         slug=str(_g("slug", "")).strip(),
@@ -96,6 +140,13 @@ def _row(row) -> Distributor:
         status=str(_g("status", "active")) or "active",
         created_at=float(_g("created_at", 0.0) or 0.0),
         updated_at=float(_g("updated_at", 0.0) or 0.0),
+        lemon_customer_id=_gs("lemon_customer_id"),
+        lemon_subscription_id=_gs("lemon_subscription_id"),
+        subscription_status=str(_g("subscription_status", "none")) or "none",
+        subscription_renews_at=_gf("subscription_renews_at"),
+        payment_failure_count=_gi("payment_failure_count", 0),
+        last_payment_at=_gf("last_payment_at"),
+        last_payment_amount_cents=_gi_opt("last_payment_amount_cents"),
     )
 
 
@@ -401,6 +452,148 @@ class DistributorStore:
     def get_c_direct(self) -> Optional[Distributor]:
         """직판 가상 대리점 조회. init_db 후에는 항상 존재."""
         return self.get_by_slug("c-direct")
+
+    # ============================================================
+    # Phase 3.2 — Lemon Squeezy subscription lifecycle
+    # ============================================================
+
+    def get_by_lemon_subscription(self, lemon_subscription_id: str) -> Optional[Distributor]:
+        """Webhook 핸들러용: Lemon Squeezy subscription_id 로 대리점 찾기.
+
+        Lemon Squeezy 가 보내는 모든 이벤트는 subscription_id 를 포함하므로 이 헬퍼로
+        webhook payload → distributor 매핑이 가능하다.
+        """
+        if not lemon_subscription_id:
+            return None
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT * FROM distributors WHERE lemon_subscription_id = ? LIMIT 1",
+            (str(lemon_subscription_id),),
+        ).fetchone()
+        return _row(row) if row else None
+
+    def attach_subscription(
+        self,
+        distributor_id: str,
+        *,
+        lemon_customer_id: Optional[str] = None,
+        lemon_subscription_id: Optional[str] = None,
+        subscription_status: Optional[str] = None,
+        subscription_renews_at: Optional[float] = None,
+    ) -> Optional[Distributor]:
+        """Lemon Squeezy 구독을 대리점에 연결 (subscription_created webhook 또는 첫 결제 직후).
+
+        None 인 인자는 변경 안 함. 명시적으로 클리어하려면 빈 문자열/0 을 명시.
+        """
+        sets: list[str] = []
+        vals: list[Any] = []
+        if lemon_customer_id is not None:
+            sets.append("lemon_customer_id = ?")
+            vals.append(str(lemon_customer_id).strip() or None)
+        if lemon_subscription_id is not None:
+            sets.append("lemon_subscription_id = ?")
+            vals.append(str(lemon_subscription_id).strip() or None)
+        if subscription_status is not None:
+            sets.append("subscription_status = ?")
+            vals.append(str(subscription_status).strip() or "none")
+        if subscription_renews_at is not None:
+            try:
+                sets.append("subscription_renews_at = ?")
+                vals.append(float(subscription_renews_at))
+            except (TypeError, ValueError):
+                pass
+        if not sets:
+            return self.get(distributor_id)
+        sets.append("updated_at = ?")
+        vals.append(time.time())
+        vals.append(distributor_id)
+        conn = get_connection()
+        conn.execute(
+            f"UPDATE distributors SET {', '.join(sets)} WHERE id = ?",
+            vals,
+        )
+        conn.commit()
+        return self.get(distributor_id)
+
+    def record_payment_success(
+        self,
+        distributor_id: str,
+        *,
+        amount_cents: int,
+        paid_at: Optional[float] = None,
+        next_renews_at: Optional[float] = None,
+    ) -> Optional[Distributor]:
+        """결제 성공 webhook 처리. 미납 카운터 0 리셋."""
+        ts = paid_at if paid_at is not None else time.time()
+        sets = [
+            "last_payment_at = ?",
+            "last_payment_amount_cents = ?",
+            "payment_failure_count = 0",
+            "subscription_status = 'active'",
+            "updated_at = ?",
+        ]
+        vals: list[Any] = [float(ts), int(amount_cents or 0), time.time()]
+        if next_renews_at is not None:
+            try:
+                sets.append("subscription_renews_at = ?")
+                vals.append(float(next_renews_at))
+            except (TypeError, ValueError):
+                pass
+        vals.append(distributor_id)
+        conn = get_connection()
+        conn.execute(
+            f"UPDATE distributors SET {', '.join(sets)} WHERE id = ?",
+            vals,
+        )
+        conn.commit()
+        return self.get(distributor_id)
+
+    def record_payment_failure(self, distributor_id: str) -> Optional[Distributor]:
+        """결제 실패 webhook 처리. 미납 카운터 +1, subscription_status='past_due'.
+
+        호출자가 카운터를 보고 「N 회 이상이면 status=suspended」 같은 정책을 결정한다.
+        """
+        conn = get_connection()
+        conn.execute(
+            """
+            UPDATE distributors
+            SET payment_failure_count = payment_failure_count + 1,
+                subscription_status = 'past_due',
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (time.time(), distributor_id),
+        )
+        conn.commit()
+        return self.get(distributor_id)
+
+    def set_subscription_status(
+        self,
+        distributor_id: str,
+        status: str,
+        *,
+        renews_at: Optional[float] = None,
+    ) -> Optional[Distributor]:
+        """subscription_status 만 갱신 (subscription_cancelled / _resumed 등에 사용)."""
+        valid = {"none", "pending", "on_trial", "active", "past_due", "paused", "cancelled", "expired"}
+        if status not in valid:
+            raise ValueError(f"invalid subscription_status: {status!r}")
+        sets = ["subscription_status = ?", "updated_at = ?"]
+        vals: list[Any] = [status, time.time()]
+        if renews_at is not None:
+            try:
+                sets.append("subscription_renews_at = ?")
+                vals.append(float(renews_at))
+            except (TypeError, ValueError):
+                pass
+        vals.append(distributor_id)
+        conn = get_connection()
+        conn.execute(
+            f"UPDATE distributors SET {', '.join(sets)} WHERE id = ?",
+            vals,
+        )
+        conn.commit()
+        return self.get(distributor_id)
 
 
 # Singleton
