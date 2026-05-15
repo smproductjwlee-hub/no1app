@@ -363,9 +363,15 @@ def _get_pg_pool():
 def _init_db_pg() -> None:
     """Postgres 経路: 初回起動時にすべてのテーブル / インデックスを冪等に作成する。
     SQLite と違い、過去の旧スキーマからの逐次 ALTER 移行は不要（新規 DB を前提とする）。
+
+    重要: autocommit=True 로 실행한다. 하나의 ALTER 가 실패하면 PG 의 트랜잭션은
+    abort 상태로 전이되어 그 후 모든 명령이 InFailedSqlTransaction 으로 실패한다.
+    init_db 는 멱등성·서로 독립이라 autocommit 으로 분리해 일부 실패가 전체 부팅을
+    막지 않도록 한다.
     """
     pool = _get_pg_pool()
     with pool.connection() as conn:
+        conn.autocommit = True
         # ============================================================
         # Phase 2.1: distributors (販売代理店 / 3계층 멀티테넌시の中間層)
         # ============================================================
