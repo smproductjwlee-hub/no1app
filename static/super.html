@@ -214,6 +214,35 @@
           </div>
         </details>
 
+        <!-- Phase 3.5: 未払い·支払い停止 代理店アラート -->
+        <section id="unpaid-card" class="hidden rounded-2xl bg-white border border-rose-300 shadow-sm overflow-hidden">
+          <div class="px-4 py-3 bg-rose-50 border-b border-rose-100">
+            <h2 class="text-sm font-semibold text-rose-900">
+              ⚠ 支払い注意の代理店 (<span id="unpaid-count">0</span>)
+            </h2>
+          </div>
+          <div class="p-4">
+            <p class="text-[11px] text-rose-700/80 leading-snug mb-2">
+              支払い失敗·解約·停止中の代理店一覧です。連続未払い 3 回で自動的にステータスが 「停止中」 になり、傘下のエンドユーザーもログインできなくなります。
+            </p>
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs">
+                <thead>
+                  <tr class="text-left text-[10px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                    <th class="py-2 pr-2">代理店</th>
+                    <th class="py-2 pr-2">subscription</th>
+                    <th class="py-2 pr-2 text-center">未払い回数</th>
+                    <th class="py-2 pr-2">運営ステータス</th>
+                    <th class="py-2 pr-2">最終支払い</th>
+                    <th class="py-2 pr-2 text-right">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="unpaid-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
         <!-- Phase 2.6: 販売代理店 管理 -->
         <details class="rounded-2xl bg-white border border-indigo-200 shadow-sm overflow-hidden">
           <summary class="cursor-pointer list-none px-4 py-3 bg-indigo-50/80 border-b border-indigo-100 flex items-center justify-between text-sm font-semibold text-indigo-900">
@@ -1393,6 +1422,7 @@
         try {
           distRowsCache = await fetchDistributors();
           renderDistributors();
+          renderUnpaidPanel();  // Phase 3.5
           // 산하 수 별도 로드 (없어도 화면 동작)
           fetchDistWorkspaceCounts().then(function (c) {
             window.__distCounts = c;
@@ -1401,6 +1431,68 @@
         } catch (e) {
           console.error(e);
         }
+      }
+
+      // ===== Phase 3.5: 미납·停止 대리점 알림 패널 =====
+      function renderUnpaidPanel() {
+        var card = document.getElementById("unpaid-card");
+        var tbody = document.getElementById("unpaid-tbody");
+        var cnt = document.getElementById("unpaid-count");
+        if (!card || !tbody) return;
+        // 필터: past_due / cancelled / paused / expired 또는 failure_count > 0 또는 ops_status=suspended
+        var unpaid = (distRowsCache || []).filter(function (d) {
+          if (d.slug === "c-direct") return false;
+          var st = d.subscription_status || "none";
+          if (["past_due", "cancelled", "paused", "expired"].indexOf(st) >= 0) return true;
+          if ((d.payment_failure_count || 0) > 0) return true;
+          if (d.status === "suspended") return true;
+          return false;
+        });
+        cnt.textContent = String(unpaid.length);
+        if (unpaid.length === 0) {
+          card.classList.add("hidden");
+          tbody.innerHTML = "";
+          return;
+        }
+        card.classList.remove("hidden");
+        tbody.innerHTML = "";
+        unpaid.forEach(function (d) {
+          var subSt = d.subscription_status || "none";
+          var subColor = "text-gray-700";
+          if (subSt === "past_due") subColor = "text-amber-700 font-semibold";
+          else if (subSt === "cancelled" || subSt === "expired") subColor = "text-rose-700 font-semibold";
+          else if (subSt === "paused") subColor = "text-slate-700";
+          else if (subSt === "active" || subSt === "on_trial") subColor = "text-emerald-700";
+          var opsLabel = d.status === "suspended"
+            ? '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-200 text-rose-900">停止中 (自動)</span>'
+            : '<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800">稼働中</span>';
+          var failCount = d.payment_failure_count || 0;
+          var failColor = failCount >= 3 ? "text-rose-700 font-bold" : failCount >= 1 ? "text-amber-700 font-semibold" : "text-gray-700";
+          var lastPay = d.last_payment_at
+            ? new Date(Number(d.last_payment_at) * 1000).toLocaleDateString("ja-JP")
+            : "—";
+          var tr = document.createElement("tr");
+          tr.className = "border-b border-gray-100 hover:bg-rose-50/30";
+          tr.innerHTML =
+            '<td class="py-2 pr-2">' +
+              '<div class="font-medium">' + escapeHtml(d.name) + '</div>' +
+              '<div class="text-[10px] text-gray-500 font-mono">/' + escapeHtml(d.slug) + '</div>' +
+            '</td>' +
+            '<td class="py-2 pr-2 ' + subColor + '">' + escapeHtml(subSt) + '</td>' +
+            '<td class="py-2 pr-2 text-center font-mono ' + failColor + '">' + failCount + '</td>' +
+            '<td class="py-2 pr-2">' + opsLabel + '</td>' +
+            '<td class="py-2 pr-2 font-mono text-[10px]">' + lastPay + '</td>' +
+            '<td class="py-2 pr-2 text-right">' +
+              '<button type="button" class="px-2 py-1 rounded bg-indigo-700 text-white text-[10px] hover:bg-indigo-800" data-dist-edit="' + d.id + '">編集</button>' +
+            '</td>';
+          tbody.appendChild(tr);
+        });
+        // 编辑 버튼 동작
+        tbody.querySelectorAll("[data-dist-edit]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            openDistEdit(btn.getAttribute("data-dist-edit"));
+          });
+        });
       }
 
       // ===== 신규 등록 =====

@@ -195,6 +195,59 @@
       <ul id="upg-list" class="text-xs space-y-1 text-rose-900 font-mono"></ul>
     </section>
 
+    <!-- Phase 3.5: お支払い情報 (Lemon Squeezy subscription) -->
+    <section id="billing-card" class="card">
+      <div class="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <h2 class="text-sm font-semibold text-gray-700">お支払い情報</h2>
+        <span id="billing-status-badge" class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold">—</span>
+      </div>
+
+      <!-- 미납 / 캔슬 시 강조 알림 -->
+      <div id="billing-alert" class="hidden mb-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 leading-snug"></div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+        <div class="bg-gray-50 rounded-lg p-2">
+          <p class="text-[10px] text-gray-500 uppercase">次の請求日</p>
+          <p id="billing-renews-at" class="font-mono text-sm">—</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-2">
+          <p class="text-[10px] text-gray-500 uppercase">直近の支払い</p>
+          <p id="billing-last-payment" class="font-mono text-sm">—</p>
+        </div>
+        <div class="bg-gray-50 rounded-lg p-2 sm:col-span-2">
+          <p class="text-[10px] text-gray-500 uppercase">連続未払い回数</p>
+          <p id="billing-fail-count" class="font-mono text-sm">0 回</p>
+        </div>
+      </div>
+
+      <details class="mt-3" id="billing-history-wrap">
+        <summary class="cursor-pointer text-xs text-indigo-700 hover:underline">
+          支払い履歴 (<span id="billing-history-count">0</span> 件)
+        </summary>
+        <div class="overflow-x-auto mt-2">
+          <table class="w-full text-[11px]">
+            <thead>
+              <tr class="text-left text-[10px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                <th class="py-1 pr-2">日時</th>
+                <th class="py-1 pr-2">イベント</th>
+                <th class="py-1 pr-2 text-right">金額</th>
+              </tr>
+            </thead>
+            <tbody id="billing-history-tbody"></tbody>
+          </table>
+          <p id="billing-history-empty" class="hidden text-center text-[11px] text-gray-500 py-3">
+            まだ支払い履歴がありません。
+          </p>
+        </div>
+      </details>
+
+      <p class="text-[10px] text-gray-500 mt-3 leading-snug">
+        ※ お支払いは Lemon Squeezy 経由で自動引き落としされます。
+        Subscription ID や請求書はメールでも受け取れます。
+        変更・解約は本社サポート (partners@linguasync.example) までご連絡ください。
+      </p>
+    </section>
+
     <!-- 산하 워크스페이스 일람 -->
     <section class="card">
       <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
@@ -515,6 +568,8 @@
         reloadMargin().catch(() => {});
         // 자동 플랜 업그레이드 알림
         reloadUpgradeEvents().catch(() => {});
+        // Phase 3.5: 결제 정보 + 이력
+        reloadBilling().catch(() => {});
       } catch (e) {
         if (e.status === 401 || e.status === 403) {
           auth.token = "";
@@ -770,6 +825,123 @@
         showError("aw-err", e.detail || e.message);
       }
     });
+
+    // ====== Phase 3.5 — お支払い情報 (Lemon Squeezy 구독 상태) ======
+    function _fmtDate(unixSec) {
+      if (!unixSec) return "—";
+      const d = new Date(Number(unixSec) * 1000);
+      if (isNaN(d.getTime())) return "—";
+      return d.toLocaleString("ja-JP", { hour12: false });
+    }
+
+    function _statusBadgeClass(status) {
+      if (status === "active" || status === "on_trial") return "bg-emerald-100 text-emerald-800";
+      if (status === "past_due") return "bg-amber-100 text-amber-800";
+      if (status === "cancelled" || status === "expired") return "bg-rose-100 text-rose-800";
+      if (status === "pending") return "bg-blue-100 text-blue-800";
+      if (status === "paused") return "bg-slate-100 text-slate-700";
+      return "bg-gray-100 text-gray-700";
+    }
+
+    function _statusLabel(status) {
+      const map = {
+        active: "稼働中",
+        on_trial: "トライアル中",
+        pending: "登録待ち",
+        past_due: "未払い",
+        paused: "一時停止",
+        cancelled: "解約済み",
+        expired: "期限切れ",
+        none: "未登録",
+      };
+      return map[status] || status;
+    }
+
+    async function reloadBilling() {
+      // /me/self 의 최신 정보를 다시 가져오기 (subscription 필드)
+      let me = window.__currentDist;
+      try {
+        me = await api("/api/v1/distributors/me/self");
+        window.__currentDist = me;
+      } catch (e) { /* fallback to cached */ }
+      if (!me) return;
+
+      const status = me.subscription_status || "none";
+      const badge = $("billing-status-badge");
+      badge.textContent = _statusLabel(status);
+      badge.className = "inline-block px-2 py-0.5 rounded text-[11px] font-semibold " + _statusBadgeClass(status);
+
+      $("billing-renews-at").textContent = _fmtDate(me.subscription_renews_at);
+      if (me.last_payment_at) {
+        const amt = me.last_payment_amount_cents != null
+          ? "¥" + Number(me.last_payment_amount_cents).toLocaleString("ja-JP")
+          : "—";
+        $("billing-last-payment").textContent = `${_fmtDate(me.last_payment_at)}  (${amt})`;
+      } else {
+        $("billing-last-payment").textContent = "—";
+      }
+      const failCount = Number(me.payment_failure_count || 0);
+      const failEl = $("billing-fail-count");
+      failEl.textContent = `${failCount} 回`;
+      failEl.className = "font-mono text-sm " + (failCount >= 1 ? "text-rose-700 font-bold" : "text-gray-700");
+
+      // 경고 알림
+      const alertEl = $("billing-alert");
+      let alertMsg = "";
+      let alertClass = "mb-2 rounded-lg border px-3 py-2 text-xs leading-snug ";
+      if (status === "none" || status === "pending") {
+        alertMsg = "定期支払いが未登録です。運営事務局からお送りした Checkout URL でお支払い情報を登録してください。";
+        alertClass += "border-blue-300 bg-blue-50 text-blue-900";
+      } else if (status === "past_due") {
+        alertMsg = `直近の支払いが失敗しました (${failCount} 回連続)。3 回連続失敗時にはサービスが一時停止されますので、お支払い方法をご確認ください。`;
+        alertClass += "border-amber-300 bg-amber-50 text-amber-900";
+      } else if (status === "cancelled" || status === "expired") {
+        alertMsg = "定期支払いが終了しています。継続をご希望の場合は本社サポートまでご連絡ください。";
+        alertClass += "border-rose-300 bg-rose-50 text-rose-900";
+      } else if (status === "paused") {
+        alertMsg = "定期支払いが一時停止中です。本社サポートまでご連絡ください。";
+        alertClass += "border-slate-300 bg-slate-50 text-slate-800";
+      }
+      if (alertMsg) {
+        alertEl.textContent = alertMsg;
+        alertEl.className = alertClass;
+        alertEl.classList.remove("hidden");
+      } else {
+        alertEl.classList.add("hidden");
+      }
+
+      // 결제 이력
+      try {
+        const events = await api(`/api/v1/distributors/${me.id}/billing-events?limit=20`);
+        const tbody = $("billing-history-tbody");
+        tbody.innerHTML = "";
+        $("billing-history-count").textContent = String(events.length);
+        const emptyEl = $("billing-history-empty");
+        if (events.length === 0) {
+          emptyEl.classList.remove("hidden");
+        } else {
+          emptyEl.classList.add("hidden");
+          events.forEach(ev => {
+            const tr = document.createElement("tr");
+            tr.className = "border-b border-gray-100";
+            const isFail = ev.event_type === "subscription_payment_failed";
+            const isSuccess = ev.event_type === "subscription_payment_success" || ev.event_type === "subscription_payment_recovered";
+            const evColor = isFail ? "text-rose-700" : isSuccess ? "text-emerald-700" : "text-gray-700";
+            const amount = ev.amount_cents != null
+              ? "¥" + Number(ev.amount_cents).toLocaleString("ja-JP")
+              : "—";
+            tr.innerHTML = `
+              <td class="py-1 pr-2 text-[10px] text-gray-600 whitespace-nowrap">${_fmtDate(ev.created_at)}</td>
+              <td class="py-1 pr-2 ${evColor}">${escapeHtml(ev.event_type)}</td>
+              <td class="py-1 pr-2 text-right font-mono">${amount}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      } catch (e) {
+        // 무시 (이력은 부수 정보)
+      }
+    }
 
     // ====== 자동 플랜 업그레이드 알림 (Phase 2.10) ======
     async function reloadUpgradeEvents() {
