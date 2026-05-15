@@ -696,9 +696,20 @@ def _init_db_pg() -> None:
             pass
         # 古いデータの整理（60日以上前の指示・1日以上前の presence）
         cutoff = time.time() - 60 * 24 * 60 * 60
-        conn.execute("DELETE FROM instruction_rounds WHERE created_at < %s", (cutoff,))
-        conn.execute("DELETE FROM ws_presence WHERE last_seen_at < %s", (time.time() - 60 * 60 * 24,))
-        conn.commit()
+        try:
+            conn.execute("DELETE FROM instruction_rounds WHERE created_at < %s", (cutoff,))
+        except Exception:
+            pass
+        try:
+            conn.execute("DELETE FROM ws_presence WHERE last_seen_at < %s", (time.time() - 60 * 60 * 24,))
+        except Exception:
+            pass
+        # autocommit=True 라 commit() 은 no-op (psycopg3 문서) — 일부 버전에서
+        # 예외를 던질 수 있어 try 로 감싼다.
+        try:
+            conn.commit()
+        except Exception:
+            pass
 
 
 def _get_connection_pg():
