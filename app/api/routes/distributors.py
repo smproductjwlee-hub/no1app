@@ -53,6 +53,14 @@ class DistributorOut(BaseModel):
     status: str
     created_at: float
     updated_at: float
+    # Phase 3.2 — Lemon Squeezy subscription state
+    lemon_customer_id: Optional[str] = None
+    lemon_subscription_id: Optional[str] = None
+    subscription_status: str = "none"
+    subscription_renews_at: Optional[float] = None
+    payment_failure_count: int = 0
+    last_payment_at: Optional[float] = None
+    last_payment_amount_cents: Optional[int] = None
 
 
 class DistributorCreateIn(BaseModel):
@@ -199,6 +207,13 @@ def _to_out(d) -> DistributorOut:
         status=d.status,
         created_at=d.created_at,
         updated_at=d.updated_at,
+        lemon_customer_id=getattr(d, "lemon_customer_id", None),
+        lemon_subscription_id=getattr(d, "lemon_subscription_id", None),
+        subscription_status=getattr(d, "subscription_status", "none") or "none",
+        subscription_renews_at=getattr(d, "subscription_renews_at", None),
+        payment_failure_count=getattr(d, "payment_failure_count", 0) or 0,
+        last_payment_at=getattr(d, "last_payment_at", None),
+        last_payment_amount_cents=getattr(d, "last_payment_amount_cents", None),
     )
 
 
@@ -814,6 +829,168 @@ async def list_distributor_workspaces(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
     rows = await run_db(workspaces.list_by_distributor, distributor_id)
     return [_to_ws_row(ws) for ws in rows]
+
+
+# ============================================================
+# Phase 3.3 — Lemon Squeezy Subscription Checkout URL 発行
+# ============================================================
+
+
+class CheckoutCreateIn(BaseModel):
+    plan: str = Field("enterprise", pattern="^(starter|business|enterprise)$")
+    quantity: int = Field(1, ge=1, le=10000)
+    redirect_url: Optional[str] = Field(None, max_length=500)
+
+
+class CheckoutCreateOut(BaseModel):
+    checkout_url: str
+    variant_id: str
+    plan: str
+
+
+def _resolve_variant_id(plan: str) -> str:
+    """plan → 환경변수에 설정된 variant id."""
+    from app.core.config import get_settings
+    s = get_settings()
+    mapping = {
+        "starter": s.lemon_variant_starter,
+        "business": s.lemon_variant_business,
+        "enterprise": s.lemon_variant_enterprise,
+    }
+    v = mapping.get(plan, "")
+    if not v:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"LEMON_VARIANT_{plan.upper()} is not configured. Set it in .env and restart.",
+        )
+    return v
+
+
+@router.post(
+    "/{distributor_id}/checkout-url",
+    response_model=CheckoutCreateOut,
+)
+async def create_distributor_checkout(
+    distributor_id: str,
+    body: CheckoutCreateIn,
+    _sess: Session = Depends(require_super_admin),
+) -> CheckoutCreateOut:
+    """대리점에게 보낼 Lemon Squeezy Subscription Checkout URL 생성.
+
+    - super_admin 만 호출 가능
+    - 운영자가 이 URL 을 대리점에 전달하면, 대리점이 카드 등록 후 Lemon 의 webhook
+      을 통해 자동으로 lemon_customer_id / lemon_subscription_id 가 매핑됨
+      (Phase 3.4 의 webhook 핸들러 참조)
+    - 환경변수 LEMON_API_KEY / LEMON_STORE_ID / LEMON_VARIANT_<PLAN> 설정 필요
+    """
+    from app.services.billing.lemon_squeezy import (
+        LemonSqueezyClient,
+        LemonSqueezyError,
+        is_configured,
+    )
+
+    d = await run_db(distributors_store.get, distributor_id)
+    if d is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="distributor not found")
+    if d.slug == "c-direct":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="c-direct (direct sales) does not subscribe via Lemon Squeezy",
+        )
+    if not is_configured():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Lemon Squeezy is not configured (LEMON_API_KEY / LEMON_STORE_ID missing).",
+        )
+
+    variant_id = _resolve_variant_id(body.plan)
+
+    # 이메일은 대리점의 owner_email 우선, 없으면 contact_email
+    customer_email = d.owner_email or d.contact_email
+    if not customer_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="distributor has no email (set owner_email or contact_email first)",
+        )
+
+    def _do_checkout() -> str:
+        client = LemonSqueezyClient()
+        return client.create_subscription_checkout_url(
+            variant_id=variant_id,
+            customer_email=customer_email,
+            customer_name=d.name or d.contact_person or "",
+            custom_data={
+                # webhook 에서 이 값으로 distributor 매핑
+                "distributor_id": d.id,
+                "distributor_slug": d.slug,
+                "plan": body.plan,
+            },
+            quantity=body.quantity,
+            redirect_url=body.redirect_url,
+        )
+
+    try:
+        url = await run_db(_do_checkout)
+    except LemonSqueezyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Lemon Squeezy API error: {e}",
+        ) from e
+
+    # 「대기 중」 상태로 마킹 (webhook 으로 active 로 전환)
+    if d.subscription_status == "none":
+        try:
+            await run_db(
+                distributors_store.set_subscription_status,
+                d.id,
+                "pending",
+            )
+        except Exception:
+            pass
+
+    return CheckoutCreateOut(checkout_url=url, variant_id=variant_id, plan=body.plan)
+
+
+# ============================================================
+# Phase 3.3 — Billing events 조회 (UI 의 결제 이력 패널)
+# ============================================================
+
+
+class BillingEventOut(BaseModel):
+    id: str
+    event_type: str
+    amount_cents: Optional[int] = None
+    currency: Optional[str] = None
+    created_at: float
+    idempotency_key: Optional[str] = None
+
+
+def _ev_to_out(e) -> BillingEventOut:
+    return BillingEventOut(
+        id=e.id,
+        event_type=e.event_type,
+        amount_cents=e.amount_cents,
+        currency=e.currency,
+        created_at=e.created_at,
+        idempotency_key=e.idempotency_key,
+    )
+
+
+@router.get(
+    "/{distributor_id}/billing-events",
+    response_model=list[BillingEventOut],
+)
+async def list_billing_events(
+    distributor_id: str,
+    limit: int = 50,
+    sess: Session = Depends(require_super_or_distributor_admin),
+) -> list[BillingEventOut]:
+    """결제 이력 (super_admin or 본인 대리점)."""
+    if sess.role.value == "distributor_admin" and sess.distributor_id != distributor_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="forbidden")
+    from app.services.billing import events as billing_events
+    rows = await run_db(billing_events.list_for_distributor, distributor_id, limit=limit)
+    return [_ev_to_out(e) for e in rows]
 
 
 # (Distributor Admin endpoints 는 위쪽 /me/self, /me/workspaces 로 통합됨)

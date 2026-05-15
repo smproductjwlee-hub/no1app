@@ -18,6 +18,7 @@ from app.api.routes import (
     i18n,
     meta,
     pages,
+    webhooks as webhooks_route,
     workspaces,
 )
 from app.core.config import get_settings
@@ -70,6 +71,7 @@ def create_app() -> FastAPI:
     application.include_router(workspaces.router, prefix="/api/v1")
     application.include_router(auth.router, prefix="/api/v1")
     application.include_router(distributors_route.router, prefix="/api/v1")
+    application.include_router(webhooks_route.router, prefix="/api/v1")
     application.include_router(curriculum.router, prefix="/api/v1")
     application.include_router(meta.router, prefix="/api/v1")
     application.include_router(i18n.router, prefix="/api/v1")
