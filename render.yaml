@@ -11,12 +11,17 @@ services:
       mountPath: /app/data
       sizeGB: 1
     envVars:
-      # ⚠ Native Python BuildPack 으로 빠질 경우의 안전망. Docker 모드면 무시됨.
-      # psycopg + Python 3.14 의 finalization 호환성 문제로 부팅 실패하므로 3.12 강제.
+      # Docker 모드면 자동 무시되지만 native Python buildpack fallback 시 안전망.
       - key: PYTHON_VERSION
         value: 3.12.7
+      # DB: production 은 Supabase Postgres URL 을 사용. 기본값은 로컬 SQLite.
+      # 신규 Blueprint 인스턴스 셋업 시 Supabase URL 로 덮어쓸 것.
       - key: DATABASE_URL
         value: sqlite:////app/data/workbridge.db
+      # JWT 서명 비밀. 기존 토큰 유지하려면 기존 서비스의 값 그대로 입력.
+      # 새로 가도 무방 (모든 사용자가 다시 로그인하면 됨).
+      - key: JWT_SECRET
+        sync: false
       - key: PORTAL_ADMIN_PASSWORD
         sync: false
       - key: SUPER_ADMIN_PASSWORD
@@ -25,3 +30,23 @@ services:
         sync: false
       - key: GOOGLE_CREDENTIALS_PATH
         value: /etc/secrets/google_key.json
+      # 메시지 보존 기간 (일). 6 개월 이상 권장 (영업 분석·교재 활용).
+      - key: INSTRUCTION_RETENTION_DAYS
+        value: "180"
+      # Phase 3 Lemon Squeezy 결제 (저녁에 셋업 후 입력. 비워두면 결제 기능만 비활성).
+      - key: LEMON_API_KEY
+        sync: false
+      - key: LEMON_STORE_ID
+        sync: false
+      - key: LEMON_VARIANT_STARTER
+        sync: false
+      - key: LEMON_VARIANT_BUSINESS
+        sync: false
+      - key: LEMON_VARIANT_ENTERPRISE
+        sync: false
+      - key: LEMON_VARIANT_MVP_FEE
+        sync: false
+      - key: LEMON_WEBHOOK_SECRET
+        sync: false
+      - key: LEMON_TEST_MODE
+        value: "true"
