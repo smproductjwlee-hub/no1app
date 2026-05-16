@@ -368,10 +368,20 @@ def _init_db_pg() -> None:
     abort 상태로 전이되어 그 후 모든 명령이 InFailedSqlTransaction 으로 실패한다.
     init_db 는 멱등성·서로 독립이라 autocommit 으로 분리해 일부 실패가 전체 부팅을
     막지 않도록 한다.
+
+    또한 `with pool.connection() as conn:` 같은 context manager 는 psycopg3 가
+    내부적으로 transaction 을 자동 시작/종료할 수 있어 autocommit=True 설정과
+    충돌해 lifespan startup 이 hang 되는 사례가 있다.  그 위험을 피하려고 raw
+    connection 을 직접 빌리고, 명시적으로 putconn 한다.
     """
     pool = _get_pg_pool()
-    with pool.connection() as conn:
-        conn.autocommit = True
+    raw = pool.getconn(timeout=30)
+    try:
+        # 첫 query 전에 autocommit 활성. 이렇게 하면 이후 모든 execute 가
+        # 독립 트랜잭션 → 한 ALTER 가 실패해도 다음 명령에 영향 없음.
+        raw.autocommit = True
+        conn = raw
+        # ↓ 아래 모든 conn.execute 는 raw connection 에 직접 호출됨
         # ============================================================
         # Phase 2.1: distributors (販売代理店 / 3계층 멀티테넌시の中間層)
         # ============================================================
@@ -751,6 +761,17 @@ def _init_db_pg() -> None:
         # 예외를 던질 수 있어 try 로 감싼다.
         try:
             conn.commit()
+        except Exception:
+            pass
+    finally:
+        # raw connection 을 pool 로 반환. autocommit=True 상태로 두면 안 되므로
+        # 반환 전 False 로 복귀. 실패해도 putconn 자체는 시도.
+        try:
+            raw.autocommit = False
+        except Exception:
+            pass
+        try:
+            pool.putconn(raw)
         except Exception:
             pass
 
