@@ -14,10 +14,12 @@ services:
       # Docker 모드면 자동 무시되지만 native Python buildpack fallback 시 안전망.
       - key: PYTHON_VERSION
         value: 3.12.7
-      # DB: production 은 Supabase Postgres URL 을 사용. 기본값은 로컬 SQLite.
-      # 신규 Blueprint 인스턴스 셋업 시 Supabase URL 로 덮어쓸 것.
+      # DB: production 은 Supabase Postgres URL 을 사용.
+      # value 를 명시하면 Blueprint 적용 시 기존 값을 덮어써버리므로 sync: false 로
+      # 「입력만 받음」 으로 처리. dashboard 에서 직접 값을 관리.
+      # (로컬 dev 는 .env 의 DATABASE_URL=sqlite:///./workbridge.db 로 동작)
       - key: DATABASE_URL
-        value: sqlite:////app/data/workbridge.db
+        sync: false
       # JWT 서명 비밀. 기존 토큰 유지하려면 기존 서비스의 값 그대로 입력.
       # 새로 가도 무방 (모든 사용자가 다시 로그인하면 됨).
       - key: JWT_SECRET
