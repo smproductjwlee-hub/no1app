@@ -397,8 +397,10 @@ def _init_db_pg() -> None:
         # 첫 query 전에 autocommit 활성. 이렇게 하면 이후 모든 execute 가
         # 독립 트랜잭션 → 한 ALTER 가 실패해도 다음 명령에 영향 없음.
         raw.autocommit = True
-        conn = raw
-        # ↓ 아래 모든 conn.execute 는 raw connection 에 직접 호출됨
+        # ⚠️ raw 가 아니라 _PgConnAdapter 로 감싸야 ? → %s placeholder 변환이
+        # 동작한다. _seed_c_direct_and_migrate 등이 SQLite 스타일의 ? 를 사용
+        # 하므로 변환 없이 raw 로 보내면 ProgrammingError ("0 placeholders").
+        conn = _PgConnAdapter(raw)
         # ============================================================
         # Phase 2.1: distributors (販売代理店 / 3계층 멀티테넌시の中間層)
         # ============================================================
