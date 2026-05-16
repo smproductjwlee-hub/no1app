@@ -29,9 +29,13 @@ def _is_valid_slug(s: str) -> bool:
 
 
 @router.get("/")
-async def root_redirect() -> RedirectResponse:
-    """브라우저에서 / 만 열었을 때 404 JSON 대신 로그인으로 보냄."""
-    return RedirectResponse(url="/login", status_code=302)
+async def root_landing() -> HTMLResponse:
+    """루트 페이지: LinguaSync 서비스 소개 (외부 검수자·결제 게이트웨이용).
+
+    내부 로그인 화면 (`/login`, `/admin`, `/distributor` 등) 은 그대로 유지하되
+    랜딩 페이지에서는 「ログイン」 버튼만 노출하고 관리 페이지 직접 link 는 없음.
+    """
+    return HTMLResponse(content=_read_html("landing.html"), headers=_NO_CACHE_HEADERS)
 
 
 @router.get("/api/login")
