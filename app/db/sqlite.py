@@ -322,32 +322,49 @@ def _seed_c_direct_and_migrate(conn) -> None:
 
 
 def _build_pg_pool():
+    import sys as _sys
     import psycopg
     from psycopg_pool import ConnectionPool
     url = _database_url()
     # ログに出ても安全なように password を伏せる
     safe_url = re.sub(r":[^:@/]+@", ":***@", url)
+
+    # 진단용: stderr + flush (uvicorn 의 stdout buffering 회피 — Render 에서 print 가
+    # 안 보이는 현상 방지)
+    def _log(msg: str) -> None:
+        _sys.stderr.write(f"[db] {msg}\n")
+        _sys.stderr.flush()
+
     # スモークテスト: プール構築前に実際の接続を試して、本当のエラーを表面化させる
     # （PoolTimeout が本当の原因をマスクしてしまうのを避ける）
-    print(f"[db] testing Postgres connection to: {safe_url}")
+    _log(f"testing Postgres connection to: {safe_url}")
     try:
-        with psycopg.connect(url, connect_timeout=10) as test_conn:
+        # prepare_threshold=None: Supabase Pooler (transaction-mode, port 6543) 가
+        # prepared statement 를 지원 안 함. None 으로 비활성화하지 않으면 일부 query
+        # 가 응답 없이 hang. 일반 PG (session-mode) 에서도 안전.
+        with psycopg.connect(url, connect_timeout=10, prepare_threshold=None) as test_conn:
             test_conn.execute("SELECT 1").fetchone()
-        print("[db] Postgres smoke test OK")
+        _log("Postgres smoke test OK")
     except Exception as e:
         raise RuntimeError(
             f"Cannot connect to Postgres ({safe_url}): {type(e).__name__}: {e}"
         ) from e
+    _log("creating connection pool ...")
     # Supabase Pooler (port 6543, mode=transaction) を推奨。
     # min_size=1 で起動を速く（後で必要に応じて増える）。
-    return ConnectionPool(
+    pool = ConnectionPool(
         url,
         min_size=1,
         max_size=int(os.environ.get("DB_POOL_MAX_SIZE", "16")),
         timeout=30,
         max_lifetime=3600,
-        kwargs={"row_factory": _pg_row_factory},
+        kwargs={
+            "row_factory": _pg_row_factory,
+            "prepare_threshold": None,  # Supabase transaction-mode 호환
+        },
     )
+    _log("connection pool ready")
+    return pool
 
 
 def _get_pg_pool():

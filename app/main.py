@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
@@ -26,15 +28,29 @@ from app.db.sqlite import init_db
 from app.ws import comm
 
 
+def _boot_log(msg: str) -> None:
+    """Render production 진단용. stderr + flush 보장 (uvicorn 의 stdout buffering 회피)."""
+    sys.stderr.write(f"[boot] {time.time():.3f} {msg}\n")
+    sys.stderr.flush()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    _boot_log("lifespan: entering, calling init_db()")
+    try:
+        init_db()
+    except Exception as e:
+        _boot_log(f"lifespan: init_db() FAILED → {type(e).__name__}: {e}")
+        raise
+    _boot_log("lifespan: init_db() returned OK")
     # asyncio.to_thread / FastAPI のスレッドプール容量を拡張。
     # デフォルトは min(32, CPU+4) で、同時 DB 呼び出しが多いと枯渇する。
     # 64 にしておくと数百同時接続時の SQLite 呼び出しが詰まらない。
     loop = asyncio.get_running_loop()
     loop.set_default_executor(ThreadPoolExecutor(max_workers=64, thread_name_prefix="wb-db"))
+    _boot_log("lifespan: ready to serve requests")
     yield
+    _boot_log("lifespan: shutdown")
 
 
 async def _http_exception_handler(request: Request, exc: StarletteHTTPException):
